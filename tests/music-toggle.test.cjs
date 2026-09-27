@@ -59,6 +59,7 @@ function modalFixture(searchSource = searchResults, current = original) {
     '@renderer/store': { getSourceI18nPrefix: () => '' },
     '@renderer/store/player/action': { addTempPlayList: items => { queue.push(...items.map(item => item.musicInfo)); const index = queue.length - items.length; if (!state.musicInfo) played.push(queue[index].id); return index } },
     '@renderer/store/player/state': { playMusicInfo: state },
+    '@renderer/store/setting': { appSetting: { 'common.showErrorDialog': false } },
     '@renderer/utils': { toNewMusicInfo: song => song, toOldMusicInfo: song => song },
     '@renderer/utils/musicSdk': Object.fromEntries(sources.map(source => [source, { musicSearch: { search: (...args) => searchSource(source, ...args) } }])),
     '@renderer/utils/musicToggleCandidates': candidates,

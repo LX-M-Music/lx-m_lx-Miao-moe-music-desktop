@@ -19,15 +19,15 @@ const assertBounds = (actual, expected) => {
     assert.ok(Math.abs(actual[key] - expected[key]) <= 1, `${key}: ${actual[key]} vs ${expected[key]}`)
   }
 }
-const assertBetween = async(group, labels, maximized = false) => {
+const assertBetween = async(group, labels, maximized = false, middle = 'max') => {
   const min = await group.getByRole('button', { name: labels.min, exact: true }).boundingBox()
   const max = await group.getByRole('button', { name: labels[maximized ? 'window_restore' : 'window_maximize'], exact: true }).boundingBox()
   const close = await group.getByRole('button', { name: labels.close, exact: true }).boundingBox()
   assert.ok(min && max && close)
   const ordered = [min, max, close].sort((a, b) => a.x - b.x)
-  assert.equal(ordered[1], max)
-  assert.ok(ordered[0].x + ordered[0].width <= max.x + 1)
-  assert.ok(max.x + max.width <= ordered[2].x + 1)
+  assert.equal(ordered[1], middle === 'min' ? min : max)
+  assert.ok(ordered[0].x + ordered[0].width <= ordered[1].x + 1)
+  assert.ok(ordered[1].x + ordered[1].width <= ordered[2].x + 1)
 }
 
 test('window buttons maximize, restore and preserve state across fullscreen and reload', { timeout: 90000 }, async t => {
@@ -44,10 +44,11 @@ test('window buttons maximize, restore and preserve state across fullscreen and 
       await t.test(`${position} controls and fullscreen exit`, async() => {
         await page.evaluate(position => { window.lxData.appSetting['common.controlBtnPosition'] = position }, position)
         const group = page.locator(position === 'right' ? '#toolbar' : '#left')
-        await assertBetween(group, labels)
+        const middle = position === 'left' ? 'min' : 'max'
+        await assertBetween(group, labels, false, middle)
         await group.getByRole('button', { name: labels.window_maximize, exact: true }).click()
         await page.locator('html.maximized').waitFor()
-        await assertBetween(group, labels, true)
+        await assertBetween(group, labels, true, middle)
         assertBounds(await window.evaluate(window => window.getBounds()), workArea)
 
         await group.getByRole('button', { name: labels.min, exact: true }).click()
