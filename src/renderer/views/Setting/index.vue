@@ -197,7 +197,7 @@ export default {
         { id: 'SettingSync', title: t('setting__sync'), prefixes: ['setting__sync'] },
         { id: 'SettingOpenAPI', title: t('setting__open_api'), prefixes: ['setting__open_api'] },
         { id: 'SettingNetwork', title: t('setting__network'), prefixes: ['setting__network'], keys: ['setting__is_enable'] },
-        { id: 'SettingCookie', title: t('setting__cookie'), prefixes: ['setting__cookie'], entries: Object.entries(SOURCE_NAME).map(([id, name]) => ({ key: `setting__cookie_source_${id}`, text: `${name} ${id}` })) },
+        { id: 'SettingCookie', title: t('setting__cookie'), prefixes: ['setting__cookie'], searchText: 'Cookie', entries: Object.entries(SOURCE_NAME).map(([id, name]) => ({ key: `setting__cookie_source_${id}`, text: `Cookie ${name} ${id}` })) },
         { id: 'SettingAdvanced', title: t('setting__advanced'), prefixes: ['setting__advanced'] },
         { id: 'SettingBackup', title: t('setting__backup'), prefixes: ['setting__backup'] },
         { id: 'SettingOther', title: t('setting__other'), prefixes: ['setting__other'] },

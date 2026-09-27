@@ -130,15 +130,15 @@ const fetchFeedParts = async(source: LX.OnlineSource, prev: SourceFeedState | un
   const bangId = board0 ? String(board0.id ?? '').split('__')[1] : undefined
   const songs = bangId
     ? await sdk?.leaderboard?.getList(bangId, 1)
-        .then((result: { list: any[] }) => (result.list ?? []).slice(0, SONGS_LIMIT).map(item => ({
-          songmid: String(item.songmid ?? ''),
-          name: String(item.name ?? ''),
-          singer: String(item.singer ?? ''),
-          img: String(item.img ?? ''),
-          interval: String(item.interval ?? ''),
-          source,
-        } as HomeSongItem)))
-        .catch(() => null)
+      .then((result: { list: any[] }) => (result.list ?? []).slice(0, SONGS_LIMIT).map((item): HomeSongItem => ({
+        songmid: String(item.songmid ?? ''),
+        name: String(item.name ?? ''),
+        singer: String(item.singer ?? ''),
+        img: String(item.img ?? ''),
+        interval: String(item.interval ?? ''),
+        source,
+      })))
+      .catch(() => null)
     : null
   return {
     playlists: playlists ?? prev?.playlists ?? [],

@@ -3,7 +3,7 @@ const path = require('node:path')
 const { test } = require('node:test')
 const { launch, route, settled } = require('./helpers/motion-fixture.cjs')
 
-test('setting explanations appear on black help icons when hovered', { timeout: 150000 }, async() => {
+test('setting explanations appear on theme-colored help icons when hovered', { timeout: 150000 }, async() => {
   const { app, page, errors } = await launch({ rendererPath: path.resolve('dist/index.html'), args: ['--disable-backgrounding-occluded-windows'] })
   page.setDefaultTimeout(8000)
   const cases = [
@@ -20,19 +20,31 @@ test('setting explanations appear on black help icons when hovered', { timeout: 
     ['SettingSync', '#sync_webdav_items', 'setting__sync_webdav_download_tip'],
     ['SettingOther', '#other_resource_cache', 'setting__other_resource_cache_tip'],
   ]
+  const assertThemeColor = async(locator, name) => {
+    const colors = await locator.evaluate(element => {
+      const probe = element.ownerDocument.createElement('span')
+      probe.style.color = 'var(--color-font)'
+      element.parentElement.appendChild(probe)
+      const expected = element.ownerDocument.defaultView.getComputedStyle(probe).color
+      const actual = element.ownerDocument.defaultView.getComputedStyle(element).color
+      probe.remove()
+      return { expected, actual }
+    })
+    assert.equal(colors.actual, colors.expected, name)
+  }
   try {
     for (const [name, heading, key] of cases) {
       await route(page, '/setting?name=' + name)
       await settled(page)
       const icon = page.locator(`${heading} .help-icon`).first()
       await icon.waitFor({ state: 'visible' })
-      assert.equal(await icon.evaluate(element => element.ownerDocument.defaultView.getComputedStyle(element).color), 'rgb(0, 0, 0)', name)
+      await assertThemeColor(icon, name)
       const explanation = await page.evaluate(key => window.i18n.t(key), key)
       await icon.hover()
       await page.getByText(explanation, { exact: false }).waitFor({ state: 'visible' })
       await page.mouse.move(0, 0)
       if (name === 'SettingSync') {
-        assert.equal(await page.locator('#sync .help-btn').evaluate(element => element.ownerDocument.defaultView.getComputedStyle(element).color), 'rgb(0, 0, 0)')
+        await assertThemeColor(page.locator('#sync .help-btn'), 'SettingSync help button')
       }
       if (name === 'SettingPluginStore') {
         const pluginCard = page.locator('[data-plugin-id="audio-tag-editor"]')
@@ -50,7 +62,7 @@ test('setting explanations appear on black help icons when hovered', { timeout: 
     await page.locator('#other_dislike_list + div button').click()
     const modalIcon = page.locator('h2 .help-icon:visible').last()
     await modalIcon.waitFor()
-    assert.equal(await modalIcon.evaluate(element => element.ownerDocument.defaultView.getComputedStyle(element).color), 'rgb(0, 0, 0)')
+    await assertThemeColor(modalIcon, 'Dislike list modal')
     const rulesExplanation = await page.evaluate(() => window.i18n.t('setting__dislike_list_tips'))
     await modalIcon.hover()
     await page.getByText(rulesExplanation, { exact: false }).waitFor({ state: 'visible' })

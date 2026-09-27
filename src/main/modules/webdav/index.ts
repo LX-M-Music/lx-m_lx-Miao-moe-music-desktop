@@ -1,3 +1,5 @@
+/* eslint-disable require-atomic-updates */
+// runWebDAV admits only one operation at a time through state.busy.
 import getStore, { withStoreExclusive, protectStoreRecovery } from '@main/utils/store'
 import { mergeSetting } from '@main/utils'
 import { serializePublicConfig } from '@main/utils/credentials'
@@ -58,8 +60,7 @@ export const runWebDAV = async(operation: LX.WebDAV.Operation): Promise<LX.WebDA
     if (operation === 'test') {
       if (selectedSections(settings).some(section => section !== 'playlists') || !settings['sync.webdav.playlists']) await client.test()
       if (settings['sync.webdav.playlists']) await mobileClient.test()
-    }
-    else {
+    } else {
       const sections = selectedSections(settings)
       if (!sections.length) throw new WebDAVError('empty_selection')
       const primarySections = sections.filter(section => section !== 'playlists')
@@ -96,7 +97,9 @@ export const runWebDAV = async(operation: LX.WebDAV.Operation): Promise<LX.WebDA
       const legacyPlaylists = syncPlaylists && !mobileParsed && remote.data.playlists ? sharedPlaylistData(remote.data.playlists) : undefined
       if (legacyPlaylists) validateData({ playlists: legacyPlaylists }, ['playlists'])
       const remoteData: LX.WebDAV.Data = { ...Object.fromEntries(primarySections.map(section => [section, normalized[section]])), ...(syncPlaylists ? { playlists: mobileParsed?.playlists ?? legacyPlaylists } : {}) }
-      if (operation === 'download' && (primarySections.length && remoteFile.content == null || syncPlaylists && !remoteData.playlists && !primarySections.length)) throw new WebDAVError('missing_remote')
+      const missingPrimary = primarySections.length > 0 && remoteFile.content == null
+      const missingPlaylists = syncPlaylists && !remoteData.playlists && primarySections.length === 0
+      if (operation === 'download' && (missingPrimary || missingPlaylists)) throw new WebDAVError('missing_remote')
       const remoteHashes = remoteFile.unchanged && cached ? { ...cached.hashes } : {}
       if (syncPlaylists) remoteHashes.playlists = hash(remoteData.playlists)
       for (const section of sections) remoteHashes[section] ??= hash(remoteData[section])
@@ -118,7 +121,7 @@ export const runWebDAV = async(operation: LX.WebDAV.Operation): Promise<LX.WebDA
       }
       await checkLocal()
       if (plan.download.length) await getStore('webdav-local-backup').override({ type: 'lx-music-webdav', version: 1, updatedAt: Date.now(), data: Object.fromEntries(plan.download.map(section => [section, section === 'settings' ? local.settings : raw[section]])) })
-      const playlistUpload = syncPlaylists && (plan.upload.includes('playlists') || !mobileParsed && remoteData.playlists !== undefined || mobileParsed?.containsPrivate)
+      const playlistUpload = syncPlaylists && (plan.upload.includes('playlists') || (!mobileParsed && remoteData.playlists !== undefined) || mobileParsed?.containsPrivate)
       if (playlistUpload) {
         const content = buildMobilePlaylists(mobileParsed?.file, (plan.upload.includes('playlists') ? local.playlists : remoteData.playlists)!)
         const file = await mobileClient.write(JSON.stringify(content), mobileFile!)
