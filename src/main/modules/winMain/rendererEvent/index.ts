@@ -13,6 +13,7 @@ import download from './download'
 import soundEffect from './soundEffect'
 import openAPI from './openAPI'
 import cookieLogin from './cookieLogin'
+import cookieLoginEmbedded from './cookieLoginEmbedded'
 import optionalPlugins from '@main/modules/optionalPlugins'
 import backup from '@main/modules/backup'
 import library from './library'
@@ -45,6 +46,7 @@ export default () => {
   soundEffect()
   openAPI()
   cookieLogin()
+  cookieLoginEmbedded()
   optionalPlugins()
   backup()
   library()

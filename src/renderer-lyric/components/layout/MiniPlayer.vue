@@ -259,12 +259,12 @@ onBeforeUnmount(() => {
 .mini-brand { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--mini-accent); white-space: nowrap; pointer-events: none; span { margin-left: 6px; font-weight: 400; letter-spacing: 0; color: rgba(255,255,255,.6); } }
 .mini-window-buttons { display: flex; gap: 2px; }
 .mini-track { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 12px 0 8px; cursor: move; }
-.mini-cover { width: 70px; height: 70px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,.1); img { width: 100%; height: 100%; object-fit: cover; } svg { width: 32px; height: 32px; opacity: .6; } }
+.mini-cover { width: 70px; height: 70px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.1); box-shadow: 0 6px 18px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(255,255,255,.12); img { width: 100%; height: 100%; object-fit: cover; } svg { width: 32px; height: 32px; opacity: .6; } }
 .mini-track-info { min-width: 0; h1, p, small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } h1 { font-size: 18px; line-height: 1.4; font-weight: 650; margin: 0 0 5px; } p { font-size: 13px; line-height: 1.4; margin: 0; opacity: .75; } small { display: block; font-size: 11px; margin-top: 4px; opacity: .5; } }
 .mini-progress > input { width: 100%; }
 .mini-times { display: flex; justify-content: space-between; font-size: 10px; opacity: .55; font-variant-numeric: tabular-nums; line-height: 1.4; }
 .mini-transport { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 3px 0 8px; }
-.mini-song-buttons { display: flex; align-items: center; gap: 8px; .mini-play { width: 38px; height: 38px; border-radius: 50%; color: #111820; background: var(--mini-accent); &:hover { background: #b9f1d8; } } }
+.mini-song-buttons { display: flex; align-items: center; gap: 8px; .mini-play { width: 38px; height: 38px; border-radius: 50%; color: #111820; background-image: linear-gradient(rgba(255, 255, 255, .22), rgba(255, 255, 255, 0)), var(--mini-accent); background-color: var(--mini-accent); box-shadow: 0 4px 16px rgba(0, 0, 0, .3); transition: filter .18s ease, transform .18s ease; &:hover { filter: brightness(1.1); transform: scale(1.04); background: var(--mini-accent); } &:active { transform: scale(.96); } } }
 .mini-volume { display: flex; align-items: center; gap: 5px; input { width: 66px; } }
 .mini-controls { transition: opacity .18s ease; }
 .auto-hide-controls, .lyrics-only { .mini-controls { opacity: 0; pointer-events: none; } }
@@ -281,7 +281,7 @@ onBeforeUnmount(() => {
 }
 .has-recovery .mini-header { margin-right: 28px; }
 .lock .mini-controls { visibility: hidden; pointer-events: none !important; }
-.mini-options { position: absolute; top: 44px; right: 10px; left: 10px; z-index: 5; max-height: calc(100% - 54px); overflow-y: auto; box-sizing: border-box; padding: 12px 16px; background: #20262f; border: 1px solid rgba(255,255,255,.15); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.3); label { display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer; input { margin: 0; accent-color: var(--mini-accent); } } p { font-size: 11px; line-height: 1.5; opacity: .6; margin: 5px 0 8px; } }
+.mini-options { position: absolute; top: 44px; right: 10px; left: 10px; z-index: 5; max-height: calc(100% - 54px); overflow-y: auto; box-sizing: border-box; padding: 12px 16px; background: rgba(28, 34, 43, .92); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.15); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.3); label { display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer; input { margin: 0; accent-color: var(--mini-accent); } } p { font-size: 11px; line-height: 1.5; opacity: .6; margin: 5px 0 8px; } }
 .mini-options-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
 .mini-options::-webkit-scrollbar { width: 6px; }
 .mini-options::-webkit-scrollbar-thumb { border-radius: 3px; background: rgba(255,255,255,.25); }

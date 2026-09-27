@@ -33,6 +33,16 @@ export const loginCookie = async(source: string): Promise<CookieLoginResult> => 
   return rendererInvoke<string, CookieLoginResult>(WIN_MAIN_RENDERER_EVENT_NAME.cookie_login, source)
 }
 
+/** 软件内嵌登录窗口：打开平台登录页，成功后自动返回 Cookie 并关闭窗口 */
+export const loginCookieEmbedded = async(source: string): Promise<CookieLoginResult> => {
+  return rendererInvoke<string, CookieLoginResult>(WIN_MAIN_RENDERER_EVENT_NAME.cookie_login_embedded, source)
+}
+
+/** 取消进行中的内嵌登录窗口 */
+export const cancelLoginCookieEmbedded = async(source: string) => {
+  return rendererInvoke<string, boolean>(WIN_MAIN_RENDERER_EVENT_NAME.cookie_login_embedded_cancel, source).catch(() => false)
+}
+
 export const sendInited = () => {
   rendererSend(WIN_MAIN_RENDERER_EVENT_NAME.inited)
 }
@@ -302,6 +312,19 @@ export interface HomePlaylistItem {
 export interface HomeBoardItem {
   id: string
   name: string
+  bangid?: string
+}
+export interface HomeFavoriteItem {
+  id: string
+  name: string
+}
+export interface HomeSongItem {
+  songmid: string
+  name: string
+  singer: string
+  img: string
+  interval: string
+  source: string
 }
 export interface HomeFeedData {
   lastSource: LX.OnlineSource | ''
@@ -315,6 +338,12 @@ export interface HomeFeedData {
     boards: HomeBoardItem[]
     boardsAt: number
     boardsOffline: boolean
+    favorites: HomeFavoriteItem[]
+    favoritesAt: number
+    favoritesOffline: boolean
+    songs: HomeSongItem[]
+    songsAt: number
+    songsOffline: boolean
   }>
   > | null
 }

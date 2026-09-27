@@ -48,11 +48,11 @@ const selectMode = (event: Event) => { savePreferences({ mode: (event.target as 
 <style lang="less" module>
 @import '@renderer/assets/styles/variables.less';
 
-.stage { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; color: #f5f7fb; background: radial-gradient(ellipse at 25% 90%, #244346, #111b2c 70%); border-radius: 12px; }
+.stage { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; color: var(--color-font); background: radial-gradient(ellipse at 25% 90%, var(--color-primary-light-300-alpha-700), var(--color-content-background) 70%); border-radius: 12px; }
 .toolbar { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 14px; font-size: 12px; position: relative; z-index: 1; }
 .picker { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.toolbar select, .toolbar button, .error button { color: inherit; background: #22364a; border: 1px solid #52717d; border-radius: 6px; padding: 5px 9px; font: inherit; cursor: pointer; }
-.toolbar option { color: #f5f7fb; background: #22364a; }
+.toolbar select, .toolbar button, .error button { color: var(--color-font); background: var(--color-primary-background); border: 1px solid var(--color-border); border-radius: 6px; padding: 5px 9px; font: inherit; cursor: pointer; }
+.toolbar option { color: var(--color-font); background: var(--color-primary-background); }
 .surface { position: relative; flex: auto; min-height: 0; }
 .surface iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
 .error { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; padding: 16px; text-align: center; }

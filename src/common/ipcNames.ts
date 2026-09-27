@@ -172,6 +172,8 @@ const modules = {
     download_list_clear: 'download_list_clear',
 
     cookie_login: 'cookie_login',
+    cookie_login_embedded: 'cookie_login_embedded',
+    cookie_login_embedded_cancel: 'cookie_login_embedded_cancel',
   },
   winLyric: {
     close: 'close',

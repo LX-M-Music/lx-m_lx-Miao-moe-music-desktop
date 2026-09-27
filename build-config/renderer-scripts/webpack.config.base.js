@@ -6,6 +6,7 @@ module.exports = {
   entry: {
     'user-api-preload': path.join(__dirname, '../../src/main/modules/userApi/renderer/preload.js'),
     'source-plugin-preload': path.join(__dirname, '../../src/main/modules/sourcePlugins/preload.js'),
+    'cookie-login-preload': path.join(__dirname, '../../src/main/modules/winMain/rendererEvent/cookieLoginPreload.ts'),
   },
   output: {
     filename: '[name].js',

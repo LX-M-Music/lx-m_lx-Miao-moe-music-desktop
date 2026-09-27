@@ -5,9 +5,9 @@ import { chromium, type Page, type Response } from 'playwright-core'
 import { mainHandle } from '@common/mainIpc'
 import { WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
 
-type MusicSource = 'wy' | 'tx' | 'kg' | 'kw' | 'mg'
+export type MusicSource = 'wy' | 'tx' | 'kg' | 'kw' | 'mg'
 
-interface CookieLoginDefinition {
+export interface CookieLoginDefinition {
   url: string
   domains: string[]
   cookieGroups: string[][]
@@ -15,17 +15,17 @@ interface CookieLoginDefinition {
   storageGroups?: string[][]
 }
 
-interface CookieLoginPlaylist {
+export interface CookieLoginPlaylist {
   id: string
   name: string
 }
 
-interface CookieLoginResult {
+export interface CookieLoginResult {
   cookie: string
   playlists?: CookieLoginPlaylist[]
 }
 
-const COOKIE_LOGIN_DEFINITIONS: Record<MusicSource, CookieLoginDefinition> = {
+export const COOKIE_LOGIN_DEFINITIONS: Record<MusicSource, CookieLoginDefinition> = {
   wy: {
     url: 'https://music.163.com/',
     domains: ['163.com'],
@@ -83,14 +83,14 @@ const getDefaultBrowserExecutable = async(): Promise<string> => {
   return executablePath
 }
 
-const getRelevantCookies = (cookies: Array<{ name: string, value: string, domain: string }>, definition: CookieLoginDefinition) => {
+export const getRelevantCookies = (cookies: Array<{ name: string, value: string, domain: string }>, definition: CookieLoginDefinition) => {
   return cookies.filter(cookie => {
     const domain = cookie.domain.replace(/^\./, '').toLowerCase()
     return definition.domains.some(rootDomain => domain == rootDomain || domain.endsWith(`.${rootDomain}`))
   })
 }
 
-const hasLoginState = (cookies: Array<{ name: string }>, storage: Map<string, string>, definition: CookieLoginDefinition) => {
+export const hasLoginState = (cookies: Array<{ name: string }>, storage: Map<string, string>, definition: CookieLoginDefinition) => {
   const names = new Set([...cookies.map(cookie => cookie.name), ...storage.keys()])
   return [...definition.cookieGroups, ...(definition.storageGroups ?? [])]
     .some(group => group.every(name => names.has(name)))
@@ -98,7 +98,7 @@ const hasLoginState = (cookies: Array<{ name: string }>, storage: Map<string, st
 
 const sanitizeCookieValue = (value: string) => value.replace(/[\r\n]/g, '')
 
-const serializeCookies = (cookies: Array<{ name: string, value: string }>, storage: Map<string, string>) => {
+export const serializeCookies = (cookies: Array<{ name: string, value: string }>, storage: Map<string, string>) => {
   const values = new Map<string, string>()
   for (const cookie of cookies) values.set(cookie.name, sanitizeCookieValue(cookie.value))
   for (const [name, value] of storage) values.set(name, sanitizeCookieValue(value))

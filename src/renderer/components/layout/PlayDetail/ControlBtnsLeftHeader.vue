@@ -1,6 +1,6 @@
 <template lang="pug">
 div(:class="$style.header")
-  div(ref="dom_btns" :class="$style.controBtn")
+  div(ref="dom_btns" :class="[$style.controBtn, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]")
     button(type="button" :class="$style.hide" :aria-label="$t('player__hide_detail_tip')" ignore-tip :title="$t('player__hide_detail_tip')" @click="hide")
       svg(:class="$style.controBtnIcon" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" width="80%" viewBox="0 0 30.727 30.727" space="preserve")
         use(xlink:href="#icon-window-hide")
@@ -25,8 +25,11 @@ import { ref, onMounted, onBeforeUnmount, useCssModule } from '@common/utils/vue
 import { isFullscreen, isMaximized } from '@renderer/store'
 import { setShowPlayerDetail } from '@renderer/store/player/action'
 import { closeWindow, minWindow, maxWindow, setFullScreen } from '@renderer/utils/ipc'
+import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
+
+const { isTrafficStyle, isIconAlways } = useWindowControls()
 
 const cssModule = useCssModule()
 
@@ -139,24 +142,59 @@ const fullscreenExit = () => {
       width: @control-btn-width;
       height: @control-btn-width;
       border-radius: 50%;
-      color: var(--color-font);
+      // 图标使用中性灰、圆滑样式（与原版 lx-music-desktop 一致）
+      color: var(--color-500);
       + button {
         margin-right: (@control-btn-width / 2);
       }
 
       &.hide {
-        background-color: var(--color-btn-hide);
+        background-color: var(--color-450);
       }
       &.min, &.fullscreenExit {
-        background-color: var(--color-btn-min);
+        background-color: var(--color-450);
       }
       &.max {
-        background-color: var(--color-btn-max, #e7aa36);
+        background-color: var(--color-450);
       }
       &.close {
-        background-color: var(--color-btn-close);
+        background-color: var(--color-450);
+        &:hover {
+          background-color: #e5776f;
+        }
+      }
+      &:hover:not(.close) {
+        background-color: var(--color-500);
       }
     }
+  }
+
+  // 红绿灯（macOS）风格
+  .controBtn.traffic {
+    button {
+      &.min, &.fullscreenExit {
+        background-color: #febc2e;
+        &:hover {
+          background-color: #ffc94d;
+        }
+      }
+      &.max {
+        background-color: #28c840;
+        &:hover {
+          background-color: #45d95c;
+        }
+      }
+      &.close {
+        background-color: #ff5f57;
+        &:hover {
+          background-color: #ff7b74;
+        }
+      }
+    }
+  }
+
+  .controBtn.iconAlways .controBtnIcon {
+    opacity: 1;
   }
 
   .controBtnIcon {

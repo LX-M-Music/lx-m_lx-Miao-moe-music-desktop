@@ -1,5 +1,5 @@
 <template>
-  <div ref="dom_btns" :class="$style.controlBtn">
+  <div ref="dom_btns" :class="[$style.controlBtn, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]">
     <button v-if="isFullscreen" type="button" :class="[$style.btn, $style.min]" :aria-label="$t('fullscreen_exit')" ignore-tip :title="$t('fullscreen_exit')" @click="setFullScreen(false)">
       <svg :class="$style.controlBtniIcon" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24">
         <use xlink:href="#icon-fullscreen-exit" />
@@ -10,26 +10,30 @@
         <use xlink:href="#icon-window-close" />
       </svg>
     </button>
-    <button v-show="!isFullscreen" type="button" :class="[$style.btn, $style.max]" :aria-label="$t(isMaximized ? 'window_restore' : 'window_maximize')" ignore-tip :title="$t(isMaximized ? 'window_restore' : 'window_maximize')" @click="maxWindow">
-      <svg :class="$style.controlBtniIcon" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24">
-        <use :xlink:href="isMaximized ? '#icon-window-restore' : '#icon-window-maximize'" />
-      </svg>
-    </button>
     <button v-show="!isFullscreen" type="button" :class="[$style.btn, $style.min]" :aria-label="$t('min')" ignore-tip :title="$t('min')" @click="minWindow">
       <svg :class="$style.controlBtniIcon" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" width="100%" viewBox="0 0 24 24" space="preserve">
         <use xlink:href="#icon-window-minimize" />
+      </svg>
+    </button>
+    <button v-show="!isFullscreen" type="button" :class="[$style.btn, $style.max]" :aria-label="$t(isMaximized ? 'window_restore' : 'window_maximize')" ignore-tip :title="$t(isMaximized ? 'window_restore' : 'window_maximize')" @click="maxWindow">
+      <svg :class="$style.controlBtniIcon" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24">
+        <use :xlink:href="isMaximized ? '#icon-window-restore' : '#icon-window-maximize'" />
       </svg>
     </button>
   </div>
 </template>
 
 <script setup>
-import { minWindow, maxWindow, closeWindow, setFullScreen } from '@renderer/utils/ipc'
 import { onMounted, onBeforeUnmount, ref, useCssModule } from '@common/utils/vueTools'
+import { minWindow, maxWindow, closeWindow, setFullScreen } from '@renderer/utils/ipc'
+
 // import { getRandom } from '../../utils'
 import { isFullscreen, isMaximized } from '@renderer/store'
+import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
+
+const { isTrafficStyle, isIconAlways } = useWindowControls()
 
 const cssModule = useCssModule()
 
@@ -91,28 +95,65 @@ onBeforeUnmount(() => {
   background: none;
   border: none;
   display: flex;
-  // justify-content: center;
-  // align-items: center;
   outline: none;
   padding: 1px;
   cursor: pointer;
   border-radius: 50%;
-  color: var(--color-font);
+  // 图标使用中性灰、圆滑样式（与原版 lx-music-desktop 一致）
+  color: var(--color-500);
+  // 中性灰圆点（默认风格）
+  background-color: var(--color-450);
+  transition: background-color 0.2s ease-in-out;
 
+  &:hover {
+    background-color: var(--color-500);
+  }
   &.min {
-    background-color: var(--color-btn-min);
+    background-color: var(--color-450);
   }
   &.max {
-    background-color: var(--color-btn-max, #e7aa36);
+    background-color: var(--color-450);
   }
   &.close {
-    background-color: var(--color-btn-close);
+    background-color: var(--color-450);
+    &:hover {
+      background-color: #e5776f;
+    }
+  }
+}
+
+// 红绿灯（macOS）风格
+.traffic {
+  .btn {
+    &.min {
+      background-color: #febc2e;
+      &:hover {
+        background-color: #ffc94d;
+      }
+    }
+    &.max {
+      background-color: #28c840;
+      &:hover {
+        background-color: #45d95c;
+      }
+    }
+    &.close {
+      background-color: #ff5f57;
+      &:hover {
+        background-color: #ff7b74;
+      }
+    }
   }
 }
 
 .controlBtniIcon {
   opacity: 0;
   transition: opacity 0.2s ease-in-out;
+}
+
+// 图标常亮模式
+.iconAlways .controlBtniIcon {
+  opacity: 1;
 }
 
 

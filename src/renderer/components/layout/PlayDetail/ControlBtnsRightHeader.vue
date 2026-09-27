@@ -1,6 +1,6 @@
 <template lang="pug">
 div(:class="$style.header")
-  div(ref="dom_btns" :class="$style.controBtn")
+  div(ref="dom_btns" :class="[$style.controBtn, { [$style.traffic]: isTrafficStyle }]")
     button(ref="dom_hide_btn" type="button" :class="$style.hide" :aria-label="$t('player__hide_detail_tip')" ignore-tip :title="$t('player__hide_detail_tip')" @click="hide")
       svg(:class="$style.controBtnIcon" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="35%" viewBox="0 0 30.727 30.727" space="preserve")
         use(xlink:href="#icon-window-hide")
@@ -25,8 +25,10 @@ import { onMounted, onBeforeUnmount, ref, useCssModule } from '@common/utils/vue
 import { isFullscreen, isMaximized } from '@renderer/store'
 import { setShowPlayerDetail } from '@renderer/store/player/action'
 import { closeWindow, minWindow, maxWindow, setFullScreen } from '@renderer/utils/ipc'
+import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
+const { isTrafficStyle } = useWindowControls()
 const cssModule = useCssModule()
 
 const handle_focus = () => {
@@ -141,8 +143,21 @@ const fullscreenExit = () => {
         background-color: var(--color-button-background-hover);
 
         &.close {
-          background-color: var(--color-btn-close);
+          background-color: #e5776f;
         }
+      }
+    }
+
+    // 红绿灯（macOS）风格
+    &.traffic button.hover {
+      &.min {
+        background-color: #febc2e;
+      }
+      &.max {
+        background-color: #28c840;
+      }
+      &.close {
+        background-color: #ff5f57;
       }
     }
   }
