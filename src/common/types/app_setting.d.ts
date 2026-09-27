@@ -805,6 +805,13 @@ declare global {
       'ui.sidebar.showLeaderboard': boolean
       'ui.sidebar.showList': boolean
 
+      /** 实验性：新版聚合首页（登录态、收藏歌单、继续播放） */
+      'experimental.newHome': boolean
+      /** 窗口控制按钮风格：default 中性灰 / traffic 红绿灯 */
+      'ui.windowControlStyle': 'default' | 'traffic'
+      /** 窗口控制按钮图标显示：always 常亮 / hover 悬停显示 */
+      'ui.windowControlsIconMode': 'always' | 'hover'
+
       /** 我的列表侧栏宽度，0 使用自适应默认宽度 */
       'ui.myListSidebar.width': number
       'ui.myListSidebar.collapsed': boolean

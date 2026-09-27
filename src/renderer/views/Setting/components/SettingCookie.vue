@@ -58,7 +58,7 @@ import {
   isCookieValid,
 } from '@renderer/utils/cookieManager'
 import { checkCookiePlaylists, syncAllPlaylists, syncCookiePlaylists } from '@renderer/utils/cookieSync'
-import { loginCookie } from '@renderer/utils/ipc'
+import { loginCookieEmbedded } from '@renderer/utils/ipc'
 
 export default {
   name: 'SettingCookie',
@@ -138,7 +138,8 @@ export default {
       if (loginBusy(item.id)) return
       loginStates[item.id] = { busy: true, tip: '', error: false }
       try {
-        const { cookie, playlists } = await loginCookie(item.id)
+        // 一键登录使用软件内嵌登录窗口，完成后窗口自动关闭并回收 Cookie
+        const { cookie, playlists } = await loginCookieEmbedded(item.id)
         appSetting[item.settingKey] = cookie
         resetTest(item.id)
         await updateSetting({ [item.settingKey]: cookie })

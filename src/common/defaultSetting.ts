@@ -102,7 +102,7 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.lyricShadowColor': 'rgba(0, 0, 0, 0.18)',
   // 'desktopLyric.style.fontWeight': false,
   'desktopLyric.style.opacity': 95,
-  'desktopLyric.style.backgroundOpacity': 92,
+  'desktopLyric.style.backgroundOpacity': 100,
   'desktopLyric.style.ellipsis': false,
   'desktopLyric.style.isZoomActiveLrc': false,
   'desktopLyric.style.isFontWeightFont': true,
@@ -214,6 +214,11 @@ const defaultSetting: LX.AppSetting = {
   'ui.leaderboardSidebar.width': 0,
   'ui.leaderboardSidebar.collapsed': false,
   'ui.settingSidebar.width': 0,
+
+  // ===== 实验性功能 =====
+  'experimental.newHome': false,
+  'ui.windowControlStyle': 'default',
+  'ui.windowControlsIconMode': 'always',
 
   // ===== 播放增强 =====
   'player.gaplessPlayback': true,
