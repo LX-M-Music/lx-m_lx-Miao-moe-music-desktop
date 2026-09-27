@@ -134,7 +134,7 @@ export default () => {
       }
     } else {
       if (message) {
-        void dialog({
+        void dialog.error({
           message: formatError(message, t('user_api__init_failed_alert', { name: apiInfo.name }), 'SOURCE_LOAD_FAILED'),
           selection: true,
           confirmButtonText: t('ok'),

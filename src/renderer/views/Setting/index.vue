@@ -52,13 +52,7 @@
       <div ref="dom_content_ref" class="scroll" :class="[$style.setting, {[$style.searchFiltering]: isFiltering}]" data-setting-content @wheel.passive="cancelScrollRestore" @pointerdown="cancelScrollRestore" @keydown="cancelScrollRestore">
       <p v-if="isFiltering && !visibleTocList.length" :class="$style.contentEmpty">{{ $t('setting__filter_empty') }}</p>
       <dl v-show="visibleTocList.length">
-        <template v-if="activePluginSetting">
-          <dt :id="activePluginSetting.id">{{ activePluginSetting.title }}</dt>
-          <dd>
-            <common-plugin-slot :key="activePluginSetting.pluginId" :plugin="activePluginSetting.pluginId" name="Settings" />
-          </dd>
-        </template>
-        <component :is="avtiveComponentName" v-else v-bind="avtiveComponentName == 'SettingBasic' ? { searchKeyword: filterQuery } : {}" />
+        <component :is="avtiveComponentName" v-bind="avtiveComponentName == 'SettingBasic' ? { searchKeyword: filterQuery } : avtiveComponentName == 'SettingPluginStore' ? { pluginId: requestedPluginId } : {}" />
         <!-- <SettingBasic />
         <SettingPlay />
         <SettingPlayDetail />
@@ -87,7 +81,7 @@ import { useI18n } from '@renderer/plugins/i18n'
 import { useRoute } from '@common/utils/vueRouter'
 import { pluginText } from '@common/optionalPlugins'
 import { builtinPlugins, getBuiltinPlugin } from '@common/builtinPlugins'
-import { pluginRuntime, pluginStore } from '@renderer/store/optionalPlugins'
+import { pluginStore } from '@renderer/store/optionalPlugins'
 import { appSetting } from '@renderer/store/setting'
 import { isMac, isLinux } from '@common/utils'
 import { userApi, themeInfo } from '@renderer/store'
@@ -179,23 +173,6 @@ export default {
       })
     })
 
-    const pluginSettingGroups = computed(() => {
-      const snapshot = pluginStore.value
-      const language = appSetting['common.langId']
-      return Object.keys(pluginRuntime.components).sort()
-        .filter(id => pluginRuntime.components[id]?.Settings)
-        .map(id => {
-          const installed = getBuiltinPlugin(id) ?? snapshot.installed[id]?.manifest
-          const available = snapshot.catalog.find(plugin => plugin.id === id)
-          return {
-            id: `SettingPlugin_${id}`,
-            pluginId: id,
-            title: pluginText(installed?.name ?? available?.name, language, id),
-            searchText: pluginSearchEntries.value.find(entry => entry.key === `plugin-card:${id}`)?.text ?? pluginText(installed?.description ?? available?.description, language),
-            prefixes: [],
-          }
-        })
-    })
     const tocList = computed(() => {
       return [
         {
@@ -211,7 +188,6 @@ export default {
         },
         { id: 'SettingPlay', title: t('setting__play'), prefixes: ['setting__play', 'setting__player'], excludes: ['setting__play_detail', 'setting__play_timeout', ...(!isMac ? ['setting__play_statusbar_lyric'] : [])] },
         { id: 'SettingPluginStore', title: t('setting__plugins'), prefixes: ['setting__plugins'], keys: ['audio_visualization', 'setting__desktop_lyric_audio_visualization'], entries: pluginSearchEntries.value },
-        ...pluginSettingGroups.value,
         { id: 'SettingPlayDetail', title: t('setting__play_detail'), prefixes: ['setting__play_detail'] },
         { id: 'SettingDesktopLyric', title: t('setting__desktop_lyric'), prefixes: ['setting__desktop_lyric'], keys: ['desktop_lyric__lrc_active_zoom_on'], excludes: ['setting__desktop_lyric_audio_visualization', ...(isLinux ? ['setting__desktop_lyric_hover_hide'] : [])] },
         { id: 'SettingSearch', title: t('setting__search'), prefixes: ['setting__search', 'setting__odc_clear_search'] },
@@ -259,12 +235,14 @@ export default {
       return tocList.value.filter(group => matchedGroups.value.has(group.id))
     })
 
-    const requestedTab = tocList.value.find(tab => tab.id === route.query.name)?.id
+    const legacyPluginId = name => typeof name === 'string' && name.startsWith('SettingPlugin_') ? name.slice('SettingPlugin_'.length) : ''
+    const resolveRequestedTab = name => tocList.value.find(tab => tab.id === name)?.id ?? (legacyPluginId(name) ? 'SettingPluginStore' : null)
+    const requestedPluginId = computed(() => typeof route.query.plugin === 'string' && route.query.plugin ? route.query.plugin : legacyPluginId(route.query.name))
+    const requestedTab = resolveRequestedTab(route.query.name)
     const savedView = !requestedTab ? settingSession.current : null
     const rememberedView = savedView && tocList.value.some(tab => tab.id === savedView.id) ? savedView : null
     const avtiveComponentName = ref(requestedTab ?? rememberedView?.id ?? (savedView ? 'SettingPluginStore' : tocList.value[0].id))
     settingFilter.value = filterQuery.value = rememberedView?.query ?? ''
-    const activePluginSetting = computed(() => pluginSettingGroups.value.find(group => group.id === avtiveComponentName.value))
 
     let disposed = false
     let restoreRevision = 0
@@ -315,7 +293,7 @@ export default {
 
       const match = matchedGroups.value.get(avtiveComponentName.value)
       if (!match) return
-      if (match.full || activePluginSetting.value) {
+      if (match.full) {
         markSearchBranch(dom_content_ref.value.querySelector('dl'))
         return
       }
@@ -411,10 +389,11 @@ export default {
     let searchOrigin = rememberedView?.searchOrigin ?? null
     let lastQuery = normalizeSearchText(filterQuery.value)
     watch(() => route.query.name, (name) => {
-      if (tocList.value.some(item => item.id === name)) {
+      const tab = resolveRequestedTab(name)
+      if (tab) {
         searchOrigin = null
         settingFilter.value = filterQuery.value = ''
-        toggleTab(name, 0)
+        toggleTab(tab, 0)
       }
     })
 
@@ -554,7 +533,7 @@ export default {
       visibleTocList,
       isFiltering,
       avtiveComponentName,
-      activePluginSetting,
+      requestedPluginId,
       dom_content_ref,
       dom_filter_input,
       dom_toc_ref,

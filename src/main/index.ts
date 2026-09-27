@@ -28,7 +28,7 @@ const init = () => {
       global.lx.event_app.app_inited()
     }).catch((error: unknown) => {
       console.error('initialize user data failed:', error)
-      dialog.showErrorBox(APP_NAME, formatError(error, '应用数据初始化失败，请检查错误原因后重试。', 'APP_INIT_FAILED'))
+      if (global.lx.appSetting['common.showErrorDialog']) dialog.showErrorBox(APP_NAME, formatError(error, '应用数据初始化失败，请检查错误原因后重试。', 'APP_INIT_FAILED'))
       app.quit()
     }).finally(() => {
       startupPromise = null

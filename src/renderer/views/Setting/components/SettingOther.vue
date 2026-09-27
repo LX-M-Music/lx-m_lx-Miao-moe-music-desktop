@@ -84,7 +84,7 @@ export default {
     const refreshLyricEditedCount = () => {
       void getLyricEditedCount().then(count => {
         lyricEditedCount.value = count
-      }).catch(error => { void dialog({ message: formatError(error, '读取自定义歌词失败') }) })
+      }).catch(error => { void dialog.error({ message: formatError(error, '读取自定义歌词失败') }) })
     }
     const handleClearLyricEditedCache = async() => {
       if (!await dialog.confirm({
@@ -93,7 +93,7 @@ export default {
         confirmButtonText: t('setting__other_resource_cache_confirm'),
       })) return
       isDisabledLyricEditedCacheClear.value = true
-      try { await clearLyricEdited(); refreshLyricEditedCount() } catch (error) { void dialog({ message: formatError(error, '清理自定义歌词失败') }) } finally { isDisabledLyricEditedCacheClear.value = false }
+      try { await clearLyricEdited(); refreshLyricEditedCount() } catch (error) { void dialog.error({ message: formatError(error, '清理自定义歌词失败') }) } finally { isDisabledLyricEditedCacheClear.value = false }
     }
     refreshLyricEditedCount()
 

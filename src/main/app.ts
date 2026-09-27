@@ -375,7 +375,7 @@ export const listenerAppEvent = (startApp: () => void) => {
     }).catch(error => {
       flushingStores = false
       log.error(error)
-      void dialog.showMessageBox({ type: 'error', message: '配置保存失败 / Configuration save failed', detail: '请检查磁盘空间和目录权限后重试退出。\nCheck disk space and permissions before quitting again.' })
+      if (global.lx.appSetting['common.showErrorDialog']) void dialog.showMessageBox({ type: 'error', message: '配置保存失败 / Configuration save failed', detail: '请检查磁盘空间和目录权限后重试退出。\nCheck disk space and permissions before quitting again.' })
     })
   })
   app.on('window-all-closed', () => {

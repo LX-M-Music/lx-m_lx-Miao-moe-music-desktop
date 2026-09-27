@@ -29,7 +29,7 @@ export default (aside: Ref<HTMLElement | undefined>) => {
     try {
       await updateSetting({ 'ui.sidebar.width': width })
     } catch {
-      showToast(window.i18n.t('sidebar__save_error'))
+      showToast(window.i18n.t('sidebar__save_error'), { error: true })
     } finally {
       if (current == revision && !resizing.value) draftWidth.value = null
     }

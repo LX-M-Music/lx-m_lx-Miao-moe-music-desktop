@@ -18,7 +18,7 @@
     role="status" :aria-busy="loadStatus == 'loading'"
   >
     <span v-if="loadStatus == 'loading'" class="ui-spinner" />
-    <p>{{ loadStatus == 'loading' ? $t('list__loading') : loadError }}</p>
+    <p>{{ loadStatus == 'loading' ? $t('list__loading') : appSetting['common.showErrorDialog'] ? loadError : $t('list__load_failed') }}</p>
     <base-btn v-if="loadStatus == 'error'" class="ui-state-retry" min @click="loadBoards">{{ $t('reload') }}</base-btn>
   </div>
   <base-menu
@@ -32,6 +32,7 @@
 
 <script setup>
 import { formatError } from '@common/utils/errorMessage'
+import { appSetting } from '@renderer/store/setting'
 import { watch, shallowReactive, ref } from '@common/utils/vueTools'
 import { getBoardsList, setBoard } from '@renderer/store/leaderboard/action'
 import { boards } from '@renderer/store/leaderboard/state'

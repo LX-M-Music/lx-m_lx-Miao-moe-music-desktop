@@ -126,7 +126,7 @@ export default (name: string, isIgnoredError = true, isShowErrorAlert = true): S
 
     const backPath = storePath + '.bak'
     fs.renameSync(storePath, backPath)
-    if (isShowErrorAlert) {
+    if (isShowErrorAlert && global.lx?.appSetting?.['common.showErrorDialog']) {
       dialog.showMessageBoxSync({
         type: 'error',
         message: name + ' data load error',

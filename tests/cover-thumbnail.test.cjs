@@ -28,12 +28,21 @@ test('QQ album and artist covers use the CDN thumbnail sizes', () => {
   }
 })
 
+test('Kuwo legacy cover links use its working HTTPS image host', () => {
+  const path = '/star/albumcover/500/s4s49/58/3052577581.jpg'
+  for (const scheme of ['http', 'https']) {
+    assert.equal(getCoverThumbnail(`${scheme}://img1.kwcdn.kuwo.cn${path}`, 28), `https://img1.kuwo.cn${path}`)
+  }
+  const signed = `https://img1.kwcdn.kuwo.cn${path}?token=abc`
+  assert.equal(getCoverThumbnail(signed, 28), signed)
+})
+
 test('unknown sources, local artwork and authenticated links stay unchanged', () => {
   for (const url of [
     '', 'data:image/png;base64,AAA', 'blob:local-cover', 'file:///D:/Music/cover.jpg',
     'https://example.com/album.jpg?size=1400', 'https://p1.music.126.net.example.com/cover.jpg',
     'https://y.gtimg.cn/other/cover.jpg', 'https://p1.music.126.net/cover.jpg?signature=abc',
-    'https://p1.music.126.net/cover.jpg?token=abc', 'https://invalid url',
+    'https://p1.music.126.net/cover.jpg?token=abc', 'https://img1.kwcdn.kuwo.cn/other/cover.jpg', 'https://invalid url',
   ]) assert.equal(getCoverThumbnail(url, 28), url)
 })
 

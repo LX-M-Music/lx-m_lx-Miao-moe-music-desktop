@@ -54,6 +54,10 @@ dialog.confirm = options => dialog(
     : { ...options, showCancel: true },
 )
 
+dialog.error = options => window.lxData?.appSetting?.['common.showErrorDialog'] === true
+  ? dialog(options)
+  : Promise.resolve(false)
+
 const dialogPlugin = {
   install(Vue, options) {
     Vue.config.globalProperties.$dialog = dialog

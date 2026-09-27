@@ -14,6 +14,7 @@ import { getDislikeListInfo, dislikeInfoOverwrite } from './modules/dislike_list
 import { syncRevision } from './syncRevision'
 import { hash, portableDownloads, isCompleted, validateData } from '../../modules/webdav/data'
 import { WebDAVError } from '../../modules/webdav/errors'
+import { isPrivatePlaylistId, retainPrivatePlaylists } from '@common/privatePlaylists'
 
 export interface BackupFile { name: string, data: string }
 interface Journal { id: string, files: Array<{ name: string, before: string | null }> }
@@ -181,7 +182,14 @@ export const webdavRestore = async(root: string, data: LX.WebDAV.Data, files: Ba
       if (data.downloadHistory !== undefined) hashes.downloadHistory = hash(portableDownloads(retained.filter(isCompleted)))
       if (data.downloadTasks !== undefined) hashes.downloadTasks = hash(portableDownloads(retained.filter(task => !isCompleted(task))))
     }
-    if (data.playlists) listDataOverwrite(data.playlists)
+    if (data.playlists) {
+      const local = {
+        defaultList: getListMusics(LIST_IDS.DEFAULT),
+        loveList: getListMusics(LIST_IDS.LOVE),
+        userList: getAllUserList().filter(list => isPrivatePlaylistId(list.id)).map(list => ({ ...list, list: getListMusics(list.id) })),
+      }
+      listDataOverwrite(retainPrivatePlaylists(data.playlists, local))
+    }
     if (data.dislike !== undefined) await dislikeInfoOverwrite(data.dislike)
     // Return only canonicalized values, not another copy of the entire library.
     return { dislike: data.dislike !== undefined ? getDislikeListInfo().rules : undefined, hashes }

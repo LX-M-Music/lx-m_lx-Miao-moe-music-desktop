@@ -23,6 +23,7 @@ const defaultSetting: LX.AppSetting = {
   'common.transparentWindow': !isMac,
   'common.tryAutoUpdate': true,
   'common.showChangeLog': true,
+  'common.showErrorDialog': false,
 
   'player.startupAutoPlay': false,
   'player.togglePlayMethod': 'listLoop',
@@ -163,6 +164,7 @@ const defaultSetting: LX.AppSetting = {
   'sync.webdav.username': '',
   'sync.webdav.password': '',
   'sync.webdav.directory': 'lx-music',
+  'sync.webdav.playlistsDirectory': 'LX_Music',
   'sync.webdav.autoSync': false,
   'sync.webdav.interval': 5,
   'sync.webdav.playlists': true,

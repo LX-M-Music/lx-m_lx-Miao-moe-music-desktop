@@ -78,7 +78,7 @@ const saveWidth = async(width: number) => {
   try {
     await updateSetting({ [keys.value.width]: width })
   } catch {
-    showToast(window.i18n.t('sidebar__save_error'))
+    showToast(window.i18n.t('sidebar__save_error'), { error: true })
   } finally {
     if (revision === widthRevision && !resizing.value) draftWidth.value = null
   }
@@ -131,7 +131,7 @@ const toggleCollapsed = async() => {
   try {
     await updateSetting({ [key]: value })
   } catch {
-    showToast(window.i18n.t('sidebar__save_error'))
+    showToast(window.i18n.t('sidebar__save_error'), { error: true })
   } finally {
     if (revision === collapseRevision) draftCollapsed.value = null
   }

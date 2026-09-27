@@ -36,7 +36,7 @@
       role="status" :aria-busy="isMessage(props.listInfo.noItemLabel, 'list__loading')"
     >
       <span v-if="isMessage(props.listInfo.noItemLabel, 'list__loading')" class="ui-spinner" />
-      <p v-text="props.listInfo.noItemLabel" />
+      <p>{{ !appSetting['common.showErrorDialog'] && isMessage(props.listInfo.noItemLabel, 'list__load_failed') ? $t('list__load_failed') : props.listInfo.noItemLabel }}</p>
       <base-btn v-if="!props.hideRetry && isMessage(props.listInfo.noItemLabel, 'list__load_failed')" class="ui-state-retry" min @click="emit('retry')">{{ $t('reload') }}</base-btn>
     </div>
   </common-list-loading>

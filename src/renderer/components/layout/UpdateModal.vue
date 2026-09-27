@@ -14,7 +14,7 @@ material-modal(:show="versionInfo.showModal" :close-btn="!isInstalling && !isCan
         base-btn(v-else :class="$style.btn" @click="handleCheckUpdate") 重新检查更新
   main(v-else-if="versionInfo.isUnknown" :class="$style.main")
     h2 ❓ 获取最新版本信息失败 ❓
-    p.load-error-detail(v-if="versionInfo.updateError" role="alert") {{ versionInfo.updateError }}
+    p.load-error-detail(v-if="versionInfo.updateError && appSetting['common.showErrorDialog']" role="alert") {{ versionInfo.updateError }}
     div.scroll.select(:class="$style.info")
       div(:class="$style.current")
         h3 当前版本：{{ versionInfo.version }}
@@ -54,7 +54,7 @@ material-modal(:show="versionInfo.showModal" :close-btn="!isInstalling && !isCan
           strong.hover.underline(aria-label="点击打开" @click="handleOpenUrl('https://lyswhut.github.io/lx-music-doc/desktop/faq')") 桌面版常见问题
           | 。
         p(v-if="versionInfo.status == 'downloaded'") 新版本已下载，点击“自动更新”即可安装并重启。
-        p(v-if="versionInfo.updateError" role="alert") {{ versionInfo.updateError }}
+        p(v-if="versionInfo.updateError && appSetting['common.showErrorDialog']" role="alert") {{ versionInfo.updateError }}
         p(v-else-if="!versionInfo.newVersion?.downloadUrl") 暂无适用的自动更新安装包，请手动更新。
       div(v-if="isUpdating" :class="$style.updateProgress" data-update-progress)
         div(:class="$style.progressHeader" role="status")
@@ -74,6 +74,7 @@ import { compareVer, sizeFormate } from '@common/utils'
 import { openUrl, clipboardWriteText } from '@common/utils/electron'
 import { dialog } from '@renderer/plugins/Dialog'
 import { versionInfo } from '@renderer/store'
+import { appSetting } from '@renderer/store/setting'
 import { getIgnoreVersion, saveIgnoreVersion, quitUpdate, downloadUpdate, cancelDownloadUpdate, checkUpdate } from '@renderer/utils/ipc'
 import { formatChangeLog } from '@renderer/utils/changeLog'
 
@@ -81,6 +82,7 @@ export default {
   setup() {
     return {
       versionInfo,
+      appSetting,
     }
   },
   data() {

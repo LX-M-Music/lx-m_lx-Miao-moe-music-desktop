@@ -83,6 +83,9 @@ declare global {
        */
       'common.showChangeLog': boolean
 
+      /** 是否显示错误弹窗和页面加载失败详情 */
+      'common.showErrorDialog': boolean
+
       /**
        * 启动时自动播放歌曲
        */
@@ -705,6 +708,7 @@ declare global {
       'sync.webdav.username': string
       'sync.webdav.password': string
       'sync.webdav.directory': string
+      'sync.webdav.playlistsDirectory': string
       'sync.webdav.autoSync': boolean
       /** 自动同步间隔，单位为分钟 */
       'sync.webdav.interval': number

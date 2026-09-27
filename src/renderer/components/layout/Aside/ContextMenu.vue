@@ -50,7 +50,7 @@ const focusFirst = async() => {
 watch(() => props.modelValue, visible => { if (visible) void focusFirst() })
 const persist = async(settings: Partial<LX.AppSetting>) => {
   saving.value = true
-  try { await updateSetting(settings) } catch { showToast(window.i18n.t('sidebar__save_error')) } finally { saving.value = false }
+  try { await updateSetting(settings) } catch { showToast(window.i18n.t('sidebar__save_error'), { error: true }) } finally { saving.value = false }
 }
 const toggle = async(id: SidebarId) => {
   if (id == 'Setting' || saving.value) return

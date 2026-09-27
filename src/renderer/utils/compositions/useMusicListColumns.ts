@@ -75,7 +75,7 @@ const useMusicListColumns = (kind: 'music' | 'download', actionsVisible: Ref<boo
       saved[currentKey] = Object.fromEntries(columns.value.map((column, index) => [column.id, values[index] / total]))
     }
     draft.value = values
-    try { await updateSetting({ 'list.columnWidths': JSON.stringify(saved) }) } catch { showToast(window.i18n.t('list__column_save_error')) } finally {
+    try { await updateSetting({ 'list.columnWidths': JSON.stringify(saved) }) } catch { showToast(window.i18n.t('list__column_save_error'), { error: true }) } finally {
       if (current == revision && currentKey == key.value) draft.value = null
     }
   }

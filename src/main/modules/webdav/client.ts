@@ -20,7 +20,7 @@ export interface RemoteFile {
   unchanged?: boolean
 }
 
-export const resolveConfig = (config: LX.WebDAV.Config) => {
+export const resolveConfig = (config: LX.WebDAV.Config, fileName = FILE_NAME) => {
   let base: URL
   try {
     base = new URL(config.url.trim())
@@ -36,11 +36,12 @@ export const resolveConfig = (config: LX.WebDAV.Config) => {
   if (parts.some(part => part == '.' || part == '..' || /[\\\x00-\x1f]/.test(part))) throw new WebDAVError('invalid_config')
   const directories = parts.map((_, index) => new URL(parts.slice(0, index + 1).map(encodeURIComponent).join('/') + '/', base))
   const directory = directories[directories.length - 1] ?? base
-  return { base, directories, directory, file: new URL(FILE_NAME, directory) }
+  if (![FILE_NAME, 'playlists.json'].includes(fileName)) throw new WebDAVError('invalid_config')
+  return { base, directories, directory, file: new URL(fileName, directory) }
 }
 
-export const createClient = (config: LX.WebDAV.Config) => {
-  const paths = resolveConfig(config)
+export const createClient = (config: LX.WebDAV.Config, fileName = FILE_NAME) => {
+  const paths = resolveConfig(config, fileName)
   const authorization = `Basic ${Buffer.from(`${config.username}:${config.password}`, 'utf8').toString('base64')}`
 
   const request = async(method: string, url: URL, body = '', headers: Record<string, string> = {}, redirects = 0): Promise<Response> => {

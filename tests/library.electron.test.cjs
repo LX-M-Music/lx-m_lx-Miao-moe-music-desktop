@@ -7,7 +7,7 @@ const rendererPath = process.env.LX_TEST_USE_DEV_SERVER ? undefined : path.resol
 const rpc = (page, method, ...args) => page.evaluate(({ method, args }) => require('electron').ipcRenderer.invoke('winMain_library_action', { method, args }), { method, args })
 const songs = page => page.evaluate(() => require('electron').ipcRenderer.invoke('player_list_music_get', 'default'))
 
-test('playlist tags move to the context menu and listening history replaces the trial list', { timeout: 120000 }, async() => {
+test('playlist tags use the context menu and the trial list precedes listening history', { timeout: 120000 }, async() => {
   let f = await launch({ rendererPath })
   const profilePath = f.output
   const first = { id: 'wy_first', name: '历史歌曲一', singer: '测试歌手', source: 'wy', interval: '03:00', meta: { songId: 'first' } }
@@ -24,7 +24,13 @@ test('playlist tags move to the context menu and listening history replaces the 
     await settled(f.page)
     assert.equal(await f.page.getByRole('button', { name: '曲库管理' }).count(), 0)
     assert.equal(await f.page.locator('#my-list .default-list[aria-label="听歌历史"]').count(), 1)
-    assert.equal(await f.page.locator('#my-list .default-list[aria-label="试听列表"]').count(), 0)
+    assert.equal(await f.page.locator('#my-list .default-list[aria-label="试听列表"]').count(), 1)
+    assert.deepEqual(await f.page.locator('#my-list .default-list').allTextContents().then(items => items.slice(0, 2).map(item => item.trim())), ['试听列表', '听歌历史'])
+    await f.page.locator('#my-list .default-list[aria-label="试听列表"]').click()
+    await f.page.locator('#my-list .default-list[aria-label="试听列表"][aria-selected="true"]').waitFor()
+    await f.page.locator('#my-list .list-item[data-song-id="wy_first"]').waitFor()
+    assert.equal(await f.page.locator('[data-listening-history]').count(), 0)
+    await f.page.locator('#my-list .user-list[data-id="one"]').click()
 
     await f.page.locator('#my-list .user-list[data-id="one"]').click({ button: 'right' })
     await f.page.getByRole('tab', { name: '编辑标签' }).click()

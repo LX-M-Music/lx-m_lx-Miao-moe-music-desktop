@@ -29,20 +29,17 @@ export default {
     let id = to.query.id
     if (!id) {
       id = await getListPrevSelectId()
-      if (id === LIST_IDS.DEFAULT) id = LIST_IDS.HISTORY
       next({
         path: to.path,
         query: { id },
       })
-    } else if (id === LIST_IDS.DEFAULT) next({ path: to.path, query: { id: LIST_IDS.HISTORY } })
-    else next()
+    } else next()
   },
   beforeRouteUpdate(to, from) {
     // console.log(to, from)
     if (to.query.updated) return
     let id = to.query.id
     if (id == null) return
-    if (id === LIST_IDS.DEFAULT) return { path: to.path, query: { id: LIST_IDS.HISTORY } }
     // if (!getList(id)) {
     //   id = defaultList.id
     // }

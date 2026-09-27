@@ -115,7 +115,7 @@
       </div>
     </div>
     <div v-show="!list.length" :class="[$style.noItem, 'ui-state', { 'ui-state-error': loadError }]" role="status">
-      <p>{{ loadError || $t('no_item') }}</p>
+      <p>{{ loadError ? (appSetting['common.showErrorDialog'] ? loadError : $t('list__load_failed')) : $t('no_item') }}</p>
       <base-btn v-if="loadError" class="ui-state-retry" min @click="retryList">{{ $t('reload') }}</base-btn>
     </div>
     <common-list-add-modal

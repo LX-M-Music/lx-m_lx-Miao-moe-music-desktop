@@ -7,7 +7,7 @@
     </header>
     <div :class="$style.musicList" :style="columnLayout.style">
       <common-music-list-header :layout="columnLayout" :action-label="$t('history__listened_at')" />
-      <p v-if="error" :class="[$style.status, $style.error]" role="alert">{{ error }}</p>
+      <p v-if="error" :class="[$style.status, $style.error]" role="alert">{{ appSetting['common.showErrorDialog'] ? error : error.split('\n')[0] }}</p>
       <p v-else-if="loading" :class="$style.status" role="status">{{ $t('history__loading') }}</p>
       <p v-else-if="!entries.length" :class="$style.status" role="status">{{ $t('history__empty') }}</p>
       <div v-else ref="listContent" :class="$style.content">

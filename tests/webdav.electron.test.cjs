@@ -37,9 +37,9 @@ test('WebDAV UI persists config, syncs all categories, refreshes restored downlo
   await page.getByRole('button', { name: '立即同步', exact: true }).click()
   await page.getByRole('status').filter({ hasText: '上传 5 项' }).waitFor()
   const cloud = JSON.parse(dav.files.get(dav.file)).data
-  assert.equal(cloud.playlists.defaultList[0].id, 'wy_ui-local')
+  assert.equal(JSON.parse(dav.files.get(dav.playlistFile)).data.defaultList[0].id, 'wy_ui-local')
   assert.equal(cloud.downloadTasks[0].status, 'pause')
-  assert(!dav.files.get(dav.file).includes('fixture-secret-cookie'))
+  assert(!dav.files.get(dav.file).includes('fixture-secret-cookie') && !dav.files.get(dav.playlistFile).includes('fixture-secret-cookie'))
 
   // Open the downloads view before restoring so this checks the live renderer cache too.
   await route(page, '/download')
@@ -73,11 +73,11 @@ test('WebDAV UI persists config, syncs all categories, refreshes restored downlo
   await app.evaluate(async(_, lists) => { await global.lx.event_list.list_data_overwrite(lists) }, playlists('automatic-edit'))
   const deadline = Date.now() + 25000
   while (Date.now() < deadline) {
-    if (JSON.parse(dav.files.get(dav.file)).data.playlists.defaultList[0].id === 'wy_automatic-edit') break
+    if (JSON.parse(dav.files.get(dav.playlistFile)).data.defaultList[0].id === 'wy_automatic-edit') break
     await delay(200)
   }
   const automatic = JSON.parse(dav.files.get(dav.file)).data
-  assert.equal(automatic.playlists.defaultList[0].id, 'wy_automatic-edit')
+  assert.equal(JSON.parse(dav.files.get(dav.playlistFile)).data.defaultList[0].id, 'wy_automatic-edit')
   assert.equal(automatic.downloadTasks[0].id, 'task_remote-task')
 
   await settingsPage(page)

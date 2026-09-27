@@ -77,9 +77,9 @@ export default ({ list, selectedList, removeAllSelect }) => {
       })
       if (canceled || !filePaths.length) return ''
       if (await relocateDownloadTask(task.id, filePaths[0])) return filePaths[0]
-      await dialog(window.i18n.t('download__relocate_failed'))
+      await dialog.error(window.i18n.t('download__relocate_failed'))
     } catch {
-      await dialog(window.i18n.t('download__relocate_failed'))
+      await dialog.error(window.i18n.t('download__relocate_failed'))
     }
     return ''
   }

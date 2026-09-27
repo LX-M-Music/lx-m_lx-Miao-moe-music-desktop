@@ -38,7 +38,7 @@ export const addLocalFile = async(listInfo: LX.List.MyListInfo) => {
     setFetchingListStatus(listInfo.id, false)
   }
   if (failedPaths.length) {
-    await dialog({
+    await dialog.error({
       message: window.i18n.t('lists__local_import_failed', { count: failedPaths.length }) + '\n' + failedPaths.join('\n'),
       selection: true,
     })

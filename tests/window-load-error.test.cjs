@@ -4,6 +4,9 @@ const { test } = require('node:test')
 const createLoader = require('./helpers/load-typescript.cjs')
 
 test('a failed main document exposes Chromium code and reason with reload; cancelled and subframe loads stay quiet', async() => {
+  const previous = global.lx
+  global.lx = { appSetting: { 'common.showErrorDialog': true } }
+  try {
   const webContents = new EventEmitter(), dialogs = []
   let reloads = 0, finish
   webContents.reload = () => { reloads++ }
@@ -28,4 +31,19 @@ test('a failed main document exposes Chromium code and reason with reload; cance
   finish({ response: 1 })
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(reloads, 1)
+  } finally { global.lx = previous }
+})
+
+test('main document failures do not open a dialog when error dialogs are disabled', () => {
+  const previous = global.lx
+  global.lx = { appSetting: { 'common.showErrorDialog': false } }
+  try {
+    const webContents = new EventEmitter()
+    const window = { webContents, isDestroyed: () => false }
+    let dialogs = 0
+    const { observeWindowLoadErrors } = createLoader({ electron: { dialog: { showMessageBox: () => { dialogs++; return Promise.resolve({ response: 1 }) } } } })('src/main/utils/windowLoadError.ts')
+    observeWindowLoadErrors(window)
+    webContents.emit('did-fail-load', {}, -6, 'ERR_FILE_NOT_FOUND', '', true)
+    assert.equal(dialogs, 0)
+  } finally { global.lx = previous }
 })

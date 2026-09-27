@@ -4,7 +4,7 @@ import { dialog } from '@renderer/plugins/Dialog'
 export const useDialog = () => {
   const t = useI18n()
   const errorDialog = message => {
-    dialog({
+    dialog.error({
       message: `${t('deep_link__handle_error_tip', { message })}`,
       confirmButtonText: t('ok'),
     })

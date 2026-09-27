@@ -46,18 +46,25 @@ async function run(mode) {
   const files = [{ name: 'config_v2.json', data: 'new config' }, { name: 'sound_effect.json', data: 'new presets' }]
   try {
     if (mode.startsWith('webdav-')) {
+      const privateList = { id: 'userlist_wy_sync_cookie', name: 'Private Cookie', locationUpdateTime: null, list: [song('private')] }
+      if (mode === 'webdav-private') list.listDataOverwrite({ ...initial, userList: [privateList] })
       await dislike.dislikeInfoOverwrite('before rule')
       const sections = ['playlists', 'downloadTasks', 'dislike', 'settings']
       const captured = backup.webdavRead(sections)
+      if (mode === 'webdav-private') assert.deepEqual(captured.data.playlists.userList.map(item => item.id), [privateList.id])
       const incoming = { playlists: { ...initial, defaultList: [song('after')] }, downloadTasks: [task('after')], dislike: 'after rule' }
       if (mode === 'webdav-file-failure') failAt = 'sound_effect.json'
       if (mode === 'webdav-db-failure') db.exec("CREATE TRIGGER fail_dislike BEFORE INSERT ON dislike_list BEGIN SELECT RAISE(ABORT, 'injected database error'); END")
       if (mode === 'webdav-revision') load('src/main/worker/dbService/syncRevision.ts').bumpSyncRevision(['playlists'])
       const restore = backup.webdavRestore(root, incoming, files, sections, captured.revision)
-      const success = mode === 'webdav-success'
+      const success = mode === 'webdav-success' || mode === 'webdav-private'
       if (success) await restore
       else await assert.rejects(restore, mode === 'webdav-revision' ? /local_changed/ : /injected/)
       assert.equal(list.getListMusics('default')[0].id, success ? 'wy_after' : 'wy_before')
+      if (mode === 'webdav-private') {
+        assert.deepEqual(list.getAllUserList().map(item => item.id), [privateList.id])
+        assert.equal(list.getListMusics(privateList.id)[0].id, 'wy_private')
+      }
       assert.deepEqual(download.getDownloadList().map(task => task.id), [success ? 'task_after' : 'task_before'])
       assert.equal(dislike.getDislikeListInfo().rules, success ? 'after rule' : 'before rule')
       assert.equal(await fs.readFile(path.join(root, 'config_v2.json'), 'utf8'), success ? 'new config' : 'old config')

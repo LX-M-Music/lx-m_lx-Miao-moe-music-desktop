@@ -35,12 +35,14 @@ test('setting explanations appear on black help icons when hovered', { timeout: 
         assert.equal(await page.locator('#sync .help-btn').evaluate(element => element.ownerDocument.defaultView.getComputedStyle(element).color), 'rgb(0, 0, 0)')
       }
       if (name === 'SettingPluginStore') {
-        const pluginIcon = page.locator('[data-plugin-id="audio-tag-editor"] .help-icon')
-        await pluginIcon.waitFor({ state: 'visible' })
+        const pluginCard = page.locator('[data-plugin-id="audio-tag-editor"]')
+        await pluginCard.waitFor({ state: 'visible' })
+        const descriptions = Object.values(require('../src/optional-plugins/audio-tag-editor/store.json').description)
+        const cardText = await pluginCard.innerText()
+        assert.ok(descriptions.some(description => cardText.includes(description)))
         const pluginExplanation = await page.evaluate(() => window.i18n.t('setting__plugins_tag_editor_hint'))
-        await pluginIcon.hover()
-        await page.getByText(pluginExplanation, { exact: false }).waitFor({ state: 'visible' })
-        await page.mouse.move(0, 0)
+        await pluginCard.getByText(pluginExplanation, { exact: true }).waitFor({ state: 'visible' })
+        assert.equal(await pluginCard.locator('.help-icon').count(), 0)
       }
     }
     await route(page, '/setting?name=SettingOther')

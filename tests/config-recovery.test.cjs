@@ -8,7 +8,9 @@ const loader = require('./helpers/load-typescript.cjs')
 function fixture(t, contents) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-config-recovery-'))
   const previous = global.lxDataPath
+  const previousLx = global.lx
   global.lxDataPath = root
+  global.lx = { appSetting: { 'common.showErrorDialog': true } }
   const alerts = []
   const module = loader({
     electron: { dialog: { showMessageBoxSync: value => alerts.push(value) }, shell: { showItemInFolder() {} } },
@@ -20,6 +22,7 @@ function fixture(t, contents) {
   fs.writeFileSync(filename, contents)
   t.after(() => {
     global.lxDataPath = previous
+    global.lx = previousLx
     assert(path.resolve(root).startsWith(path.join(os.tmpdir(), 'lx-config-recovery-')))
     fs.rmSync(root, { recursive: true, force: true })
   })
@@ -38,6 +41,14 @@ for (const contents of ['null', '[]', '42', 'true', '"text"', '{invalid']) {
     assert.equal(f.alerts.length, 1)
   })
 }
+
+test('invalid configuration still recovers without an error dialog when disabled', t => {
+  const f = fixture(t, 'null')
+  global.lx.appSetting['common.showErrorDialog'] = false
+  f.default('settings')
+  assert.equal(fs.readFileSync(f.filename + '.bak', 'utf8'), 'null')
+  assert.equal(f.alerts.length, 0)
+})
 
 test('strict loading does not change an invalid config and valid objects do not trigger recovery', t => {
   const f = fixture(t, 'null')

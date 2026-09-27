@@ -30,7 +30,7 @@
         <div v-else :class="$style.noItem">
           <p v-if="!isError" v-text="noItemLabel" />
           <template v-if="isError">
-            <p class="load-error-detail">{{ loadErrors[source] }}</p>
+            <p class="load-error-detail">{{ appSetting['common.showErrorDialog'] ? loadErrors[source] : $t('list__load_failed') }}</p>
             <base-btn class="ui-state-retry" min @click="retrySource">{{ $t('reload') }}</base-btn>
           </template>
         </div>
@@ -79,6 +79,7 @@ import { toNewMusicInfo, toOldMusicInfo } from '@renderer/utils'
 import musicSdk from '@renderer/utils/musicSdk'
 import { markRaw } from 'vue'
 import { rankMusicToggleCandidates } from '@renderer/utils/musicToggleCandidates'
+import { appSetting } from '@renderer/store/setting'
 
 const sources = ['kw', 'kg', 'tx', 'wy', 'mg']
 
@@ -112,6 +113,7 @@ export default {
     }
   },
   computed: {
+    appSetting() { return appSetting },
     defaultSource() {
       return [this.preferredSource, this.musicInfo?.source].find(source => sources.includes(source)) ?? sources[0]
     },

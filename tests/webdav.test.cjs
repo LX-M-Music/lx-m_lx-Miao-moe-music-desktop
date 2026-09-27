@@ -99,13 +99,13 @@ async function fixture(t, selected = ['playlists']) {
 }
 
 test('connection test creates nested UTF-8 directories, verifies credentials and read/write, then removes its own probe', async t => {
-  const f = await fixture(t)
+  const f = await fixture(t, ['playlists', 'settings'])
   f.settings['sync.webdav.directory'] = '音乐/我的 同步'
   assert.equal((await f.run('test')).success, true)
   assert(f.dav.directories.has('/dav/%E9%9F%B3%E4%B9%90/%E6%88%91%E7%9A%84%20%E5%90%8C%E6%AD%A5/'))
   assert.equal(f.dav.files.size, 0)
   assert(f.dav.requests.some(req => req.method === 'PROPFIND' && req.headers.depth === '0'))
-  assert.equal(f.dav.requests.filter(req => req.method === 'DELETE').length, 1)
+  assert.equal(f.dav.requests.filter(req => req.method === 'DELETE').length, 2)
   f.settings['sync.webdav.password'] = 'wrong'
   assert.equal((await f.run('test')).error, 'auth')
   assert.deepEqual(f.dav.errors, [])
@@ -119,11 +119,13 @@ test('all selected categories upload without credentials, local paths, cached UR
   assert.deepEqual(result.uploaded, sections)
   const text = f.dav.files.get(f.dav.file)
   const remote = JSON.parse(text).data
-  assert.deepEqual(Object.keys(remote), sections)
-  assert.deepEqual(remote.playlists, f.local.playlists)
+  assert.deepEqual(Object.keys(remote), sections.filter(section => section !== 'playlists'))
+  const mobile = JSON.parse(f.dav.files.get(f.dav.playlistFile))
+  assert.equal(mobile.version, '2')
+  assert.deepEqual(mobile.data, { ...f.local.playlists, tempList: [] })
   assert.equal(remote.downloadHistory[0].status, 'completed')
   assert.equal(remote.downloadTasks[0].status, 'pause')
-  for (const secret of ['secret-cookie', 'pass word', 'expired.example', 'D:/local/', 'sync.webdav.', 'download.savePath']) assert(!text.includes(secret), secret)
+  for (const secret of ['secret-cookie', 'pass word', 'expired.example', 'D:/local/', 'sync.webdav.', 'download.savePath']) assert(!text.includes(secret) && !JSON.stringify(mobile).includes(secret), secret)
   assert.equal(remote.downloadTasks[0].downloaded, 0)
   assert.equal(f.dav.requests.find(req => req.method === 'PUT').headers['if-none-match'], '*')
 })
@@ -133,9 +135,8 @@ test('upload preserves every unselected cloud category and unknown future catego
   const disabled = { downloadHistory: [task('7', true)], settings: { 'player.volume': 0.7 }, dislike: 'cloud', futureCategory: { keep: true } }
   f.dav.seed({ ...disabled, playlists: playlists('8') })
   assert.equal((await f.run('upload')).success, true)
-  const { playlists: uploaded, ...rest } = JSON.parse(f.dav.files.get(f.dav.file)).data
-  assert.deepEqual(uploaded, f.local.playlists)
-  assert.deepEqual(rest, disabled)
+  assert.deepEqual(JSON.parse(f.dav.files.get(f.dav.playlistFile)).data, { ...f.local.playlists, tempList: [] })
+  assert.deepEqual(JSON.parse(f.dav.files.get(f.dav.file)).data, disabled)
 })
 
 test('automatic sync propagates a single-side edit and detects two-side changes before writing anything', async t => {
@@ -148,11 +149,11 @@ test('automatic sync propagates a single-side edit and detects two-side changes 
   assert.equal(f.local.playlists.defaultList[0].id, 'wy_remote')
   f.local.playlists.loveList.push(song('local-edit'))
   f.dav.seed({ playlists: playlists('remote-edit') })
-  const before = f.dav.files.get(f.dav.file)
+  const before = f.dav.files.get(f.dav.playlistFile)
   const conflict = await f.run('sync')
   assert.equal(conflict.error, 'conflict')
   assert.deepEqual(conflict.sections, ['playlists'])
-  assert.equal(f.dav.files.get(f.dav.file), before)
+  assert.equal(f.dav.files.get(f.dav.playlistFile), before)
   assert.equal(f.local.playlists.loveList[0].id, 'wy_local-edit')
   assert.equal((await f.run('download')).success, true)
   assert.equal(f.stores.get('webdav-local-backup').data.playlists.loveList[0].id, 'wy_local-edit')
@@ -242,7 +243,7 @@ test('conditional PUT rejects concurrent remote edits and does not advance the b
     if (req.method === 'PUT') f.dav.seed({ playlists: playlists('other-device') })
   }
   assert.equal((await f.run('sync')).error, 'remote_changed')
-  assert.equal(JSON.parse(f.dav.files.get(f.dav.file)).data.playlists.defaultList[0].id, 'wy_other-device')
+  assert.equal(JSON.parse(f.dav.files.get(f.dav.playlistFile)).data.defaultList[0].id, 'wy_other-device')
   assert.deepEqual(f.stores.get('webdav').baseline, baseline)
 })
 
@@ -306,7 +307,7 @@ test('F01/F02: each round reads one local snapshot and unchanged remote data use
     assert.deepEqual(result.downloaded, [])
   }
   assert.equal(f.local.reads, 4)
-  assert.equal(f.dav.requests.length - before, 3)
+  assert.equal(f.dav.requests.length - before, 6)
   assert(f.dav.requests.slice(before).every(req => req.method === 'GET' && req.headers['if-none-match']))
   f.settings['sync.webdav.password'] = 'wrong'
   assert.equal((await f.run('sync')).error, 'auth')
@@ -344,12 +345,91 @@ test('F02: Last-Modified is used when no ETag is supplied and changed remote con
 })
 
 test('F01: enabling a previously unselected category validates its cached body before applying it', async t => {
-  const f = await fixture(t)
-  f.dav.seed({ playlists: playlists('remote'), downloadTasks: [{ invalid: true }] })
+  const f = await fixture(t, ['playlists', 'settings'])
+  f.dav.seed({ playlists: playlists('remote'), settings: {}, downloadTasks: [{ invalid: true }] })
   assert.equal((await f.run('download')).success, true)
   const writes = f.local.writes.length
   f.settings['sync.webdav.downloadTasks'] = true
   assert.equal((await f.run('download')).error, 'invalid_data')
   assert.equal(f.local.writes.length, writes)
   assert(f.dav.requests.at(-1).headers['if-none-match'])
+})
+
+test('mobile version 2 upload preserves Walnut history, tasks, temp list, and future fields', async t => {
+  const f = await fixture(t)
+  const old = { version: '2', lastModified: Date.now() + 5000, data: { ...playlists('mobile'), tempList: [song('temporary')], futureListField: 'keep' }, playHistory: [{ id: 'history-1' }], downloadTasks: [{ id: 'mobile-task' }], futureTopField: { keep: true } }
+  f.dav.seedMobile(old)
+  f.local.playlists.userList.push({ id: 'userlist_wy_sync_private', name: 'Cookie', list: [song('private')] })
+  const result = await f.run('upload')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.uploaded, ['playlists'])
+  const mobile = JSON.parse(f.dav.files.get(f.dav.playlistFile))
+  assert(mobile.lastModified > old.lastModified, 'mobile clients detect the update even if the old clock was ahead')
+  assert.deepEqual(mobile.data.defaultList, f.local.playlists.defaultList)
+  assert.deepEqual(mobile.data.tempList, old.data.tempList)
+  assert.equal(mobile.data.futureListField, 'keep')
+  assert.deepEqual(mobile.playHistory, old.playHistory)
+  assert.deepEqual(mobile.downloadTasks, old.downloadTasks)
+  assert.deepEqual(mobile.futureTopField, old.futureTopField)
+  assert(!f.dav.files.get(f.dav.playlistFile).includes('userlist_wy_sync_private'))
+  assert.deepEqual((await f.run('sync')).uploaded, [])
+})
+
+test('mobile download keeps LXM Cookie lists local and scrubs leaked Cookie lists from the shared file', async t => {
+  const f = await fixture(t)
+  const privateList = { id: 'userlist_tx_sync_private', name: 'My Cookie List', list: [song('private')] }
+  f.local.playlists.userList.push(privateList)
+  const remote = playlists('from-mobile')
+  remote.userList.push({ id: 'normal-list', name: 'Shared', list: [song('shared')] }, { id: 'userlist_kw_sync_leaked', name: 'Leaked', list: [song('leaked')] })
+  f.dav.seedMobile({ version: '2', lastModified: Date.now(), data: { ...remote, tempList: [song('mobile-temp')] }, playHistory: [{ id: 'walnut-history' }] })
+  const result = await f.run('download')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.downloaded, ['playlists'])
+  assert.deepEqual(f.local.playlists.userList.map(list => list.id), ['normal-list', privateList.id])
+  assert.equal(f.local.playlists.defaultList[0].id, 'wy_from-mobile')
+  assert.equal(f.local.playlists.tempList, undefined)
+  const cleaned = JSON.parse(f.dav.files.get(f.dav.playlistFile))
+  assert.deepEqual(cleaned.data.userList.map(list => list.id), ['normal-list'])
+  assert.equal(cleaned.data.tempList[0].id, 'wy_mobile-temp')
+  assert.deepEqual(cleaned.playHistory, [{ id: 'walnut-history' }])
+  assert.equal((await f.run('sync')).success, true)
+})
+
+test('existing LXM-only playlist snapshot migrates to mobile file without replacing its other sections', async t => {
+  const f = await fixture(t)
+  f.local.playlists = playlists()
+  const legacy = playlists('old-lxm')
+  legacy.userList.push({ id: 'userlist_mg_sync_old', name: 'Old Cookie', list: [song('secret')] })
+  f.dav.seedLegacy({ playlists: legacy, dislike: 'legacy-rule' })
+  const before = f.dav.files.get(f.dav.file)
+  const result = await f.run('sync')
+  assert.equal(result.success, true)
+  assert.deepEqual(result.downloaded, ['playlists'])
+  assert.equal(f.local.playlists.defaultList[0].id, 'wy_old-lxm')
+  assert.equal(f.dav.files.get(f.dav.file), before)
+  assert.deepEqual(JSON.parse(f.dav.files.get(f.dav.playlistFile)).data.userList, [])
+  assert.equal((await f.run('sync')).success, true)
+})
+
+test('invalid mobile playlist file is rejected before local or cloud writes', async t => {
+  const f = await fixture(t)
+  for (const value of [
+    { version: '3', lastModified: Date.now(), data: { ...playlists('remote'), tempList: [] } },
+    { version: '2', lastModified: Date.now(), data: { ...playlists('remote'), userList: [null], tempList: [] } },
+    { version: '2', lastModified: Date.now(), data: { ...playlists('remote'), tempList: 'broken' } },
+  ]) {
+    f.dav.seedMobile(value)
+    const before = f.dav.files.get(f.dav.playlistFile)
+    assert.equal((await f.run('download')).error, 'invalid_data')
+    assert.equal(f.dav.files.get(f.dav.playlistFile), before)
+    assert.deepEqual(f.local.writes, [])
+  }
+})
+
+test('custom mobile playlist directory matches a mobile fork with a changed WebDAV path', async t => {
+  const f = await fixture(t)
+  f.settings['sync.webdav.playlistsDirectory'] = 'Music/手机'
+  assert.equal((await f.run('upload')).success, true)
+  assert(f.dav.files.has('/dav/Music/%E6%89%8B%E6%9C%BA/playlists.json'))
+  assert(!f.dav.files.has(f.dav.playlistFile))
 })

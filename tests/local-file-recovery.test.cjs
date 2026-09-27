@@ -55,7 +55,7 @@ for (const failure of ['worker', 'database', 'partial', 'none', 'cancel']) {
           added.push(...items)
         },
       },
-      '@renderer/plugins/Dialog': { dialog: async options => { assert.equal(status.at(-1), false); dialogs.push(options) } },
+      '@renderer/plugins/Dialog': { dialog: { error: async options => { assert.equal(status.at(-1), false); dialogs.push(options) } } },
     })('src/renderer/views/List/MyList/actions.ts')
     await actions.addLocalFile({ id: 'playlist' })
     assert.deepEqual(status, failure === 'cancel' ? [] : [true, false])

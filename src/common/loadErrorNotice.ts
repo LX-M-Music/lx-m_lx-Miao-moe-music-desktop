@@ -4,6 +4,10 @@ import { errorText, formatError, isCancelledError } from './utils/errorMessage'
 // Expected loading errors belong to the page that initiated the operation.
 export const showLoadError = (error: unknown, code = 'APP_LOAD_FAILED', retry?: () => void) => {
   if (!globalThis.document?.body || isCancelledError(error)) return
+  if ((globalThis as { lxData?: { appSetting?: { 'common.showErrorDialog'?: boolean } } }).lxData?.appSetting?.['common.showErrorDialog'] !== true) {
+    document.querySelector<HTMLElement>('[data-app-load-error]')?.remove()
+    return
+  }
   const message = formatError(error, '', code)
   let panel = document.querySelector<HTMLElement>('[data-app-load-error]')
   if (panel?.querySelector('pre')?.textContent === message) return

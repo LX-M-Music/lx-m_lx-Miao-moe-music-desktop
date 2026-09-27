@@ -105,7 +105,7 @@
             role="status" :aria-busy="isMessage(noItem, 'list__loading')"
           >
             <span v-if="isMessage(noItem, 'list__loading')" class="ui-spinner" />
-            <p v-text="noItem" />
+            <p>{{ !appSetting['common.showErrorDialog'] && isMessage(noItem, 'list__load_failed') ? $t('list__load_failed') : noItem }}</p>
             <base-btn v-if="!hideRetry && isMessage(noItem, 'list__load_failed')" class="ui-state-retry" min @click="$emit('retry')">{{ $t('reload') }}</base-btn>
           </div>
         </transition>

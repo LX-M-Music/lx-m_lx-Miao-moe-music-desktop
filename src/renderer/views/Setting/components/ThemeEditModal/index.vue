@@ -511,7 +511,7 @@ export default {
           confirmButtonText: window.i18n.t('alert_button_text'),
         })
       } catch (err) {
-        void dialog({
+        void dialog.error({
           message: window.i18n.t('theme_export_failed', { message: err.message }),
           confirmButtonText: window.i18n.t('alert_button_text'),
         })

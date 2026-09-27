@@ -21,7 +21,7 @@ test('built-in effects and tag editing work offline and supersede legacy package
   const checkCards = async() => {
     for (const card of cards()) {
       assert.equal(await card.locator('[data-plugin-status]').innerText(), '自带')
-      assert.equal(await card.getByRole('button').count(), 0)
+      assert.equal(await card.getByRole('button', { name: await label(page, 'setting__plugins_settings'), exact: true }).count(), 1)
     }
   }
   const set = values => page.evaluate(async values => {
@@ -37,6 +37,12 @@ test('built-in effects and tag editing work offline and supersede legacy package
       await checkCards()
       assert.equal(await page.locator('[data-setting-tab="SettingPlugin_audio-tag-editor"]').count(), 0)
       assert.equal(await page.locator('[data-setting-tab="SettingPlugin_sound-effects"]').count(), 0)
+      await cards()[0].getByRole('button', { name: await label(page, 'setting__plugins_settings'), exact: true }).click()
+      await cards()[0].locator('[data-plugin-settings="sound-effects"]').waitFor()
+      await cards()[0].getByRole('button', { name: await label(page, 'setting__plugins_close_settings'), exact: true }).click()
+      await cards()[1].getByRole('button', { name: await label(page, 'setting__plugins_settings'), exact: true }).click()
+      await cards()[1].locator('[data-audio-tag-editor]').waitFor()
+      await cards()[1].getByRole('button', { name: await label(page, 'setting__plugins_close_settings'), exact: true }).click()
       await seedTrack(page)
       await page.evaluate(() => {
         window.lxData.musicInfo.lrc = '[00:00.00]Built-in audio check\n[00:01.00]Offline test signal'

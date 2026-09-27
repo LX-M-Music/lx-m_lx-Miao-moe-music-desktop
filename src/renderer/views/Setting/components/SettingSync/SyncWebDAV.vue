@@ -12,6 +12,8 @@
         <base-input id="setting_sync_webdav_password" v-model="form.password" type="password" :disabled="disabled" :trim="false" :auto-paste="false" autocomplete="new-password" />
         <label for="setting_sync_webdav_directory">{{ $t('setting__sync_webdav_directory') }}</label>
         <base-input id="setting_sync_webdav_directory" v-model="form.directory" :disabled="disabled" placeholder="lx-music" :auto-paste="false" />
+        <label for="setting_sync_webdav_playlists_directory">{{ $t('setting__sync_webdav_playlists_directory') }}</label>
+        <base-input id="setting_sync_webdav_playlists_directory" v-model="form.playlistsDirectory" :disabled="disabled" placeholder="LX_Music" :auto-paste="false" />
       </div>
       <div class="p" :class="$style.buttons">
         <base-btn min :disabled="disabled || !dirty" @click="saveConnection">{{ $t('setting__sync_webdav_save') }}</base-btn>
@@ -65,8 +67,8 @@ import SyncDiffPanel from '@renderer/components/common/SyncDiffPanel.vue'
 
 const t = useI18n()
 const sections = ['playlists', 'downloadHistory', 'downloadTasks', 'settings', 'dislike'] as const
-const connectionKeys = ['url', 'username', 'password', 'directory'] as const
-const form = reactive({ url: '', username: '', password: '', directory: '' })
+const connectionKeys = ['url', 'username', 'password', 'directory', 'playlistsDirectory'] as const
+const form = reactive({ url: '', username: '', password: '', directory: '', playlistsDirectory: '' })
 for (const key of connectionKeys) watch(() => appSetting[`sync.webdav.${key}`], value => { form[key] = value }, { immediate: true })
 const saving = ref(false)
 const saved = ref(false)
@@ -104,6 +106,7 @@ const saveConnection = async() => {
       'sync.webdav.username': form.username,
       'sync.webdav.password': form.password,
       'sync.webdav.directory': form.directory.trim(),
+      'sync.webdav.playlistsDirectory': form.playlistsDirectory.trim(),
     })
     saved.value = true
     return true

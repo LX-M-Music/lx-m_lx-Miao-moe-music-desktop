@@ -116,7 +116,7 @@ function makeLyricMenu(saveLyricEdited, removeLyricEdited = async() => {}) {
     '@renderer/store/player/action': { setMusicInfo: () => {} },
     '@renderer/core/lyric': { setLyricOffset: () => {} },
     '@common/utils/errorMessage': { formatError: error => error.message },
-    '@renderer/plugins/Dialog': { dialog: async options => { dialogs.push(options.message) } },
+    '@renderer/plugins/Dialog': { dialog: { error: async options => { dialogs.push(options.message) } } },
   }
   vm.runInNewContext(compiled, {
     module,

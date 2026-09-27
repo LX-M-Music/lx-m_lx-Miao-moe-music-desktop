@@ -16,7 +16,7 @@ node lx-plugin.cjs check ../my-plugin
 node lx-plugin.cjs pack ../my-plugin
 ```
 
-生成 `my-plugin.zip` 后，在 LX-M 的「设置 → 插件商店 → 导入插件」中选择它。设置页会出现插件面板和可点击的计数器。修改 `src/Settings.vue` 后重新打包、导入即可更新。
+生成 `my-plugin.zip` 后，在 LX-M 的「设置 → 插件商店 → 导入插件」中选择它。插件会出现在商店卡片中；点击卡片上的「插件设置」即可使用计数器。修改 `src/Settings.vue` 后重新打包、导入即可更新。
 
 Windows 也可以直接复制 `template` 文件夹到工具包外，修改 plugin.json 的 id，再把插件文件夹拖到 `pack.cmd`。将文件夹或 ZIP 拖到 `check.cmd` 可以校验。文件路径含空格时，命令行中请加双引号。
 

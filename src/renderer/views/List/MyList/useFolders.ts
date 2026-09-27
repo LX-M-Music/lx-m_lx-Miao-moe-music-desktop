@@ -2,11 +2,12 @@ import { computed, reactive, watch, type Ref } from '@common/utils/vueTools'
 import { COOKIE_SOURCES, SOURCE_NAME, type CookieSource } from '@renderer/utils/cookieManager'
 import { userLists } from '@renderer/store/list/state'
 import { libraryPreferences } from '@renderer/utils/library'
+import { isPrivatePlaylistId } from '@common/privatePlaylists'
 
 const STORAGE_KEY = 'my-list-platform-folders'
 
 export const getListFolder = (list?: LX.List.UserListInfo): CookieSource | undefined => {
-  return list && COOKIE_SOURCES.find(source => list.id.startsWith(`userlist_${source}_sync_`))
+  return list && isPrivatePlaylistId(list.id) ? COOKIE_SOURCES.find(source => list.id.startsWith(`userlist_${source}_sync_`)) : undefined
 }
 
 export default ({ listId }: { listId: Ref<string> }) => {

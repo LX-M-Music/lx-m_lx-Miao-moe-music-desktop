@@ -20,13 +20,14 @@ export const mergeSetting = (newSetting: Partial<LX.AppSetting>) => {
     // @ts-expect-error
     appSetting[key] = value
   }
+  if (newSetting['common.showErrorDialog'] === false) globalThis.document?.querySelector('[data-app-load-error]')?.remove()
 }
 
 // Keep the original promise so fire-and-forget callers use the rejection handler attached below.
 // eslint-disable-next-line @typescript-eslint/promise-function-async
 export const updateSetting = window.lxData.updateSetting = (setting: Partial<LX.AppSetting>) => {
   const task = saveSetting(setting)
-  void task.catch(error => { void dialog({ message: formatError(error, window.i18n.t('setting__backup_config_failed'), 'CONFIG_SAVE_FAILED') }) })
+  void task.catch(error => { void dialog.error({ message: formatError(error, window.i18n.t('setting__backup_config_failed'), 'CONFIG_SAVE_FAILED') }) })
   return task
 }
 

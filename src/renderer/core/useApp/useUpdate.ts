@@ -83,7 +83,7 @@ export default () => {
         versionInfo.isUnknown = true
         versionInfo.status = 'error'
         let ignoreFailTipTime = parseInt(localStorage.getItem('update__check_failed_tip') ?? '0')
-        if (Date.now() - ignoreFailTipTime > 7 * 86400000) {
+        if (appSetting['common.showErrorDialog'] && Date.now() - ignoreFailTipTime > 7 * 86400000) {
           versionInfo.showModal = true
         }
         return
@@ -105,7 +105,7 @@ export default () => {
           versionInfo.showModal = true
           if (status == 'error' && preStatus == 'downloading' && !localStorage.getItem('update__download_failed_tip')) {
             setTimeout(() => {
-              void dialog({
+              void dialog.error({
                 message: window.i18n.t('update__error_top'),
                 confirmButtonText: window.i18n.t('alert_button_text'),
               }).finally(() => {

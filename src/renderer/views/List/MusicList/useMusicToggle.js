@@ -42,10 +42,10 @@ export default (props, list) => {
         result = await replaceListMusic(listId, oldId, toggleMusicInfo, true)
       }
       isShowMusicToggleModal.value = false
-      if (result === 'missing') { await dialog({ message: t('music_toggle_missing') }); return }
+      if (result === 'missing') { await dialog.error({ message: t('music_toggle_missing') }); return }
       if (playMusicInfo.listId === listId && playMusicInfo.musicInfo?.id === oldId) playListById(listId, toggleMusicInfo.id)
     } catch {
-      await dialog({ message: t('music_toggle_failed') })
+      await dialog.error({ message: t('music_toggle_failed') })
     } finally { changing.value = false }
   }
 

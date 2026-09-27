@@ -27,6 +27,7 @@ function uiFixture(t, confirm = true, canceled = false) {
   const task = makeTask(); const opened = []; const located = []; const notices = []
   let resolveLookup
   const dialog = async value => { notices.push(value) }
+  dialog.error = dialog
   dialog.confirm = async value => { notices.push(value); return confirm }
   const actions = loader({
     '@common/utils/vueRouter': { useRouter: () => ({}) },

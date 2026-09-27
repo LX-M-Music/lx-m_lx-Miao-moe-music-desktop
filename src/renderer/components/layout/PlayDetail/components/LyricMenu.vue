@@ -204,7 +204,7 @@ export default {
         if (!unmounted && current && ('progress' in current ? current.metadata.musicInfo : current).id === id) offset.value = pending.confirmed.offset
         apply(pending.confirmed)
         pendingLyrics.delete(id)
-        void dialog({ message: formatError(error, window.i18n.t('lyric_menu__save_failed'), 'LYRICS_SAVE_FAILED') }).catch(console.error)
+        void dialog.error({ message: formatError(error, window.i18n.t('lyric_menu__save_failed'), 'LYRICS_SAVE_FAILED') }).catch(console.error)
       }).catch(console.error)
     }
     const setOffset = step => {

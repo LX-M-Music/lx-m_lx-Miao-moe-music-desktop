@@ -149,7 +149,8 @@ import { handleRemoteListAction } from '@main/modules/sync/listEvent'
 const handler: LX.Sync.ServerSyncHandlerListActions<LX.Sync.Server.Socket> = {
   async onListSyncAction(socket, action) {
     if (!socket.moduleReadys.list) return
-    await handleRemoteListAction(action)
+    const sharedAction = await handleRemoteListAction(action)
+    if (!sharedAction) return
     const userSpace = getUserSpace(socket.userInfo.name)
     const key = await userSpace.listManage.createSnapshot()
     await userSpace.listManage.updateDeviceSnapshotKey(socket.keyInfo.clientId, key)
@@ -157,7 +158,7 @@ const handler: LX.Sync.ServerSyncHandlerListActions<LX.Sync.Server.Socket> = {
     const currentId = socket.keyInfo.clientId
     socket.broadcast((client) => {
       if (client.keyInfo.clientId == currentId || !client.moduleReadys?.list || client.userInfo.name != currentUserName) return
-      void client.remoteQueueList.onListSyncAction(action).then(async() => {
+      void client.remoteQueueList.onListSyncAction(sharedAction).then(async() => {
         return userSpace.listManage.updateDeviceSnapshotKey(client.keyInfo.clientId, key)
       }).catch(err => {
         // TODO send status

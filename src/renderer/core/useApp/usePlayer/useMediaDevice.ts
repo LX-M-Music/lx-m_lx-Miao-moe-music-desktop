@@ -29,7 +29,7 @@ export default () => {
 
     if (!device && !devices.length && !isShowingTipAlert) {
       isShowingTipAlert = true
-      void dialog({
+      void dialog.error({
         message: window.i18n.t('media_device__empty_device_tip'),
         confirmButtonText: window.i18n.t('ok'),
       }).finally(() => {

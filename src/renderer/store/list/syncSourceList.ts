@@ -10,7 +10,7 @@ import { queuePlaylistSync } from '@renderer/utils/syncQueue'
 import { formatError } from '@common/utils/errorMessage'
 
 export const showSyncError = (error: unknown) => {
-  void dialog({ message: formatError(error, window.i18n.t(`list_writeback__error_${error instanceof WritebackError ? error.code : 'failed'}`), 'PLAYLIST_SYNC_FAILED') })
+  void dialog.error({ message: formatError(error, window.i18n.t(`list_writeback__error_${error instanceof WritebackError ? error.code : 'failed'}`), 'PLAYLIST_SYNC_FAILED') })
 }
 
 const fetchList = async(id: string, source: LX.OnlineSource, sourceListId: string) => {

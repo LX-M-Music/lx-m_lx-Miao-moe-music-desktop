@@ -9,11 +9,10 @@ import audioTagEditor from '../../optional-plugins/audio-tag-editor'
 import { editor } from '../../optional-plugins/audio-tag-editor/session'
 
 const modules: Record<string, PluginModule> = {
-  'sound-effects': { ...soundEffects, components: { SoundEffectButton: soundEffects.components.SoundEffectButton } },
+  'sound-effects': { ...soundEffects, components: { SoundEffectButton: soundEffects.components.SoundEffectButton, Settings: soundEffects.components.Settings } },
   'audio-tag-editor': {
     ...audioTagEditor,
-    // The bundled editor opens in Downloads; the archived plugin keeps its older settings API.
-    components: {},
+    components: { Settings: audioTagEditor.components.Settings },
     activate() {
       const dispose = audioTagEditor.activate()
       return () => { editor.visible = false; dispose() }

@@ -262,7 +262,7 @@ export default {
         theme = null
       }
       if (!theme?.config?.themeColors || !theme?.config?.extInfo) {
-        void dialog({
+        void dialog.error({
           message: formatError(importError ?? { code: 'THEME_INVALID_DATA', message: t('theme_import_failed') }, '', 'THEME_LOAD_FAILED'),
           confirmButtonText: t('alert_button_text'),
         })
@@ -304,7 +304,7 @@ export default {
       await saveTheme(newTheme)
       init()
       void dialog({
-        message: importError ? formatError(importError, t('theme_import_success'), 'THEME_BACKGROUND_LOAD_FAILED') : t('theme_import_success'),
+        message: importError && appSetting['common.showErrorDialog'] ? formatError(importError, t('theme_import_success'), 'THEME_BACKGROUND_LOAD_FAILED') : t('theme_import_success'),
         confirmButtonText: t('alert_button_text'),
       })
     }

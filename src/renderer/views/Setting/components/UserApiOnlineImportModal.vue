@@ -64,14 +64,14 @@ export default {
       try {
         script = await httpFetch(url, { follow_max: 3 }).promise.then(resp => resp.body)
       } catch (err) {
-        void dialog(this.$t('user_api_import__failed', { message: formatError(err, '', 'SOURCE_IMPORT_FAILED') }))
+        void dialog.error(this.$t('user_api_import__failed', { message: formatError(err, '', 'SOURCE_IMPORT_FAILED') }))
         return
       } finally {
         this.disabled = false
         this.btnText = this.$t('user_api_import_online__input_confirm')
       }
       if (script.length > 9_000_000) {
-        void dialog(this.$t('user_api_import__failed', {
+        void dialog.error(this.$t('user_api_import__failed', {
           message: 'Too large script',
           confirm: this.$t('ok'),
         }))

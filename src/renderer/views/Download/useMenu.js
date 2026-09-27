@@ -157,9 +157,9 @@ export default ({
       action.pluginAction.run(task.id, {
         openSettings: async() => {
           if (!pluginRuntime.downloadActions[action.pluginId]?.includes(action.pluginAction)) return
-          await router.push({ path: '/setting', query: { name: `SettingPlugin_${action.pluginId}` } })
+          await router.push({ path: '/setting', query: { name: 'SettingPluginStore', plugin: action.pluginId } })
         },
-      }).catch(error => { console.error('Download plugin action failed:', error); return dialog({ message: String(error.message ?? error) }) })
+      }).catch(error => { console.error('Download plugin action failed:', error); return dialog.error({ message: String(error.message ?? error) }) })
       return
     }
     switch (action.action) {

@@ -64,9 +64,20 @@ exports.createDAV = async() => {
     files, directories, requests, errors, control,
     config: { url: `http://127.0.0.1:${server.address().port}/dav/`, username: 'fixture', password: ' pass word ', directory: 'lx-music' },
     file: '/dav/lx-music/lx-music-sync.json',
+    playlistFile: '/dav/LX_Music/playlists.json',
     seed(data) {
+      const { playlists, ...other } = data
+      directories.add('/dav/lx-music/')
+      files.set('/dav/lx-music/lx-music-sync.json', JSON.stringify(exports.snapshot(other)))
+      if (playlists) this.seedMobile({ version: '2', lastModified: Date.now(), data: { ...playlists, tempList: [] } })
+    },
+    seedLegacy(data) {
       directories.add('/dav/lx-music/')
       files.set('/dav/lx-music/lx-music-sync.json', JSON.stringify(exports.snapshot(data)))
+    },
+    seedMobile(data) {
+      directories.add('/dav/LX_Music/')
+      files.set('/dav/LX_Music/playlists.json', JSON.stringify(data))
     },
     async close() {
       server.closeAllConnections()

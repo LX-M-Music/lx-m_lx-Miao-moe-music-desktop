@@ -8,21 +8,25 @@ import { hash, normalizeData, parseSnapshot, selectedSections, validateData } fr
 import { planSync, type Baseline } from './plan'
 import { WebDAVError } from './errors'
 import { errorForTransport, getErrorInfo } from '@common/utils/errorMessage'
+import { retainPrivatePlaylists, sharedPlaylistData } from '@common/privatePlaylists'
+import { buildMobilePlaylists, parseMobilePlaylists } from './mobilePlaylists'
 
 const state = { busy: false }
 interface Restored { dislike?: string, hashes?: Partial<Record<LX.WebDAV.Section, string>> }
 // One bounded remote document. A 304 reuses its parsed data as well as its body.
 let cached: { identity: string, file: RemoteFile, snapshot: LX.WebDAV.Snapshot, normalized: LX.WebDAV.Data, validated: Set<LX.WebDAV.Section>, hashes: Partial<Record<LX.WebDAV.Section, string>> } | undefined
+let mobileCached: { identity: string, remoteFile: RemoteFile, parsed: ReturnType<typeof parseMobilePlaylists> } | undefined
 export const getWebDAVLastResult = (): LX.WebDAV.Result | null => getStore('webdav').get<LX.WebDAV.Result>('lastResult') ?? null
 
-const applyLocal = async(data: LX.WebDAV.Data, sections: LX.WebDAV.Section[], revision: string, checkSettings: () => void) => withStoreExclusive(async() => {
+const applyLocal = async(data: LX.WebDAV.Data, sections: LX.WebDAV.Section[], revision: string, checkSettings: () => void, localPlaylists?: LX.Sync.List.ListData) => withStoreExclusive(async() => {
   checkSettings()
+  const restoreData = data.playlists && localPlaylists ? { ...data, playlists: retainPrivatePlaylists(data.playlists, localPlaylists) } : data
   const config = getStore(STORE_NAMES.APP_SETTINGS)
   const change = data.settings ? mergeSetting(config.get<LX.AppSetting>('setting') ?? global.lx.appSetting, data.settings) : undefined
   const next = change ? { ...config.snapshot(), setting: change.setting } : undefined
   let restored: Restored
   try {
-    restored = await global.lx.worker.dbService.webdavRestore(global.lxDataPath, data, next ? [{ name: 'config_v2.json', data: serializePublicConfig(next) }] : [], sections, revision)
+    restored = await global.lx.worker.dbService.webdavRestore(global.lxDataPath, restoreData, next ? [{ name: 'config_v2.json', data: serializePublicConfig(next) }] : [], sections, revision)
     protectStoreRecovery(null)
   } catch (error) {
     if (String(error).includes('backup:rollback_failed')) protectStoreRecovery(error instanceof Error ? error : new Error(String(error)))
@@ -35,7 +39,7 @@ const applyLocal = async(data: LX.WebDAV.Data, sections: LX.WebDAV.Section[], re
   // Notify renderers only after every selected section has committed.
   const notify = (action: () => void) => { try { action() } catch (error) { console.error('WebDAV committed notification failed', errorForTransport(error)) } }
   if (change) notify(() => { global.lx.event_app.config_committed(change.setting, change.updatedSettingKeys, change.updatedSetting) })
-  if (data.playlists) notify(() => { global.lx.event_list.list_data_restored(data.playlists!) })
+  if (restoreData.playlists) notify(() => { global.lx.event_list.list_data_restored(restoreData.playlists!) })
   if (restored.dislike !== undefined) notify(() => { global.lx.event_dislike.dislike_data_restored(restored.dislike!) })
   return restored
 })
@@ -48,36 +52,55 @@ export const runWebDAV = async(operation: LX.WebDAV.Operation): Promise<LX.WebDA
     const settings = { ...global.lx.appSetting }
     if (!['test', 'sync', 'upload', 'download'].includes(operation)) throw new WebDAVError('invalid_config')
     if (operation !== 'test' && !settings['sync.webdav.enable']) throw new WebDAVError('disabled')
-    const client = createClient({ url: settings['sync.webdav.url'], username: settings['sync.webdav.username'], password: settings['sync.webdav.password'], directory: settings['sync.webdav.directory'] })
-    if (operation === 'test') await client.test()
+    const config = { url: settings['sync.webdav.url'], username: settings['sync.webdav.username'], password: settings['sync.webdav.password'], directory: settings['sync.webdav.directory'] }
+    const client = createClient(config)
+    const mobileClient = createClient({ ...config, directory: settings['sync.webdav.playlistsDirectory'] }, 'playlists.json')
+    if (operation === 'test') {
+      if (selectedSections(settings).some(section => section !== 'playlists') || !settings['sync.webdav.playlists']) await client.test()
+      if (settings['sync.webdav.playlists']) await mobileClient.test()
+    }
     else {
       const sections = selectedSections(settings)
       if (!sections.length) throw new WebDAVError('empty_selection')
+      const primarySections = sections.filter(section => section !== 'playlists')
+      const syncPlaylists = sections.includes('playlists')
       const storage = getStore('webdav')
-      const identity = hash(client.identity)
+      const identity = hash([client.identity, mobileClient.identity])
       const cacheIdentity = hash([client.identity, settings['sync.webdav.password']])
+      const mobileCacheIdentity = hash([mobileClient.identity, settings['sync.webdav.password']])
       if (cached?.identity !== cacheIdentity) cached = undefined
+      if (mobileCached?.identity !== mobileCacheIdentity) mobileCached = undefined
       const baseline = storage.get<{ identity: string, data: Baseline }>('baseline')
-      const previous = baseline?.identity === identity ? baseline.data : {}
+      const previous = baseline?.identity === identity || baseline?.identity === hash(client.identity) ? baseline.data : {}
       const captured = await global.lx.worker.dbService.webdavRead(sections)
       const raw = { ...captured.data, ...(sections.includes('settings') ? { settings } : {}) }
-      validateData(raw, sections)
-      const local = normalizeData(raw, sections)
+      const sharedRaw = raw.playlists ? { ...raw, playlists: sharedPlaylistData(raw.playlists) } : raw
+      validateData(sharedRaw, sections)
+      const local = normalizeData(sharedRaw, sections)
       const localHashes = Object.fromEntries(sections.map(section => [section, hash(local[section])]))
-      const remoteFile = await client.read(cached?.file)
-      if (operation === 'download' && remoteFile.content == null) throw new WebDAVError('missing_remote')
+      const mobileFile = syncPlaylists ? await mobileClient.read(mobileCached?.remoteFile) : undefined
+      const mobileParsed = mobileFile?.unchanged && mobileCached ? mobileCached.parsed : mobileFile?.content == null ? undefined : parseMobilePlaylists(mobileFile.content)
+      if (mobileFile && mobileParsed) mobileCached = { identity: mobileCacheIdentity, remoteFile: mobileFile, parsed: mobileParsed }
+      else if (mobileFile) mobileCached = undefined
+      const readPrimary = primarySections.length > 0 || (syncPlaylists && !mobileParsed)
+      const remoteFile: RemoteFile = readPrimary ? await client.read(cached?.file) : { content: null }
       const remote = remoteFile.unchanged && cached ? cached.snapshot : remoteFile.content == null ? { type: 'lx-music-webdav' as const, version: 1 as const, updatedAt: 0, data: {} } : parseSnapshot(remoteFile.content)
       const normalized = remoteFile.unchanged && cached ? cached.normalized : {}
       const validated = remoteFile.unchanged && cached ? cached.validated : new Set<LX.WebDAV.Section>()
-      const unchecked = sections.filter(section => !validated.has(section))
+      const unchecked = primarySections.filter(section => !validated.has(section))
       validateData(remote.data, unchecked)
       Object.assign(normalized, normalizeData(remote.data, unchecked))
       for (const section of unchecked) validated.add(section)
-      const remoteData: LX.WebDAV.Data = Object.fromEntries(sections.map(section => [section, normalized[section]]))
-      const remoteHashes = remoteFile.unchanged && cached ? cached.hashes : {}
+      if (readPrimary) cached = { identity: cacheIdentity, file: remoteFile, snapshot: remote, normalized, validated, hashes: remoteFile.unchanged && cached ? cached.hashes : {} }
+      if (syncPlaylists && !mobileParsed && remote.data.playlists && (!Array.isArray(remote.data.playlists.userList) || remote.data.playlists.userList.some(list => !list || typeof list !== 'object'))) throw new WebDAVError('invalid_data', ['playlists'])
+      const legacyPlaylists = syncPlaylists && !mobileParsed && remote.data.playlists ? sharedPlaylistData(remote.data.playlists) : undefined
+      if (legacyPlaylists) validateData({ playlists: legacyPlaylists }, ['playlists'])
+      const remoteData: LX.WebDAV.Data = { ...Object.fromEntries(primarySections.map(section => [section, normalized[section]])), ...(syncPlaylists ? { playlists: mobileParsed?.playlists ?? legacyPlaylists } : {}) }
+      if (operation === 'download' && (primarySections.length && remoteFile.content == null || syncPlaylists && !remoteData.playlists && !primarySections.length)) throw new WebDAVError('missing_remote')
+      const remoteHashes = remoteFile.unchanged && cached ? { ...cached.hashes } : {}
+      if (syncPlaylists) remoteHashes.playlists = hash(remoteData.playlists)
       for (const section of sections) remoteHashes[section] ??= hash(remoteData[section])
-      // eslint-disable-next-line require-atomic-updates -- The busy guard serializes all access to this cache.
-      cached = { identity: cacheIdentity, file: remoteFile, snapshot: remote, normalized, validated, hashes: remoteHashes }
+      if (readPrimary && cached) cached.hashes = remoteHashes
       const hashes: Baseline = Object.fromEntries(sections.map(section => [section, { local: localHashes[section], remote: remoteHashes[section]! }]))
       let plan: ReturnType<typeof planSync>
       try { plan = planSync(operation, local, remoteData, previous, sections, hashes) } catch (error) {
@@ -95,17 +118,24 @@ export const runWebDAV = async(operation: LX.WebDAV.Operation): Promise<LX.WebDA
       }
       await checkLocal()
       if (plan.download.length) await getStore('webdav-local-backup').override({ type: 'lx-music-webdav', version: 1, updatedAt: Date.now(), data: Object.fromEntries(plan.download.map(section => [section, section === 'settings' ? local.settings : raw[section]])) })
-      if (plan.upload.length) {
-        const upload: LX.WebDAV.Snapshot = { ...remote, updatedAt: Date.now(), data: { ...remote.data, ...Object.fromEntries(plan.upload.map(section => [section, local[section]])) } }
+      const playlistUpload = syncPlaylists && (plan.upload.includes('playlists') || !mobileParsed && remoteData.playlists !== undefined || mobileParsed?.containsPrivate)
+      if (playlistUpload) {
+        const content = buildMobilePlaylists(mobileParsed?.file, (plan.upload.includes('playlists') ? local.playlists : remoteData.playlists)!)
+        const file = await mobileClient.write(JSON.stringify(content), mobileFile!)
+        mobileCached = { identity: mobileCacheIdentity, remoteFile: file, parsed: parseMobilePlaylists(JSON.stringify(content)) }
+        result.uploaded.push('playlists')
+      }
+      const primaryUpload = plan.upload.filter(section => section !== 'playlists')
+      if (primaryUpload.length) {
+        const upload: LX.WebDAV.Snapshot = { ...remote, updatedAt: Date.now(), data: { ...remote.data, ...Object.fromEntries(primaryUpload.map(section => [section, local[section]])) } }
         const file = await client.write(JSON.stringify(upload), remoteFile)
-        // eslint-disable-next-line require-atomic-updates -- The busy guard stays held until the result is persisted.
-        cached = { identity: cacheIdentity, file, snapshot: upload, normalized: { ...normalized, ...Object.fromEntries(plan.upload.map(section => [section, local[section]])) }, validated, hashes: { ...remoteHashes, ...Object.fromEntries(plan.upload.map(section => [section, localHashes[section]])) } }
-        result.uploaded = plan.upload
+        cached = { identity: cacheIdentity, file, snapshot: upload, normalized: { ...normalized, ...Object.fromEntries(primaryUpload.map(section => [section, local[section]])) }, validated, hashes: { ...remoteHashes, ...Object.fromEntries(primaryUpload.map(section => [section, localHashes[section]])) } }
+        result.uploaded.push(...primaryUpload)
       }
       let restored: Restored = {}
       if (plan.download.length) {
         await checkLocal()
-        restored = await applyLocal(Object.fromEntries(plan.download.map(section => [section, remoteData[section]])), sections, captured.revision, checkSettings)
+        restored = await applyLocal(Object.fromEntries(plan.download.map(section => [section, remoteData[section]])), sections, captured.revision, checkSettings, raw.playlists)
         result.downloaded = plan.download
       }
       const next: Baseline = { ...previous }
@@ -116,6 +146,7 @@ export const runWebDAV = async(operation: LX.WebDAV.Operation): Promise<LX.WebDA
         }
       }
       await storage.set('baseline', { identity, data: next })
+      result.uploaded.sort((a, b) => sections.indexOf(a) - sections.indexOf(b))
     }
     result.success = true
   } catch (error) {

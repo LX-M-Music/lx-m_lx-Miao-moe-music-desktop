@@ -69,7 +69,7 @@ export default {
       return importUserApi(script).then(({ apiList }) => {
         userApi.list = apiList
       }).catch((err) => {
-        if (showError) void dialog(this.$t('user_api_import__failed', { message: formatError(err, '', 'SOURCE_IMPORT_FAILED') }))
+        if (showError) void dialog.error(this.$t('user_api_import__failed', { message: formatError(err, '', 'SOURCE_IMPORT_FAILED') }))
         return err
       })
     },
@@ -110,7 +110,7 @@ export default {
         }
       }
       if (errors.length) {
-        void dialog(this.$t('user_api_import__failed', { message: errors.join('\n') }))
+        void dialog.error(this.$t('user_api_import__failed', { message: errors.join('\n') }))
       }
     },
     handleExport() {

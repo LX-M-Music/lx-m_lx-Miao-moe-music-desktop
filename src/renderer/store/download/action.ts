@@ -31,7 +31,7 @@ let downloadMutations = 0
 let pendingTaskUpdate: Promise<unknown> = Promise.resolve()
 const checkDownloadSyncLock = () => {
   if (!downloadSyncLocked) return false
-  showToast(window.i18n.t('setting__sync_webdav_error_busy'))
+  showToast(window.i18n.t('setting__sync_webdav_error_busy'), { error: true })
   return true
 }
 
@@ -432,7 +432,7 @@ export const createDownloadTasks = async(list: LX.Music.MusicInfoOnline[], quali
         : preview.summary.overBatch ? 'download__space_batch_exceeded'
           : preview.summary.insufficientDisk ? 'download__space_disk_shortage' : null
     if (failureKey) {
-      showToast(window.i18n.t(failureKey, { count: preview.summary.overTaskCount }))
+      showToast(window.i18n.t(failureKey, { count: preview.summary.overTaskCount }), { error: true })
       return false
     }
     const batchLimitBytes = downloadLimitBytes(appSetting['download.maxBatchSizeMiB'])
@@ -444,7 +444,7 @@ export const createDownloadTasks = async(list: LX.Music.MusicInfoOnline[], quali
     void checkStartTask()
     return true
   } catch (error) {
-    showToast(formatError(error, window.i18n.t('download___status_error'), 'DOWNLOAD_CREATE_FAILED'))
+    showToast(formatError(error, window.i18n.t('download___status_error'), 'DOWNLOAD_CREATE_FAILED'), { error: true })
     return false
   } finally { downloadMutations-- }
 }

@@ -2,6 +2,7 @@
 import { removeSelectModeListener, sendCloseSelectMode, sendSelectMode } from '@main/modules/winMain'
 import { getUserSpace, getUserConfig } from '../../../user'
 import { buildUserListInfoFull, getLocalListData, setLocalListData } from '@main/modules/sync/listEvent'
+import { isPrivatePlaylistId, sharedPlaylistData } from '@common/privatePlaylists'
 import { SYNC_CLOSE_CODE } from '@common/constants_sync'
 // import { LIST_IDS } from '@common/constants'
 
@@ -19,9 +20,10 @@ const patchListData = (listData: Partial<LX.Sync.List.ListData>): LX.Sync.List.L
   }, listData)
 }
 
-const getRemoteListData = async(socket: LX.Sync.Server.Socket): Promise<LX.Sync.List.ListData> => {
+const getRemoteListData = async(socket: LX.Sync.Server.Socket): Promise<{ data: LX.Sync.List.ListData, hasPrivate: boolean }> => {
   console.log('getRemoteListData')
-  return patchListData(await socket.remoteQueueList.list_sync_get_list_data())
+  const raw = patchListData(await socket.remoteQueueList.list_sync_get_list_data())
+  return { data: sharedPlaylistData(raw), hasPrivate: raw.userList.some(list => isPrivatePlaylistId(list.id)) }
 }
 
 const getRemoteListMD5 = async(socket: LX.Sync.Server.Socket): Promise<string> => {
@@ -197,7 +199,8 @@ const handleMergeListData = async(socket: LX.Sync.Server.Socket): Promise<[LX.Sy
   const mode: LX.Sync.List.SyncMode = await getSyncMode(socket)
 
   if (mode == 'cancel') throw new Error('cancel')
-  const [remoteListData, localListData] = await Promise.all([getRemoteListData(socket), getLocalListData()])
+  const [remote, localListData] = await Promise.all([getRemoteListData(socket), getLocalListData()])
+  const remoteListData = remote.data
   console.log('handleMergeListData', 'remoteListData, localListData')
   let listData: LX.Sync.List.ListData
   let requiredUpdateLocalListData = true
@@ -227,11 +230,12 @@ const handleMergeListData = async(socket: LX.Sync.Server.Socket): Promise<[LX.Sy
     // case 'cancel':
     default: throw new Error('cancel')
   }
-  return [listData, requiredUpdateLocalListData, requiredUpdateRemoteListData]
+  return [listData, requiredUpdateLocalListData, requiredUpdateRemoteListData || remote.hasPrivate]
 }
 
 const handleSyncList = async(socket: LX.Sync.Server.Socket) => {
-  const [remoteListData, localListData] = await Promise.all([getRemoteListData(socket), getLocalListData()])
+  const [remote, localListData] = await Promise.all([getRemoteListData(socket), getLocalListData()])
+  const remoteListData = remote.data
   console.log('handleSyncList', 'remoteListData, localListData')
   console.log('localListData', localListData.defaultList.length || localListData.loveList.length || localListData.userList.length)
   console.log('remoteListData', remoteListData.defaultList.length || remoteListData.loveList.length || remoteListData.userList.length)
@@ -259,8 +263,10 @@ const handleSyncList = async(socket: LX.Sync.Server.Socket) => {
     if (remoteListData.defaultList.length || remoteListData.loveList.length || remoteListData.userList.length) {
       key = await setLocalList(socket, remoteListData)
       await overwriteRemoteListData(socket, remoteListData, key, [clientId])
+      if (remote.hasPrivate) await setRemotelList(socket, remoteListData, key)
     }
     key ??= await userSpace.listManage.getCurrentListInfoKey()
+    if (remote.hasPrivate && !remoteListData.defaultList.length && !remoteListData.loveList.length && !remoteListData.userList.length) await setRemotelList(socket, remoteListData, key)
     await userSpace.listManage.updateDeviceSnapshotKey(clientId, key)
   }
 }
@@ -326,7 +332,8 @@ const handleMergeListDataFromSnapshot = async(socket: LX.Sync.Server.Socket, sna
   if (await checkListLatest(socket)) return
 
   const addMusicLocationType = getUserConfig(socket.userInfo.name)['list.addMusicLocationType']
-  const [remoteListData, localListData] = await Promise.all([getRemoteListData(socket), getLocalListData()])
+  const [remote, localListData] = await Promise.all([getRemoteListData(socket), getLocalListData()])
+  const remoteListData = remote.data
   const newListData: LX.Sync.List.ListData = {
     defaultList: [],
     loveList: [],
@@ -336,6 +343,7 @@ const handleMergeListDataFromSnapshot = async(socket: LX.Sync.Server.Socket, sna
   newListData.loveList = mergeListDataFromSnapshot(localListData.loveList, remoteListData.loveList, snapshot.loveList, addMusicLocationType)
   const localUserListData = createUserListDataObj(localListData)
   const remoteUserListData = createUserListDataObj(remoteListData)
+  snapshot = sharedPlaylistData(snapshot)
   const snapshotUserListData = createUserListDataObj(snapshot)
   const removedListIds = new Set<string | number>()
   const localUserListIds = new Set<string | number>()

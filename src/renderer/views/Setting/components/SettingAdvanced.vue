@@ -28,6 +28,17 @@ common-setting-reveal(tag="dd" :show="appSetting['ui.smoothAnimation']" data-set
     )
 
 dd
+  h3#advanced_errors {{ $t('setting__advanced_errors') }}
+  .gap-top
+    base-checkbox(
+      id="setting_advanced_show_error_dialog"
+      :model-value="appSetting['common.showErrorDialog']"
+      :label="$t('setting__advanced_show_error_dialog')"
+      @update:model-value="updateSetting({ 'common.showErrorDialog': $event })"
+    )
+    svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_show_error_dialog_tip')")
+
+dd
   h3#advanced_background {{ $t('setting__advanced_background') }}
   .gap-top
     base-checkbox(

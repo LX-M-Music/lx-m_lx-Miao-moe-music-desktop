@@ -127,11 +127,20 @@ test('settings remember navigation for the running session and reset after resta
         await at(cancel ? 0 : basicTop)
       }
     })
-    await t.test('an uninstalled remembered plugin falls back to the store', async() => {
+    await t.test('legacy plugin links open the store and removed plugins leave the store usable', async() => {
       await mockGitHub(app)
       await openStore(page)
       await install(page, 'audio-visualizer')
-      await select('SettingPlugin_audio-visualizer')
+      await route(page, '/setting?name=SettingPlugin_audio-visualizer')
+      await settled(page)
+      assert.equal(await selected(), 'SettingPluginStore')
+      await page.locator('[data-plugin-id="audio-visualizer"] [data-plugin-settings="audio-visualizer"]').waitFor()
+      assert.equal(await page.locator('[data-setting-tab^="SettingPlugin_"]').count(), 0)
+      await select('SettingAdvanced')
+      await route(page, '/setting?name=SettingPluginStore&plugin=audio-visualizer')
+      await settled(page)
+      assert.equal(await selected(), 'SettingPluginStore')
+      await page.locator('[data-plugin-id="audio-visualizer"] [data-plugin-settings="audio-visualizer"]').waitFor()
       await leave()
       await page.evaluate(() => require('electron').ipcRenderer.invoke('optional_plugins:uninstall', 'audio-visualizer'))
       await enter()

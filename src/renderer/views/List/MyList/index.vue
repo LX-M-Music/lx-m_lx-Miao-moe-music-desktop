@@ -22,6 +22,18 @@
     </div>
     <ul ref="dom_lists_list" class="scroll" :class="[$style.listsContent, { [$style.sortable]: isModDown || isDragging }]">
       <li
+        class="default-list" :class="[$style.listsItem, {[$style.active]: defaultList.id == listId}, {[$style.clicked]: rightClickItemIndex == -2}, {[$style.fetching]: fetchingListStatus[defaultList.id]}]"
+        :aria-label="$t(defaultList.name)" :aria-selected="defaultList.id == listId"
+        @contextmenu="handleListsItemRigthClick($event, -2)" @click="handleListToggle(defaultList.id)"
+      >
+        <span :class="$style.listsLabel">
+          <transition name="list-active">
+            <svg-icon v-if="defaultList.id == listId" name="angle-right-solid" :class="$style.activeIcon" />
+          </transition>
+          {{ $t(defaultList.name) }}
+        </span>
+      </li>
+      <li
         class="default-list" :class="[$style.listsItem, {[$style.active]: LIST_IDS.HISTORY == listId}]"
         :aria-label="$t('history__title')" :aria-selected="LIST_IDS.HISTORY == listId"
         @click="handleListToggle(LIST_IDS.HISTORY)"
@@ -105,7 +117,7 @@ import ListUpdateModal from './components/ListUpdateModal.vue'
 import RecycleBinModal from './components/RecycleBinModal.vue'
 import PlaylistTagsModal from './components/PlaylistTagsModal.vue'
 
-import { loveList, userLists, fetchingListStatus } from '@renderer/store/list/state'
+import { defaultList, loveList, userLists, fetchingListStatus } from '@renderer/store/list/state'
 import { removeUserList } from '@renderer/store/list/action'
 
 import { computed, ref, watch, useCssModule } from '@common/utils/vueTools'
@@ -196,7 +208,7 @@ export default {
         if (!isRemove) return
         if (!await removeUserList([listInfo.id])) return
         if (props.listId == listInfo.id) {
-          handleListToggle(LIST_IDS.HISTORY)
+          handleListToggle(LIST_IDS.DEFAULT)
         }
       })
     }
@@ -249,12 +261,12 @@ export default {
     })
 
     watch(() => userLists, (lists) => {
-      if (props.listId === LIST_IDS.HISTORY || props.listId === loveList.id) return
+      if (props.listId === LIST_IDS.DEFAULT || props.listId === LIST_IDS.HISTORY || props.listId === loveList.id) return
       if (lists.some(l => l.id == props.listId)) return
       void router.replace({
         path: '/list',
         query: {
-          id: LIST_IDS.HISTORY,
+          id: LIST_IDS.DEFAULT,
         },
       })
     })
@@ -265,6 +277,7 @@ export default {
       tagsListInfo,
       LIST_IDS,
       rightClickItemIndex,
+      defaultList,
       loveList,
       userLists,
       listGroups,

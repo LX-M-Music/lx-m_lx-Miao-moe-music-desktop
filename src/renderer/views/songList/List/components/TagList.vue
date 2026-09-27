@@ -16,7 +16,7 @@
           <p>{{ $t('list__loading') }}</p>
         </div>
         <div v-else-if="isLoadFailed" class="ui-state ui-state-error" role="status">
-          <p>{{ loadError }}</p>
+          <p>{{ appSetting['common.showErrorDialog'] ? loadError : $t('list__load_failed') }}</p>
           <base-btn min @click="loadTags(source)">{{ $t('reload') }}</base-btn>
         </div>
         <dl v-for="tagInfo in list" :key="tagInfo.name">
@@ -30,6 +30,7 @@
 
 <script setup>
 import { formatError } from '@common/utils/errorMessage'
+import { appSetting } from '@renderer/store/setting'
 import { watch, shallowReactive, ref, onMounted, onBeforeUnmount, computed, reactive } from '@common/utils/vueTools'
 import { setTags, getTags } from '@renderer/store/songList/action'
 import { tags } from '@renderer/store/songList/state'

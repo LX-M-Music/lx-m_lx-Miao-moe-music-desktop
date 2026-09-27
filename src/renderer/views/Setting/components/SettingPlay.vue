@@ -105,7 +105,7 @@ export default {
     const mediaDeviceId = ref(appSetting['player.mediaDeviceId'])
     const handleMediaDeviceIdChnage = async() => {
       if (hasInitedAdvancedAudioFeatures() && !supportsAudioOutputDeviceSelection()) {
-        await dialog({
+        await dialog.error({
           message: t('setting__play_media_device_error_tip'),
           confirmButtonText: t('alert_button_text'),
         })

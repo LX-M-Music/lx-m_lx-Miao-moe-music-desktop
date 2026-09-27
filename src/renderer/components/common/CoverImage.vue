@@ -32,7 +32,8 @@ const showError = (error: unknown) => {
   const parent = element.value?.parentElement
   if (parent) {
     parent.dataset.coverError = ''
-    parent.title = formatError(error, '', 'COVER_LOAD_FAILED')
+    if (window.lxData?.appSetting?.['common.showErrorDialog']) parent.title = formatError(error, '', 'COVER_LOAD_FAILED')
+    else parent.removeAttribute('title')
   }
   emit('error', new CustomEvent('error', { detail: getErrorInfo(error, 'COVER_LOAD_FAILED') }))
 }

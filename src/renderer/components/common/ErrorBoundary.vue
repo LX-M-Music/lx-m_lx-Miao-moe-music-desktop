@@ -4,7 +4,7 @@
       <div :class="$style.card">
         <svg-icon name="help-circle-outline" :class="$style.icon" />
         <h2 :class="$style.title">{{ $t('error_view__title') }}</h2>
-        <div :class="$style.detail">
+        <div v-if="appSetting['common.showErrorDialog']" :class="$style.detail">
           <p :class="$style.row">
             <span :class="$style.label">{{ $t('error_view__reason') }}</span>
             <span :class="$style.value" :title="errorInfo?.message">{{ errorInfo?.message }}</span>
@@ -28,6 +28,7 @@
 <script setup lang="ts">
 import { onErrorCaptured, ref, watch } from '@common/utils/vueTools'
 import { useRoute, useRouter } from '@common/utils/vueRouter'
+import { appSetting } from '@renderer/store/setting'
 
 interface ErrorInfo {
   message: string

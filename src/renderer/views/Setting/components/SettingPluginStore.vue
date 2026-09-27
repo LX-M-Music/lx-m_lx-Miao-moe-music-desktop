@@ -8,20 +8,24 @@
       </div>
     </div>
     <p v-if="pluginTransferNotice" :class="$style.notice" :role="pluginTransferNotice.error ? 'alert' : 'status'" data-plugin-transfer-status>{{ pluginTransferNotice.message }}</p>
-    <p v-if="pluginStore.catalogError || pluginStoreError" :class="$style.notice" role="status">{{ formatError(pluginStore.catalogError || pluginStoreError, $t('setting__plugins_catalog_error'), 'PLUGIN_CATALOG_LOAD_FAILED') }}</p>
+    <p v-if="pluginStore.catalogError || pluginStoreError" :class="$style.notice" role="status">{{ appSetting['common.showErrorDialog'] ? formatError(pluginStore.catalogError || pluginStoreError, $t('setting__plugins_catalog_error'), 'PLUGIN_CATALOG_LOAD_FAILED') : $t('setting__plugins_catalog_error') }}</p>
     <p v-if="!refreshing && !items.length" :class="$style.notice" role="status">{{ $t('setting__plugins_empty') }}</p>
-    <div :class="$style.grid">
-      <article v-for="item in items" :key="item.id" :class="$style.card" :data-plugin-id="item.id" :data-setting-search="`plugin-card:${item.id}`">
+    <div ref="grid" :class="$style.grid">
+      <article v-for="item in items" :key="item.id" :class="[$style.card, { [$style.expanded]: expanded === item.id && item.hasSettings }]" :data-plugin-id="item.id" :data-setting-search="`plugin-card:${item.id}`">
         <div :class="$style.cardHeader">
           <span :class="$style.icon" aria-hidden="true"><svg viewBox="0 0 24 24"><use :xlink:href="item.icon" /></svg></span>
           <div>
-            <div :class="$style.titleRow"><h3 :class="$style.title">{{ item.title }}</h3><svg-icon v-if="pluginHelpText(item)" class="help-icon" name="help-circle-outline" :aria-label="pluginHelpText(item)" /></div>
+            <h3 :class="$style.title">{{ item.title }}</h3>
             <p :class="$style.meta">{{ $t(item.local ? 'setting__plugins_local' : 'setting__plugins_official') }}<span v-if="item.version"> · v{{ item.version }}</span></p>
           </div>
           <span :class="[$style.badge, {[$style.installed]: item.loaded}]" data-plugin-status>{{ $t(item.builtin ? 'setting__plugins_builtin' : item.broken ? 'setting__plugins_broken' : item.disabled ? 'setting__plugins_disabled' : item.installed ? 'setting__plugins_installed' : 'setting__plugins_available') }}</span>
         </div>
+        <p v-if="item.description" :class="$style.description">{{ item.description }}</p>
+        <p v-if="item.builtin && item.id === 'audio-tag-editor'" :class="$style.meta">{{ $t('setting__plugins_tag_editor_hint') }}</p>
+        <p v-if="item.builtin && item.id === 'sound-effects'" :class="$style.meta">{{ $t('setting__plugins_sound_effects_hint') }}</p>
         <p v-if="item.bytes" :class="$style.meta">{{ (item.bytes / 1024 / 1024).toFixed(2) }} MB</p>
         <p v-if="item.incompatible" :class="$style.notice" role="status">{{ $t('setting__plugins_incompatible') }}</p>
+        <p v-if="item.local" :class="$style.notice">{{ $t('setting__plugins_local_hint') }}</p>
         <p v-else-if="!item.builtin && item.installed && !item.available" :class="$style.notice" role="status">{{ $t('setting__plugins_removed') }}</p>
         <p v-if="item.broken || pluginOperationErrors[item.id]" :class="$style.notice" role="alert">{{ formatError(pluginOperationErrors[item.id] || item.error, $t('setting__plugins_operation_error'), 'PLUGIN_LOAD_FAILED') }}</p>
         <p v-if="pluginRuntime.cleanupErrors[item.id]" :class="$style.notice" role="alert">{{ formatError(pluginRuntime.cleanupErrors[item.id], $t('setting__plugins_cleanup_error'), 'PLUGIN_CLEANUP_FAILED') }}</p>
@@ -34,26 +38,26 @@
           <base-btn v-if="item.installed && !item.builtin" min :disabled="storeBusy || !item.exportable" @click="transferPlugin(item.id)">{{ $t('setting__plugins_export') }}</base-btn>
           <base-btn v-if="item.installed && !item.builtin" min outline :disabled="pluginBusy[item.id] || pluginTransferBusy" @click="uninstall(item.id)">{{ $t(pluginBusy[item.id] ? 'setting__plugins_working' : 'setting__plugins_uninstall') }}</base-btn>
         </div>
+        <section v-if="expanded === item.id && item.hasSettings" :class="$style.settings" :aria-label="item.title" data-plugin-settings-panel>
+          <common-plugin-slot :key="item.id" :plugin="item.id" name="Settings" />
+        </section>
       </article>
     </div>
-    <section v-if="expandedItem?.hasSettings" :class="$style.settings" :data-setting-search="`plugin-card:${expandedItem.id}`">
-      <h3>{{ expandedItem.title }}</h3>
-      <common-plugin-slot :plugin="expanded" name="Settings" />
-    </section>
   </dd>
 </template>
 
 <script setup>
 import { formatError } from '@common/utils/errorMessage'
-import { computed, onMounted, ref } from '@common/utils/vueTools'
+import { computed, nextTick, onMounted, ref, watch } from '@common/utils/vueTools'
 import { isPluginApiSupported, pluginPackages, pluginText, comparePluginVersions } from '@common/optionalPlugins'
 import { builtinPlugins, getBuiltinPlugin } from '@common/builtinPlugins'
 import { pluginStore, pluginRuntime, pluginBusy, pluginOperationErrors, pluginStoreError, pluginTransferBusy, pluginTransferNotice, refreshPlugins, changePluginInstallation, changePluginEnabled, transferPlugin } from '@renderer/store/optionalPlugins'
 import { appSetting } from '@renderer/store/setting'
-import { useI18n } from '@renderer/plugins/i18n'
 
-const t = useI18n()
+const props = defineProps({ pluginId: { type: String, default: '' } })
+const grid = ref(null)
 const expanded = ref(null)
+let pendingRevealId = ''
 const refreshing = ref(false)
 const storeBusy = computed(() => pluginTransferBusy.value || Object.values(pluginBusy).some(Boolean))
 const items = computed(() => {
@@ -91,13 +95,20 @@ const items = computed(() => {
     }
   })
 })
-const expandedItem = computed(() => items.value.find(item => item.id === expanded.value))
-const pluginHelpText = item => [
-  item.description,
-  item.builtin && item.id === 'audio-tag-editor' ? t('setting__plugins_tag_editor_hint') : '',
-  item.builtin && item.id === 'sound-effects' ? t('setting__plugins_sound_effects_hint') : '',
-  item.local ? t('setting__plugins_local_hint') : '',
-].filter(Boolean).join('\n')
+const revealPlugin = async(id) => {
+  expanded.value = id
+  await nextTick()
+  if (props.pluginId !== id) return
+  const card = [...(grid.value?.querySelectorAll('[data-plugin-id]') ?? [])].find(element => element.dataset.pluginId === id)
+  if (card) {
+    pendingRevealId = ''
+    card.scrollIntoView({ block: 'start' })
+  } else pendingRevealId = id
+}
+watch(() => props.pluginId, id => {
+  pendingRevealId = id
+  if (id) void revealPlugin(id)
+}, { immediate: true })
 const refresh = async() => {
   if (refreshing.value) return
   refreshing.value = true
@@ -107,18 +118,21 @@ const uninstall = async(id) => {
   if (expanded.value === id) expanded.value = null
   await changePluginInstallation(id, false)
 }
-onMounted(() => { void refresh() })
+onMounted(async() => {
+  await refresh()
+  if (pendingRevealId && pendingRevealId === props.pluginId) await revealPlugin(pendingRevealId)
+})
 </script>
 
 <style lang="less" module>
-.header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
-.headerActions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.header { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
+.headerActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .header button { flex: none; }
+.description { color: var(--color-font); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; max-width: 1000px; }
 .card { border: 1px solid var(--color-primary-light-100-alpha-700); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.expanded { grid-column: 1 / -1; }
 .cardHeader { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.titleRow { display: flex; align-items: center; gap: 4px; }
-.titleRow :global(.help-icon) { margin: 0; }
 .title { margin: 0 !important; font-size: 15px !important; }
 .icon { display: flex; width: 36px; height: 36px; padding: 7px; box-sizing: border-box; border-radius: var(--radius-md); color: var(--color-primary); background: var(--color-primary-alpha-900); }
 .icon svg { width: 100%; height: 100%; }
@@ -128,5 +142,5 @@ onMounted(() => { void refresh() })
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
 .notice { margin: 8px 15px; color: var(--color-font); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
 .card .notice { margin: 0; }
-.settings { max-width: 960px; padding: 0 15px 15px; }
+.settings { min-width: 0; padding-top: 12px; border-top: 1px solid var(--color-primary-light-100-alpha-700); }
 </style>

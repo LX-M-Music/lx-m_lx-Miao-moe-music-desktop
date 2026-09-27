@@ -5,6 +5,8 @@ export const observeWindowLoadErrors = (window: BrowserWindow) => {
   let showing = false
   window.webContents.on('did-fail-load', (_event, code, reason, _url, isMainFrame) => {
     if (!isMainFrame || code === -3 || showing || window.isDestroyed()) return
+    console.error('Main window load failed:', code, reason)
+    if (!global.lx.appSetting['common.showErrorDialog']) return
     showing = true
     void dialog.showMessageBox(window, {
       type: 'error',

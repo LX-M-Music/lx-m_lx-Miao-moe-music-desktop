@@ -53,7 +53,7 @@
         </base-virtualized-list>
       </div>
       <div v-else :class="[$style.noItem, 'ui-state', { 'ui-state-error': loadError }]" role="status">
-        <p>{{ loadError || $t('no_item') }}</p>
+        <p>{{ loadError ? (appSetting['common.showErrorDialog'] ? loadError : $t('list__load_failed')) : $t('no_item') }}</p>
         <base-btn v-if="loadError" class="ui-state-retry" min @click="loadList">{{ $t('reload') }}</base-btn>
       </div>
       <base-menu v-model="isShowItemMenu" :menus="menus" :xy="menuLocation" item-name="name" @menu-click="handleMenuClick" />
@@ -375,4 +375,3 @@ export default {
 }
 
 </style>
-

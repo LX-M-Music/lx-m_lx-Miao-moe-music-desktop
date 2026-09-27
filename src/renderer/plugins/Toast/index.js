@@ -6,9 +6,10 @@ let currentToast = null
 /**
  * 在屏幕中间显示一个短暂的提示（Toast）
  * @param message 提示内容
- * @param {{ autoCloseTime?: number, actionText?: string, onAction?: (() => void | Promise<void>) | null }} options
+ * @param {{ autoCloseTime?: number, actionText?: string, onAction?: (() => void | Promise<void>) | null, error?: boolean }} options
  */
-export default (message, { autoCloseTime = 1500, actionText = '', onAction = null } = {}) => {
+export default (message, { autoCloseTime = 1500, actionText = '', onAction = null, error = false } = {}) => {
+  if (error && window.lxData?.appSetting?.['common.showErrorDialog'] !== true) return { cancel() {} }
   if (currentToast) currentToast.cancel()
 
   let timer = null

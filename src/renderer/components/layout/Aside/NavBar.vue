@@ -43,7 +43,7 @@ const reorder = async(id: SidebarId, toIndex: number) => {
   try {
     await updateSetting({ 'ui.sidebar.order': next.join(',') })
   } catch {
-    showToast(window.i18n.t('sidebar__save_error'))
+    showToast(window.i18n.t('sidebar__save_error'), { error: true })
   } finally {
     if (current == revision) draftOrder.value = null
   }
