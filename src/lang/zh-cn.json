@@ -1331,5 +1331,5 @@
   "setting__advanced_window_controls_preview": "预览",
   "setting__advanced_window_controls_icon_always": "图标常亮",
   "setting__advanced_window_controls_icon_hover": "自动隐藏（悬停显示）",
-  "setting__advanced_window_controls_icon_tip": "控制按钮上的图标是常亮显示，还是仅在鼠标悬停时显示；红绿灯风格下图标始终显示。"
+  "setting__advanced_window_controls_icon_tip": "两种风格都支持图标常亮或悬停显示；自动隐藏时保留圆点，鼠标移到按钮区域或使用键盘聚焦时显示图标。"
 }

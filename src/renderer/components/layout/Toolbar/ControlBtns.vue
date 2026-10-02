@@ -1,5 +1,5 @@
 <template>
-  <div ref="dom_btns" :class="$style.control">
+  <div ref="dom_btns" :class="[$style.control, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]">
     <button v-if="isFullscreen" type="button" :class="[$style.btn, $style.max]" :aria-label="$t('fullscreen_exit')" ignore-tip :title="$t('fullscreen_exit')" @click="setFullScreen(false)">
       <svg xmlns="http://www.w3.org/2000/svg" height="60%" viewBox="0 0 24 24">
         <use xlink:href="#icon-fullscreen-exit" />
@@ -28,8 +28,10 @@ import { minWindow, maxWindow, closeWindow, setFullScreen } from '@renderer/util
 import { onMounted, onBeforeUnmount, ref, useCssModule } from '@common/utils/vueTools'
 // import { getRandom } from '../../utils'
 import { isFullscreen, isMaximized } from '@renderer/store'
+import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
+const { isTrafficStyle, isIconAlways } = useWindowControls()
 
 const cssModule = useCssModule()
 
@@ -69,6 +71,7 @@ onBeforeUnmount(() => {
 
 <style lang="less" module>
 @import '@renderer/assets/styles/layout.less';
+@import '@renderer/assets/styles/windowControls.less';
 
 .control {
   display: flex;
@@ -100,6 +103,7 @@ onBeforeUnmount(() => {
       }
     }
   }
+  .right-window-controls();
 }
 
 </style>

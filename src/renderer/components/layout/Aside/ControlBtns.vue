@@ -79,7 +79,7 @@ onBeforeUnmount(() => {
   -webkit-app-region: no-drag;
   opacity: 1;
   transition: opacity @transition-normal;
-  &.hover {
+  &.hover, &:focus-within {
     opacity: 1;
     .controlBtniIcon {
       opacity: 1;

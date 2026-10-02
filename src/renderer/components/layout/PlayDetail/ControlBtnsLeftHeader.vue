@@ -131,7 +131,7 @@ const fullscreenExit = () => {
     height: @height-toolbar * .7;
     transition: opacity @transition-normal;
     opacity: 1;
-    &.hover {
+    &.hover, &:focus-within {
       opacity: 1;
       .controBtnIcon {
         opacity: 1;

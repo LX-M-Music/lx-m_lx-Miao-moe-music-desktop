@@ -1330,5 +1330,5 @@
   "setting__advanced_window_controls_preview": "Preview",
   "setting__advanced_window_controls_icon_always": "Always show icons",
   "setting__advanced_window_controls_icon_hover": "Auto-hide (show on hover)",
-  "setting__advanced_window_controls_icon_tip": "Whether the glyphs on the control buttons are always visible or shown on hover only; traffic-light style always shows glyphs."
+  "setting__advanced_window_controls_icon_tip": "Both styles support always-visible or hover-only icons. Auto-hide keeps the dots visible and shows icons when you hover over the controls or focus them with the keyboard."
 }

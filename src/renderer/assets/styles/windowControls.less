@@ -1,0 +1,52 @@
+// Keep the right-side click targets while matching the circular control preview.
+.right-window-controls() {
+  > button {
+    &::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: var(--color-450);
+      transition: background-color .2s ease-in-out;
+    }
+    > svg {
+      position: relative;
+      width: 12px;
+      height: 12px;
+      opacity: 0;
+      transition: opacity .2s ease-in-out;
+    }
+    &.hover::before {
+      background-color: var(--color-500);
+    }
+    &.close.hover::before {
+      background-color: #e5776f;
+    }
+  }
+
+  &.iconAlways > button > svg, &:hover > button > svg, &:focus-within > button > svg {
+    opacity: 1;
+  }
+  &.traffic > button {
+    color: #6b6f76;
+    &.min::before, &.fullscreenExit::before {
+      background-color: #febc2e;
+    }
+    &.max::before {
+      background-color: #28c840;
+    }
+    &.close::before {
+      background-color: #ff5f57;
+    }
+    &.min.hover::before, &.fullscreenExit.hover::before {
+      background-color: #ffc94d;
+    }
+    &.max.hover::before {
+      background-color: #45d95c;
+    }
+    &.close.hover::before {
+      background-color: #ff7b74;
+    }
+  }
+}

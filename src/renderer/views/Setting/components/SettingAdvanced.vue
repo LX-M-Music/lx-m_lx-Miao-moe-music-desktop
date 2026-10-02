@@ -134,8 +134,7 @@ dd
     )
     svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_experimental_new_home_tip')")
 
-//- 暂时隐藏窗口控制按钮设置，保留选项、预览和相关代码。
-dd(v-if="false")
+dd
   h3#advanced_window_controls {{ $t('setting__advanced_window_controls') }}
   div.setting-options
     base-checkbox(
@@ -151,7 +150,7 @@ dd(v-if="false")
   //- 实时预览
   div.gap-top.setting-preview-row
     span.setting-label {{ $t('setting__advanced_window_controls_preview') }}
-    span.control-preview(:class="{ traffic: appSetting['ui.windowControlStyle'] == 'traffic', 'icon-always': appSetting['ui.windowControlsIconMode'] == 'always' }")
+    span.control-preview(:class="{ traffic: isTrafficStyle, 'icon-always': isIconAlways }")
       span.pv-dot.pv-close
         span.pv-icon ×
       span.pv-dot.pv-min
@@ -163,11 +162,13 @@ dd(v-if="false")
 
 <script>
 import { appSetting, updateSetting } from '@renderer/store/setting'
-import { ref, watch } from '@common/utils/vueTools'
+import { computed, ref, watch } from '@common/utils/vueTools'
+import { useWindowControls } from '@renderer/components/layout/useWindowControls'
 
 export default {
   name: 'SettingAdvanced',
   setup() {
+    const { isTrafficStyle, isIconAlways } = useWindowControls()
     const gaplessValue = ref(appSetting['player.gaplessPlayback'])
     let pendingSaves = 0
     let saveQueue = Promise.resolve()
@@ -187,14 +188,14 @@ export default {
         if (!pendingSaves && !saved) gaplessValue.value = appSetting['player.gaplessPlayback']
       })
     }
-    const windowControlStyleList = [
+    const windowControlStyleList = computed(() => [
       { id: 'default', label: window.i18n.t('setting__advanced_window_controls_default') },
       { id: 'traffic', label: window.i18n.t('setting__advanced_window_controls_traffic') },
-    ]
-    const windowControlIconModeList = [
+    ])
+    const windowControlIconModeList = computed(() => [
       { id: 'always', label: window.i18n.t('setting__advanced_window_controls_icon_always') },
       { id: 'hover', label: window.i18n.t('setting__advanced_window_controls_icon_hover') },
-    ]
+    ])
     return {
       appSetting,
       updateSetting,
@@ -202,6 +203,8 @@ export default {
       updateGapless,
       windowControlStyleList,
       windowControlIconModeList,
+      isTrafficStyle,
+      isIconAlways,
     }
   },
 }
@@ -253,7 +256,7 @@ select {
       transition: opacity .15s;
     }
   }
-  &.icon-always .pv-icon {
+  &.icon-always .pv-icon, &:hover .pv-icon {
     opacity: 1;
   }
   &.traffic {
@@ -262,7 +265,6 @@ select {
     .pv-max { background-color: #28c840; }
     .pv-icon {
       color: #6b6f76;
-      opacity: 1;
     }
   }
 }

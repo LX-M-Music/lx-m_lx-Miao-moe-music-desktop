@@ -1,6 +1,6 @@
 <template lang="pug">
 div(:class="$style.header")
-  div(ref="dom_btns" :class="[$style.controBtn, { [$style.traffic]: isTrafficStyle }]")
+  div(ref="dom_btns" :class="[$style.controBtn, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]")
     button(ref="dom_hide_btn" type="button" :class="$style.hide" :aria-label="$t('player__hide_detail_tip')" ignore-tip :title="$t('player__hide_detail_tip')" @click="hide")
       svg(:class="$style.controBtnIcon" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="35%" viewBox="0 0 30.727 30.727" space="preserve")
         use(xlink:href="#icon-window-hide")
@@ -28,7 +28,7 @@ import { closeWindow, minWindow, maxWindow, setFullScreen } from '@renderer/util
 import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
-const { isTrafficStyle } = useWindowControls()
+const { isTrafficStyle, isIconAlways } = useWindowControls()
 const cssModule = useCssModule()
 
 const handle_focus = () => {
@@ -80,6 +80,7 @@ const fullscreenExit = () => {
 
 <style lang="less" module>
 @import '@renderer/assets/styles/layout.less';
+@import '@renderer/assets/styles/windowControls.less';
 
 @control-btn-width: @height-toolbar * .26;
 
@@ -148,18 +149,7 @@ const fullscreenExit = () => {
       }
     }
 
-    // 红绿灯（macOS）风格
-    &.traffic button.hover {
-      &.min {
-        background-color: #febc2e;
-      }
-      &.max {
-        background-color: #28c840;
-      }
-      &.close {
-        background-color: #ff5f57;
-      }
-    }
+    .right-window-controls();
   }
 }
 
