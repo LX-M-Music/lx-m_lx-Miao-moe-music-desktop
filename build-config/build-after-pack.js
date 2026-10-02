@@ -6,9 +6,8 @@ const fs = require('fs').promises
 module.exports = async(context) => {
   const { electronPlatformName, appOutDir } = context
   if (electronPlatformName === 'win32') {
-    const { stageUpdateTools, writeInventory } = require('./portable-update.cjs')
+    const { stageUpdateTools } = require('./portable-update.cjs')
     await stageUpdateTools(appOutDir)
-    await writeInventory(appOutDir)
     return
   }
   if (electronPlatformName !== 'darwin') return

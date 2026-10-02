@@ -34,6 +34,7 @@ test('actual packaging configuration writes the correct edition/architecture mar
           // Simulate code signing after afterPack. The emitted sidecar must
           // describe these final bytes, not the earlier unsigned executable.
           fs.appendFileSync(path.join(appOutDir, 'LX-M Music.exe'), ' signed bytes')
+          await options.config.afterSign(context)
         }
         return options.config.afterAllArtifactBuild?.({ outDir }) ?? []
       })()
@@ -62,6 +63,12 @@ test('actual packaging configuration writes the correct edition/architecture mar
       const marker = JSON.parse(fs.readFileSync(path.join(context.appOutDir, 'resources/lx-update-runtime.json'), 'utf8'))
       assert.deepEqual(marker, { schema: 1, appId: 'com.lx-m.music.desktop', edition, arch: Arch[context.arch], win7, version: '9.0.0' })
       assert(fs.existsSync(path.join(context.appOutDir, 'resources/update-tools/7za.exe')))
+      const inventory = JSON.parse(fs.readFileSync(path.join(context.appOutDir, 'resources/lx-update-inventory.json'), 'utf8'))
+      for (const file of inventory.files) {
+        const bytes = fs.readFileSync(path.join(context.appOutDir, file.path))
+        assert.equal(file.size, bytes.length, file.path)
+        assert.equal(file.sha256, sha256(bytes), file.path)
+      }
     }
     if (edition !== 'portable') assert.deepEqual(artifacts, [])
     else {

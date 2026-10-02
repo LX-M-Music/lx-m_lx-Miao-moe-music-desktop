@@ -16,6 +16,9 @@ const options = {
   productName: 'LX-M Music',
   beforePack,
   afterPack,
+  afterSign: async(context) => {
+    if (context.electronPlatformName === 'win32') await require('./portable-update.cjs').writeInventory(context.appOutDir)
+  },
   protocols: {
     name: 'lx-m-music-protocol',
     schemes: [
@@ -298,7 +301,6 @@ const build = async(target, arch, packageType, publishType) => {
       await require('node:fs/promises').writeFile(require('node:path').join(context.appOutDir, 'resources/lx-update-runtime.json'), JSON.stringify({
         schema: 1, appId: 'com.lx-m.music.desktop', edition, arch: builder.Arch[context.arch], win7: isWin7Build, version: context.packager.appInfo.version,
       }))
-      await require('./portable-update.cjs').writeInventory(context.appOutDir)
       if (isGreen) portableContexts.push(context)
     },
     ...(isGreen ? { afterAllArtifactBuild: require('./portable-update.cjs').portableArtifactHook(portableContexts, isWin7Build) } : {}),

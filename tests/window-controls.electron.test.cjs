@@ -315,11 +315,15 @@ test('window layouts fit small, HD, 2K, 4K and short ultrawide viewports', { tim
         await route(page, '/search')
         await settled(page)
         const layout = await page.evaluate(() => {
-          const bounds = selector => {
-            const { x, y, width, height, right, bottom } = document.querySelector(selector).getBoundingClientRect()
+          const bounds = target => {
+            const element = typeof target === 'string' ? document.querySelector(target) : target
+            const { x, y, width, height, right, bottom } = element.getBoundingClientRect()
             return { x, y, width, height, right, bottom }
           }
-          const rects = ['#left', '#toolbar', '#view', '#player', '#left [role="toolbar"]', '#toolbar input', '#toolbar button:last-child', '#view [role="tablist"]'].map(bounds)
+          const rects = ['#left', '#toolbar', '#view', '#player', '#toolbar input', '#toolbar button:last-child', '#view [role="tablist"]'].map(bounds)
+          // The navigation list can extend beyond its scrollport on small windows.
+          // Check the visible menu region rather than the clipped list contents.
+          rects.push(bounds(document.querySelector('#left [role="toolbar"]').parentElement))
           const root = bounds('#root')
           const tabs = [...document.querySelectorAll('#view [role="tab"]')].map(el => {
             const { x, y, right, bottom } = el.getBoundingClientRect()
