@@ -18,6 +18,7 @@ module.exports = function loader(overrides = {}) {
     const execute = vm.runInThisContext('(function(require,module,exports,__dirname){' + code + '\n})', { filename })
     execute(name => {
       if (Object.hasOwn(overrides, name)) return overrides[name]
+      if (name === 'original-fs') return require('node:fs')
       if (name.startsWith('node:')) return require(name)
       if (name.startsWith('@common/')) return load(path.resolve('src/common', name.slice(8)))
       if (name === '@renderer/utils/requestContext') return load('src/renderer/utils/requestContext.js')

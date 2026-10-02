@@ -29,16 +29,16 @@
     },
     {
       "id": "audio-visualizer",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "apiVersion": 1,
-      "path": "audio-visualizer/1.2.0/27184b783f2541b0ede03396ea9efafd58234d4c8869758cadc923aa456c9f24.zip",
-      "bytes": 126083,
-      "sha256": "27184b783f2541b0ede03396ea9efafd58234d4c8869758cadc923aa456c9f24",
+      "path": "audio-visualizer/1.2.1/f8ac0c0caca262e14f0c62b48efda8eb8d251d23c6f771a7366fa3dafc5ce27c.zip",
+      "bytes": 127185,
+      "sha256": "f8ac0c0caca262e14f0c62b48efda8eb8d251d23c6f771a7366fa3dafc5ce27c",
       "packages": {
         "lxplugin": {
-          "path": "audio-visualizer/1.2.0/4ce1168bbd2b0a66397673f9052904045ea9f8c4810b2afd943d47cef544ea5e.lxplugin",
-          "bytes": 126168,
-          "sha256": "4ce1168bbd2b0a66397673f9052904045ea9f8c4810b2afd943d47cef544ea5e"
+          "path": "audio-visualizer/1.2.1/d129b4ccc353bc3ca8507677291ac1af114c1a07c9e47bcdd0b97eb9a853da4c.lxplugin",
+          "bytes": 128377,
+          "sha256": "d129b4ccc353bc3ca8507677291ac1af114c1a07c9e47bcdd0b97eb9a853da4c"
         }
       },
       "name": {

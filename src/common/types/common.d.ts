@@ -108,17 +108,38 @@ declare namespace LX {
     prev: boolean
   }
 
-  type UpdateStatus = 'downloaded' | 'downloading' | 'verifying' | 'installing' | 'error' | 'checking' | 'idle'
+  type UpdateEdition = 'installed' | 'portable' | 'single-file' | 'development'
+  interface UpdateRuntime {
+    edition: UpdateEdition
+    arch: string
+    win7: boolean
+  }
+  interface UpdateAsset {
+    downloadUrl: string
+    fileName: string
+    size: number
+    digest: string
+  }
+  interface UpdateDifferential {
+    manifest: UpdateAsset
+    payload: UpdateAsset
+  }
+  type UpdateStatus = 'downloaded' | 'testing' | 'downloading' | 'preparing' | 'verifying' | 'installing' | 'error' | 'checking' | 'idle'
   interface VersionInfo {
     version: string
     desc: string
   }
   interface UpdateProgressInfo {
-    phase?: 'downloading' | 'verifying' | 'installing'
+    phase?: 'testing' | 'downloading' | 'preparing' | 'verifying' | 'installing'
     progress: number
     transferred: number
     total: number
     bytesPerSecond: number
+    testedSources?: number
+    totalSources?: number
+    source?: string
+    mode?: 'full' | 'differential'
+    reusedBytes?: number
   }
   interface UpdateDownloadInfo {
     version: string
@@ -127,5 +148,7 @@ declare namespace LX {
     size: number
     digest: string
     installAfterDownload?: boolean
+    edition?: UpdateEdition
+    differential?: UpdateDifferential
   }
 }

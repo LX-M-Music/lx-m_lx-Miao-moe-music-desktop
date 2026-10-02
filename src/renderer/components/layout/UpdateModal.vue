@@ -38,6 +38,7 @@ material-modal(:show="versionInfo.showModal" :close-btn="!isInstalling && !isCan
       div(:class="$style.current")
         h3 最新版本：{{ versionInfo.newVersion?.version }}
         h3 当前版本：{{ versionInfo.version }}
+        h3(v-if="editionLabel") 当前版本类型：{{ editionLabel }}
         h3 版本变化：
         pre(:class="$style.desc" v-text="desc")
       div(v-if="history.length" :class="[$style.history, $style.desc]")
@@ -46,7 +47,7 @@ material-modal(:show="versionInfo.showModal" :close-btn="!isInstalling && !isCan
 
     div(:class="$style.footer")
       div(:class="$style.desc")
-        p 点击“自动更新”后才会下载更新，完成后将自动安装并重启。
+        p {{ updateDescription }}
         p 手动更新可以去&nbsp;
           strong.hover.underline(aria-label="点击打开" @click="handleOpenUrl('https://github.com/Miao-moe/lx-m_lx-Miao-moe-music-desktop/releases')") 软件发布页
           | 下载。
@@ -110,15 +111,27 @@ export default {
       return this.history.map(ver => formatChangeLog(ver.desc, ver.version)).join('\n\n')
     },
     isUpdating() {
-      return this.isCancelling || ['downloading', 'verifying', 'installing'].includes(this.versionInfo.status)
+      return this.isCancelling || ['testing', 'downloading', 'preparing', 'verifying', 'installing'].includes(this.versionInfo.status)
+    },
+    editionLabel() {
+      return { installed: '安装版', portable: '便携版', 'single-file': '单文件版', development: '开发版本' }[this.versionInfo.newVersion?.edition] ?? ''
+    },
+    updateDescription() {
+      const edition = this.versionInfo.newVersion?.edition
+      if (edition == 'portable') return '点击“自动更新”后先测速，优先下载差分数据；不可用时下载完整便携包，完成后自动替换程序并重启。'
+      if (edition == 'single-file') return '点击“自动更新”后先测速并下载完整单文件版，完成后自动替换原文件并重启。'
+      return '点击“自动更新”后先测速并选择下载节点，下载完成后将自动安装并重启。'
     },
     isInstalling() {
       return this.versionInfo.status == 'installing'
     },
     progressLabel() {
       if (this.isCancelling) return '正在停止更新…'
-      if (this.versionInfo.status == 'verifying') return '下载完成，正在校验安装包…'
-      if (this.versionInfo.status == 'installing') return '正在启动安装，稍后将自动重启…'
+      if (this.versionInfo.status == 'testing') return '正在测速更新节点…'
+      if (this.versionInfo.status == 'preparing') return this.versionInfo.downloadProgress?.mode == 'differential' ? '正在比对并复用本地文件…' : '正在准备便携版更新…'
+      if (this.versionInfo.status == 'verifying') return '正在校验更新文件…'
+      if (this.versionInfo.status == 'installing') return ['portable', 'single-file'].includes(this.versionInfo.newVersion?.edition) ? '正在准备替换程序，稍后将自动重启…' : '正在启动安装，稍后将自动重启…'
+      if (this.versionInfo.downloadProgress?.mode == 'differential') return '正在下载差分数据…'
       return '正在下载更新…'
     },
     progressValue() {
@@ -127,11 +140,13 @@ export default {
       return Math.max(0, Math.min(100, info.progress))
     },
     progress() {
-      if (this.isCancelling || this.versionInfo.status != 'downloading') return ''
+      if (this.isCancelling) return ''
       const info = this.versionInfo.downloadProgress
+      if (this.versionInfo.status == 'testing') return info?.totalSources ? `已测试 ${info.testedSources ?? 0} / ${info.totalSources} 个节点` : '正在连接测速…'
+      if (this.versionInfo.status != 'downloading') return ''
       if (!info) return '正在连接下载…'
       const total = info.total > 0 ? ` / ${sizeFormate(info.total)}` : ''
-      return `${sizeFormate(info.transferred)}${total} · ${sizeFormate(info.bytesPerSecond)}/s`
+      return `${sizeFormate(info.transferred)}${total} · ${sizeFormate(info.bytesPerSecond)}/s${info.source ? ` · ${info.source}` : ''}${info.reusedBytes ? ` · 已复用 ${sizeFormate(info.reusedBytes)}` : ''}`
     },
     isIgnored() {
       return this.ignoreVersion == this.versionInfo.newVersion?.version
@@ -146,7 +161,7 @@ export default {
   methods: {
     async handleClose() {
       if (this.isInstalling || this.isCancelling) return false
-      if (['downloading', 'downloaded', 'verifying'].includes(this.versionInfo.status)) {
+      if (['testing', 'downloading', 'preparing', 'downloaded', 'verifying'].includes(this.versionInfo.status)) {
         this.isCancelling = true
         try {
           if (!await cancelDownloadUpdate()) return false
@@ -206,7 +221,7 @@ export default {
         return
       }
       versionInfo.downloadProgress = null
-      versionInfo.status = 'downloading'
+      versionInfo.status = 'testing'
       downloadUpdate({
         version: info.version,
         downloadUrl: info.downloadUrl,
@@ -214,6 +229,8 @@ export default {
         size: info.size ?? 0,
         digest: info.digest ?? '',
         installAfterDownload: true,
+        edition: info.edition,
+        differential: info.differential,
       })
     },
     async handleManualUpdate() {
@@ -332,7 +349,7 @@ export default {
   margin-top: 14px;
   padding: 12px;
   border-radius: var(--radius-sm);
-  background: var(--color-primary-alpha-100);
+  background: var(--color-primary-alpha-900);
 }
 .progressHeader {
   display: flex;
@@ -347,7 +364,7 @@ export default {
   margin-top: 9px;
   overflow: hidden;
   border-radius: 4px;
-  background: var(--color-primary-alpha-200);
+  background: var(--color-primary-alpha-800);
 }
 .progressFill {
   height: 100%;
@@ -356,7 +373,7 @@ export default {
   transition: width var(--duration-fast) linear;
 }
 .indeterminate {
-  animation: update-progress 1.4s ease-in-out infinite;
+  animation: update-progress-pulse 1.4s ease-in-out infinite;
 }
 .progressDetail {
   margin-top: 7px;
@@ -364,7 +381,7 @@ export default {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
-@keyframes update-progress {
+@keyframes update-progress-pulse {
   from { transform: translateX(-100%); }
   to { transform: translateX(315%); }
 }

@@ -4,10 +4,10 @@ const { test } = require('node:test')
 const loader = require('./helpers/load-typescript.cjs')
 const geometry = loader()('src/common/miniPlayer.ts')
 
-function fixture(t, { locked = true, linux = false, hoverHide = false, autoHide = false, showPlayer = true } = {}) {
+function fixture(t, { locked = true, linux = false, hoverHide = false, autoHide = false, showPlayer = true, background = 92 } = {}) {
   t.mock.timers.enable({ apis: ['setInterval'] })
   const previous = global.lx
-  global.lx = { appSetting: { 'desktopLyric.isLock': locked, 'desktopLyric.isHoverHide': hoverHide, 'desktopLyric.autoHideControls': autoHide, 'desktopLyric.showPlayer': showPlayer } }
+  global.lx = { appSetting: { 'desktopLyric.isLock': locked, 'desktopLyric.isHoverHide': hoverHide, 'desktopLyric.autoHideControls': autoHide, 'desktopLyric.showPlayer': showPlayer, 'desktopLyric.style.backgroundOpacity': background } }
   const window = new EventEmitter()
   const bounds = { x: 240, y: 120, width: 450, height: 300 }
   let point = { x: 300, y: 200 }
@@ -101,12 +101,31 @@ test('updating an active lock does not duplicate polling, and closing disposes i
   assert.equal(f.reads(), reads)
 })
 
-test('unlocked windows do not need recovery polling', t => {
+test('opaque unlocked windows with visible controls do not need recovery polling', t => {
   const f = fixture(t, { locked: false })
   f.controls.update()
   t.mock.timers.tick(1000)
   assert.equal(f.reads(), 0)
   assert.equal(f.calls.at(-1).ignore, false)
+})
+
+test('transparent backgrounds track window entry and exit even when all player controls are visible', t => {
+  const f = fixture(t, { locked: false })
+  f.controls.update()
+  assert.equal(f.reads(), 0)
+  global.lx.appSetting['desktopLyric.style.backgroundOpacity'] = 0
+  f.controls.update()
+  assert.deepEqual(f.pointers.at(-1), { x: 60, y: 80 }, 'transparency reveals the outline for a pointer already inside')
+  f.move({ x: f.bounds.x + f.bounds.width - 1, y: f.bounds.y + f.bounds.height - 1 })
+  assert.deepEqual(f.pointers.at(-1), { x: 449, y: 299 }, 'the entire window participates in hover')
+  assert.equal(f.calls.at(-1).ignore, false, 'transparency does not enable click-through')
+  f.move({ x: f.bounds.x + f.bounds.width, y: f.bounds.y + f.bounds.height - 1 })
+  assert.equal(f.pointers.at(-1), null, 'the right boundary is outside the window')
+  global.lx.appSetting['desktopLyric.style.backgroundOpacity'] = 92
+  f.controls.update()
+  const reads = f.reads()
+  t.mock.timers.tick(1000)
+  assert.equal(f.reads(), reads, 'restoring an opaque background stops the extra tracking')
 })
 
 test('recovery does not depend on forwarded mouse events on Linux', t => {

@@ -2,10 +2,12 @@ import { showLoadError } from '@common/loadErrorNotice'
 import { ipcRenderer } from 'electron'
 import { PLUGIN_IPC, type PluginStoreSnapshot } from '@common/optionalPlugins'
 import { createPluginRuntime } from '@common/optionalPluginRuntime'
+import * as performancePolicy from '@common/performance'
 import { isPlay, setting } from './state'
 import { useEvent, getAnalyserDataArray } from '@lyric/core/mainWindowChannel'
 
 export const pluginRuntime = createPluginRuntime({
+  performance: performancePolicy,
   lyricState: { isPlay, setting },
   lyricChannel: { useEvent, getAnalyserDataArray },
 }, true, async(id, directory, error) => ipcRenderer.invoke(PLUGIN_IPC.runtimeResult, id, directory, error))

@@ -37,7 +37,7 @@ export const setLrcConfig = (keys: Array<keyof LX.AppSetting>, setting: Partial<
         }
       }
     }
-    if (keys.some(key => key === 'desktopLyric.isLock' || key === 'desktopLyric.autoHideControls' || key === 'desktopLyric.showPlayer')) updateMouseLock()
+    if (keys.some(key => key === 'desktopLyric.isLock' || key === 'desktopLyric.autoHideControls' || key === 'desktopLyric.showPlayer' || key === 'desktopLyric.style.backgroundOpacity')) updateMouseLock()
     if (keys.includes('desktopLyric.isAlwaysOnTop') && isAlwaysOnTop != global.lx.appSetting['desktopLyric.isAlwaysOnTop']) {
       isAlwaysOnTop = global.lx.appSetting['desktopLyric.isAlwaysOnTop']
       alwaysOnTopTools.setAlwaysOnTop(global.lx.appSetting['desktopLyric.isAlwaysOnTopLoop'])

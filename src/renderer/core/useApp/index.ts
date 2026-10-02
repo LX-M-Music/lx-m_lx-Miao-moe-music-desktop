@@ -17,6 +17,7 @@ import usePlayer from './usePlayer'
 import { libraryError, refreshLibraryPreferences } from '@renderer/utils/library'
 import { formatError } from '@common/utils/errorMessage'
 import useSettingSync from './useSettingSync'
+import useLowPowerMode from './useLowPowerMode'
 import { useRouter } from '@common/utils/vueRouter'
 import handleListAutoUpdate from './listAutoUpdate'
 import { onBeforeUnmount } from '@common/utils/vueTools'
@@ -37,6 +38,7 @@ export default () => {
   const initOpenAPI = useOpenAPI()
   const initStatusbarLyric = useStatusbarLyric()
   useWindowState()
+  useLowPowerMode()
   useEventListener()
   const initPlayer = usePlayer()
   const pluginsReady = initOptionalPlugins()

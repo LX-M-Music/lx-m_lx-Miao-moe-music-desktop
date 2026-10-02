@@ -1,5 +1,6 @@
 import AudioMotionAnalyzer from 'audiomotion-analyzer'
 import { RADIAL_FFT_SIZE, RADIAL_MIN_DB, RADIAL_MAX_DB, readRadialData } from './radialData'
+import { isLowPowerMode } from './performance'
 
 type FrameAnalyzer = AudioMotionAnalyzer & { renderFrame: (timestamp: number) => void }
 
@@ -66,7 +67,7 @@ export const createRadialRenderer = () => {
         analyzer.setFreqRange(30, Math.min(16000, frame.sampleRate / 2))
       }
       const ratio = window.devicePixelRatio || 1
-      const nextPixels = Math.max(32, Math.min(1400, Math.round(size * Math.min(ratio, 2))))
+      const nextPixels = Math.max(32, Math.min(isLowPowerMode() ? 640 : 1400, Math.round(size * Math.min(ratio, isLowPowerMode() ? 1 : 2))))
       if (pixels !== nextPixels || lastRatio !== ratio) {
         pixels = nextPixels
         lastRatio = ratio

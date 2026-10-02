@@ -1,12 +1,12 @@
 import { nextTick, onBeforeUnmount, ref, watch } from '@common/utils/vueTools'
-import { isShowPlayerDetail } from '@renderer/store/player/state'
+import { isShowPlayerDetail, isPlayerDetailDisplayed } from '@renderer/store/player/state'
 import { isMotionEnabled, playMotion } from '@renderer/utils/motion'
 
 export default ({ onOpened, onClosed }: { onOpened: () => void, onClosed: () => void }) => {
   const detailRoot = ref<HTMLElement | null>(null)
   const detailCover = ref<HTMLImageElement | null>(null)
   const detailMounted = ref(false)
-  const detailDisplayed = ref(false)
+  const detailDisplayed = isPlayerDetailDisplayed
   const visibled = ref(false)
   const coverTravelling = ref(false)
   let revision = 0
@@ -17,6 +17,7 @@ export default ({ onOpened, onClosed }: { onOpened: () => void, onClosed: () => 
   const clear = () => {
     for (const animation of running) animation.cancel()
     running = []
+    detailRoot.value?.removeAttribute('data-detail-entering')
     flight.element?.remove()
     flight.element = null
     coverTravelling.value = false
@@ -39,6 +40,8 @@ export default ({ onOpened, onClosed }: { onOpened: () => void, onClosed: () => 
     await nextTick()
     if (disposed || token !== revision || !detailRoot.value) return
     const root = detailRoot.value
+    // Apply the first artwork palette while the page is still transparent.
+    if (visible && !wasDisplayed) root.dataset.detailEntering = ''
     root.style.pointerEvents = visible ? '' : 'none'
     const rootAnimation = playMotion(root, [{ opacity: previousOpacity }, { opacity: visible ? 1 : 0 }], 'detail')
     if (rootAnimation) running.push(rootAnimation)
@@ -108,6 +111,7 @@ export default ({ onOpened, onClosed }: { onOpened: () => void, onClosed: () => 
     disposed = true
     ++revision
     clear()
+    detailDisplayed.value = false
     onClosed()
     window.removeEventListener('lx-motion-change', resetCoverTilt)
   })

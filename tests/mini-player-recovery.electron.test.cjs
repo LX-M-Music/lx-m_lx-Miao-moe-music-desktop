@@ -20,10 +20,10 @@ test('transparent hidden lyrics controls recover using the system pointer withou
     return window
   }
   const pointAt = async(selector) => {
-    const point = selector ? await mini.locator(selector).evaluate(el => {
+    const point = typeof selector === 'string' ? await mini.locator(selector).evaluate(el => {
       const rect = el.getBoundingClientRect()
       return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
-    }) : null
+    }) : selector
     const window = await app.browserWindow(mini)
     try {
       const bounds = await window.evaluate(window => window.getContentBounds())
@@ -68,24 +68,68 @@ test('transparent hidden lyrics controls recover using the system pointer withou
     await update({ 'desktopLyric.enable': true })
     mini = await getMini()
 
-    await t.test('all three switches leave a visible options button that works without finding the header', async() => {
+    await t.test('lyrics-only options appear across the window and hide outside even with menu focus', async() => {
       await options()
       for (const key of ['mini_player__transparent', 'mini_player__hide_controls', 'mini_player__lyrics_only']) await mini.getByLabel(await label(key), { exact: true }).check()
       await closeOptions()
       await hide()
       assert.equal(await mini.locator('[data-mini-track]').count(), 0)
       await mini.waitForFunction(() => getComputedStyle(document.querySelector('#background')).opacity === '0')
-      assert.equal(await mini.locator('[data-mini-recovery]').evaluate(el => getComputedStyle(el).opacity), '0.85')
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('[data-mini-recovery]')).visibility === 'hidden')
+      assert.equal(await mini.locator('[data-mini-recovery]').evaluate(el => getComputedStyle(el).opacity), '0')
       assert.equal(await mini.locator('[data-mini-recovery]').evaluate(el => !!el.closest('#container')), false)
+      assert.equal(await mini.locator('#container').evaluate(el => getComputedStyle(el, '::after').opacity), '0')
+      const lyricsBefore = await mini.locator('[data-mini-lyrics]').boundingBox()
+      await pointAt('[data-mini-lyrics]')
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('[data-mini-recovery]')).opacity === '0.85' && getComputedStyle(document.querySelector('#container'), '::after').opacity === '1')
+      assert.equal(await mini.locator('.mini-header').evaluate(el => getComputedStyle(el).opacity), '0', 'the options button can appear without covering lyrics with the header')
+      assert.deepEqual(await mini.locator('[data-mini-lyrics]').boundingBox(), lyricsBefore, 'hover does not move or resize lyrics')
+      await mini.screenshot({ path: path.join(fixture.output, 'mini-transparent-hover.png'), omitBackground: true })
+      for (const position of [{ x: 1, y: 1 }, { x: 449, y: 299 }]) {
+        await pointAt(position)
+        await mini.waitForFunction(() => document.querySelector('[data-mini-recovery]').classList.contains('native-window-hover'))
+      }
       await pointAt('[data-mini-recovery]')
+      await mini.locator('[data-mini-recovery]').waitFor({ state: 'visible' })
       if (process.platform === 'win32') assert.equal(await nativeHitTest(app, mini, '[data-mini-recovery]'), 1, 'the visible recovery button is clickable, not a drag region')
       await mini.locator('[data-mini-recovery]').click()
       await mini.locator('#mini-options').waitFor()
       assert.equal(await mini.getByRole('button', { name: await label('mini_player__options'), exact: true }).count(), 1)
+      await mini.getByLabel(await label('mini_player__transparent'), { exact: true }).focus()
+      await pointAt(null)
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('[data-mini-recovery]')).opacity === '0' && getComputedStyle(document.querySelector('#container'), '::after').opacity === '0')
+      assert.equal(await mini.locator('[data-mini-recovery]').evaluate(el => getComputedStyle(el).pointerEvents), 'none', 'menu focus cannot pin the floating button after the pointer leaves')
+      await closeOptions()
+      await hide()
+      await mini.screenshot({ path: path.join(fixture.output, 'mini-transparent-outside.png'), omitBackground: true })
+      await options()
       for (const key of ['mini_player__lyrics_only', 'mini_player__hide_controls', 'mini_player__transparent']) await mini.getByLabel(await label(key), { exact: true }).uncheck()
       await closeOptions()
       await mini.locator('[data-mini-track]').waitFor()
       await mini.waitForFunction(() => getComputedStyle(document.querySelector('#background')).opacity !== '0')
+    })
+
+    await t.test('transparent full players show only a subtle non-interactive outline on system hover', async() => {
+      await update({ 'desktopLyric.showPlayer': true, 'desktopLyric.autoHideControls': false, 'desktopLyric.style.backgroundOpacity': 0 })
+      await pointAt(null)
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '0')
+      await pointAt('[data-mini-lyrics]')
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '1')
+      const outline = await mini.locator('#container').evaluate(el => {
+        const style = getComputedStyle(el, '::after')
+        return { shadow: style.boxShadow, pointerEvents: style.pointerEvents, radius: style.borderRadius }
+      })
+      assert.match(outline.shadow, /rgba\(255, 255, 255, 0\.16\).*1px/)
+      assert.equal(outline.pointerEvents, 'none', 'the outline cannot intercept controls or native dragging')
+      assert.equal(outline.radius, '14px')
+      await update({ 'desktopLyric.style.backgroundOpacity': 92 })
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '0')
+      await update({ 'desktopLyric.style.backgroundOpacity': 0 })
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '1')
+      await mini.emulateMedia({ reducedMotion: 'reduce' })
+      assert.equal(await mini.locator('#container').evaluate(el => getComputedStyle(el, '::after').transitionDuration), '0s')
+      await mini.emulateMedia({ reducedMotion: 'no-preference' })
+      await update({ 'desktopLyric.style.backgroundOpacity': 92 })
     })
 
     await t.test('both lyric directions remain recoverable after reopening, including pause-hide and hover-hide', async() => {
@@ -147,6 +191,7 @@ test('transparent hidden lyrics controls recover using the system pointer withou
     })
     assert.deepEqual(errors, [])
     assert.deepEqual(fixture.errors, [])
+    console.log('Mini-player hover screenshots:', fixture.output)
   } finally {
     await app.evaluate(({ screen }) => {
       screen.getCursorScreenPoint = global.__miniRecoveryOriginalPointer

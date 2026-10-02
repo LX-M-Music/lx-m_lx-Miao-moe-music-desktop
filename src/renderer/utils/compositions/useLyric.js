@@ -1,7 +1,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from '@common/utils/vueTools'
 import { formatPlayTime2 } from '@common/utils/common'
-import { scrollTo } from '@common/utils/renderer'
-import { isMotionEnabled, scrollWithSpring } from '@renderer/utils/motion'
+import { isMotionEnabled, scrollWithMotion, scrollWithSpring } from '@renderer/utils/motion'
 import { play } from '@renderer/core/player/action'
 import { appSetting } from '@renderer/store/setting'
 
@@ -109,15 +108,22 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
   }
 
   const handleScrollLrc = (duration = 300) => {
-    if (!dom_lines?.length || !dom_lyric.value) return
+    if (!dom_lines?.length || !dom_lyric.value?.clientHeight) return
     if (isSkipMouseEnter || isSkipFocused) return
     if (isStopScroll.value) return
     let dom_p = dom_lines[lyric.line]
     cancelScrollFn?.()
-    const target = dom_p ? (dom_p.offsetTop - dom_lyric.value.clientHeight * 0.38) : 0
-    cancelScrollFn = duration && isMotionEnabled()
-      ? scrollWithSpring(dom_lyric.value, target)
-      : scrollTo(dom_lyric.value, target, 0)
+    // Center the complete lyric group, including wrapped translations/romaji.
+    // Scaling around the row's center keeps this anchor stable during zoom.
+    const target = dom_p ? dom_p.offsetTop + dom_p.offsetHeight / 2 - dom_lyric.value.clientHeight / 2 : 0
+    if (!duration || !isMotionEnabled()) {
+      dom_lyric.value.scrollTop = target
+      cancelScrollFn = null
+      return
+    }
+    cancelScrollFn = appSetting['playDetail.isZoomActiveLrc']
+      ? scrollWithMotion(dom_lyric.value, target)
+      : scrollWithSpring(dom_lyric.value, target)
   }
   const clearLyricScrollTimeout = () => {
     if (!timeout) return
@@ -208,7 +214,7 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
       if (!dom_lyric.value) return
       dom_lines = dom_lyric.value.querySelectorAll('.line-content')
       const currentLineDom = dom_lines[currentLine]
-      if (lineOffset != null && currentLineDom) {
+      if (lineOffset != null && currentLineDom && isStopScroll.value) {
         dom_lyric.value.scrollTop = currentLineDom.offsetTop - lineOffset
       } else {
         handleScrollLrc()
@@ -237,7 +243,8 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     if (isSetedLines) return
     if (oldLine == null || line - oldLine != 1) return handleScrollLrc()
 
-    if (appSetting['playDetail.isDelayScroll']) {
+    // Enlarging the next lyric and moving it up must begin together.
+    if (appSetting['playDetail.isDelayScroll'] && !appSetting['playDetail.isZoomActiveLrc']) {
       delayScrollTimeout = setTimeout(() => {
         delayScrollTimeout = null
         handleScrollLrc(600)
@@ -265,7 +272,12 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     document.addEventListener('touchend', handleMouseMsUp)
     document.addEventListener('touchcancel', handleMouseMsUp)
     dom_lyric.value.addEventListener('scroll', setTime, { passive: true })
-    resizeObserver = new window.ResizeObserver(setTime)
+    resizeObserver = new window.ResizeObserver(() => {
+      setTime()
+      // Reflow can change both the viewport and the active row's height.
+      // Manual lyric browsing remains suspended in handleScrollLrc.
+      handleScrollLrc(0)
+    })
     resizeObserver.observe(dom_lyric.value)
     resizeObserver.observe(dom_lyric_text.value)
 

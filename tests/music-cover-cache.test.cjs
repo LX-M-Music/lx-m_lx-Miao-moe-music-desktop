@@ -76,6 +76,23 @@ function playerFixture(cover, getPic) {
   return exports
 }
 
+test('low-power URL eviction reloads artwork metadata from disk and normal mode restores retention', async() => {
+  const disk = storage()
+  let requests = 0
+  const covers = fixture(disk, () => { requests++; return url })
+  covers.setCoverUrlMemoryLimit(2)
+  const songs = Array.from({ length: 5 }, (_, i) => ({ ...song, id: `bounded-${i}` }))
+  for (const info of songs) await covers.getMusicCoverUrl(info)
+  assert.equal(covers.getCachedCoverUrl(songs[0]), '')
+  assert.equal(covers.getCachedCoverUrl(songs[4]), url)
+  assert.equal(requests, 5)
+  assert.equal(await covers.getMusicCoverUrl(songs[0]), url)
+  assert.equal(requests, 5, 'eviction preserves the persistent URL cache')
+  covers.setCoverUrlMemoryLimit(Infinity)
+  for (const info of songs) await covers.getMusicCoverUrl(info)
+  assert(songs.every(info => covers.getCachedCoverUrl(info) === url))
+})
+
 test('resolved source URLs persist and bypass the API in a new renderer', async() => {
   const disk = storage()
   let calls = 0

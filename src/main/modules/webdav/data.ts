@@ -10,6 +10,8 @@ const finite = (value: unknown): value is number => typeof value == 'number' && 
 
 const deviceSettings = new Set([
   'version', 'common.apiSource', 'common.isAgreePact', 'common.windowSizeId',
+  'common.windowWidth', 'common.windowHeight',
+  'ui.lowPowerMode',
   'download.savePath', 'player.mediaDeviceId', 'player.soundEffect.convolution.fileName',
   'desktopLyric.x', 'desktopLyric.y',
 ])

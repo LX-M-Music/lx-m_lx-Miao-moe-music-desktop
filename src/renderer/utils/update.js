@@ -1,5 +1,6 @@
 import { httpGet } from './request'
-import { getWindowsSetupPriority } from '@common/utils/update'
+import { getWindowsUpdatePriority } from '@common/utils/update'
+import { getUpdateRuntime } from './ipc'
 
 const REPO_OWNER = 'Miao-moe'
 const REPO_NAME = 'lx-m_lx-Miao-moe-music-desktop'
@@ -35,14 +36,14 @@ const getArchKeyword = () => {
   }
 }
 
-const selectAsset = (assets) => {
+const selectAsset = (assets, runtime) => {
   if (!Array.isArray(assets) || !assets.length) return null
   const arch = getArchKeyword().toLowerCase()
   const platform = process.platform
 
   if (platform === 'win32') {
     return assets
-      .map(asset => ({ asset, priority: getWindowsSetupPriority(asset.name || '', process.arch) }))
+      .map(asset => ({ asset, priority: getWindowsUpdatePriority(asset.name || '', runtime) }))
       .filter(({ priority }) => priority > 0)
       .sort((a, b) => b.priority - a.priority)[0]?.asset ?? null
   }
@@ -68,7 +69,16 @@ export const getVersionInfo = async() => {
   if (!info || info.tag_name == null) throw new Error('failed')
 
   const version = String(info.tag_name).replace(/^v/i, '')
-  const asset = selectAsset(info.assets)
+  const runtime = process.platform === 'win32' ? await getUpdateRuntime() : null
+  const asset = selectAsset(info.assets, runtime)
+  let differential
+  if (runtime?.edition === 'portable') {
+    const find = type => info.assets?.find(asset => getWindowsUpdatePriority(asset.name || '', runtime, type) > 0)
+    const manifest = find('manifest')
+    const payload = find('payload')
+    const convert = asset => ({ downloadUrl: asset.browser_download_url, fileName: asset.name, size: asset.size, digest: asset.digest })
+    if (manifest && payload) differential = { manifest: convert(manifest), payload: convert(payload) }
+  }
 
   return {
     version,
@@ -78,5 +88,7 @@ export const getVersionInfo = async() => {
     fileName: asset?.name ?? '',
     size: asset?.size ?? 0,
     digest: asset?.digest ?? '',
+    edition: runtime?.edition,
+    differential,
   }
 }

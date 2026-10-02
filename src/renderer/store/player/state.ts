@@ -57,6 +57,9 @@ export const statusText = ref('')
 
 export const isShowPlayerDetail = ref(false)
 
+// Includes the exit animation, so shared visuals live until the page has faded out.
+export const isPlayerDetailDisplayed = ref(false)
+
 export const isShowPlayComment = ref(false)
 
 export const isShowLrcSelectContent = ref(false)

@@ -82,7 +82,7 @@ test('playlist downloads use matching search metadata for every quality through 
   info.meta._qualitys = { '128k': { size: '1B' }, flac: { size: '3B' } }
   assert.equal(shouldRefreshDownloadQuality(info, sourceQualitys, 'my-list'), true)
   assert.equal(shouldRefreshDownloadQuality(info, sourceQualitys, ''), false)
-  assert.deepEqual(types(getDownloadQualityOptions(info, sourceQualitys)), ['128k', 'flac'], 'do not infer unsupported tiers from FLAC alone')
+  assert.deepEqual(types(getDownloadQualityOptions(info, sourceQualitys)), ['128k', 'flac', 'master'], 'Master accepts lossless metadata while intermediate tiers require 24-bit audio')
 
   const searched = {
     ...info,
@@ -97,5 +97,27 @@ test('playlist downloads use matching search metadata for every quality through 
   for (const quality of ['flac24bit', 'hires', 'atmos', 'atmos_plus', 'master']) {
     assert.equal(getMusicType(enriched, quality, { wy: sourceQualitys }), quality, `${quality} must reach the download worker unchanged`)
   }
-  assert.deepEqual(types(getDownloadQualityOptions(info, sourceQualitys)), ['128k', 'flac'], 'search must not mutate the saved playlist entry')
+  assert.deepEqual(types(info.meta.qualitys), ['128k', 'flac'], 'search must not mutate the saved playlist entry')
+})
+
+test('leaderboard lossless songs can request Master without a 24-bit flag', () => {
+  for (const source of ['wy', 'tx', 'kw', 'kg', 'mg']) {
+    const info = { ...onlineSong([{ type: '128k', size: '1 MB' }, { type: 'flac', size: '6 MB' }], source), id: `${source}_101`, name: 'Ranked song' }
+    info.meta._qualitys = { '128k': { size: '1 MB' }, flac: { size: '6 MB' } }
+    assert.equal(shouldRefreshDownloadQuality(info, sourceQualitys, true), true)
+    assert.deepEqual(types(getDownloadQualityOptions(info, sourceQualitys)), ['128k', 'flac', 'master'])
+    assert.equal(getMusicType(info, 'master', { [source]: sourceQualitys }), 'master', 'selected Master must reach the worker unchanged')
+    assert.equal(info.meta._qualitys.flac24bit, undefined, 'do not fabricate song metadata')
+    const withoutMaster = sourceQualitys.filter(type => type != 'master')
+    assert.deepEqual(types(getDownloadQualityOptions(info, withoutMaster)), ['128k', 'flac'], 'a source without Master must not offer it')
+  }
+  assert.deepEqual(types(getDownloadQualityOptions(onlineSong([{ type: '320k', size: '2 MB' }]), sourceQualitys)), ['320k'], 'lossy songs must not gain Master')
+})
+
+test('Master added from FLAC uses its own size and is not duplicated', () => {
+  const info = onlineSong([{ type: 'flac', size: '6 MB' }])
+  info.meta._qualitys = { flac: { size: '6 MB' }, master: { size: '12 MB' } }
+  assert.deepEqual(getDownloadQualityOptions(info, sourceQualitys), [{ type: 'flac', size: '6 MB' }, { type: 'master', size: '12 MB' }])
+  info.meta.qualitys.push({ type: 'master', size: '12 MB' })
+  assert.deepEqual(types(getDownloadQualityOptions(info, sourceQualitys)), ['flac', 'master'])
 })

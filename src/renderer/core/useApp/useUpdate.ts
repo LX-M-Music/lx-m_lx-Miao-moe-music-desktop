@@ -103,7 +103,7 @@ export default () => {
         if (result.version === ignoreVersion) return
         void nextTick(() => {
           versionInfo.showModal = true
-          if (status == 'error' && preStatus == 'downloading' && !localStorage.getItem('update__download_failed_tip')) {
+          if (status == 'error' && ['testing', 'downloading', 'preparing'].includes(preStatus) && !localStorage.getItem('update__download_failed_tip')) {
             setTimeout(() => {
               void dialog.error({
                 message: window.i18n.t('update__error_top'),
@@ -130,7 +130,7 @@ export default () => {
     })
   })
   const rUpdateProgress = onUpdateProgress(({ params: progress }) => {
-    if (!['downloading', 'downloaded', 'verifying', 'installing'].includes(versionInfo.status)) return
+    if (!['testing', 'downloading', 'preparing', 'downloaded', 'verifying', 'installing'].includes(versionInfo.status)) return
     versionInfo.downloadProgress = progress
     versionInfo.status = progress.phase ?? 'downloading'
   })

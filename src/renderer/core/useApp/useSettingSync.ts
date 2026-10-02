@@ -1,7 +1,7 @@
 import { watch } from '@common/utils/vueTools'
-import { proxy, sync, windowSizeList } from '@renderer/store'
+import { proxy, sync } from '@renderer/store'
 import { appSetting } from '@renderer/store/setting'
-import { sendSyncAction, setWindowSize } from '@renderer/utils/ipc'
+import { sendSyncAction } from '@renderer/utils/ipc'
 import { setLanguage } from '@root/lang'
 import { setUserApi } from '../apiSource'
 import { applyAppFont } from '@renderer/utils/fonts'
@@ -9,10 +9,6 @@ import { applyAppFont } from '@renderer/utils/fonts'
 
 
 export default () => {
-  watch(() => appSetting['common.windowSizeId'], (index) => {
-    const info = index == null ? windowSizeList[2] : windowSizeList[index]
-    setWindowSize(info.width, info.height)
-  })
   watch(() => appSetting['common.langId'], (id) => {
     if (!id) return
     setLanguage(id)

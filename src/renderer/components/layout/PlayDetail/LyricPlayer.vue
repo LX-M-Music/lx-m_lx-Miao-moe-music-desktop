@@ -149,6 +149,7 @@ export default {
       return {
         textAlign: appSetting['playDetail.style.align'],
         '--lyric-transform-origin': appSetting['playDetail.style.align'],
+        '--lyric-zoom-margins': appSetting['playDetail.style.align'] === 'left' ? '0 auto' : appSetting['playDetail.style.align'] === 'right' ? 'auto 0' : 'auto',
       }
     })
     const lrcFontSize = computed(() => {
@@ -222,14 +223,14 @@ export default {
   isolation: isolate;
   --lyric-idle-color: var(--color-font);
   --lyric-idle-opacity: .68;
-  --lyric-unsung-color: var(--color-450);
+  --lyric-surface-color: var(--ambient-surface-color, var(--color-surface));
   --lyric-active-color: var(--ambient-lyric-accent, var(--color-primary-dark-400));
 
   :global(#root[data-ambient-controls]) & {
-    // Adaptive secondary text already has readable contrast; emphasize the
-    // current lyric with its own stronger accent instead of fading both colors.
+    // Resolve the shared idle color at the reading panel so original,
+    // translated and romanized lyrics keep the same contrast and opacity.
     --lyric-idle-color: var(--color-450);
-    --lyric-idle-opacity: 1;
+    --lyric-idle-opacity: .78;
   }
 
   // A soft local surface keeps the moving artwork from washing out the text.
@@ -239,32 +240,26 @@ export default {
     inset: -12px;
     z-index: -1;
     border-radius: 32px;
-    background: var(--color-surface);
-    opacity: .72;
-    filter: blur(24px);
-    -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 75%);
-    mask-image: radial-gradient(ellipse at center, #000 35%, transparent 75%);
+    background: var(--lyric-surface-color);
+    opacity: .26;
+    filter: blur(36px);
+    -webkit-mask-image: radial-gradient(ellipse closest-side at center, #000, transparent 100%);
+    mask-image: radial-gradient(ellipse closest-side at center, #000, transparent 100%);
     pointer-events: none;
   }
 
   :global {
     .font-lrc {
       --lyric-active-color: var(--ambient-local-lyric-accent, var(--ambient-lyric-accent, var(--color-primary-dark-400)));
-      font-weight: 400;
     }
     .line-content:not(.active) .font-lrc {
       --lyric-active-color: var(--lyric-idle-color);
-    }
-    .line-content.active > .line .font-lrc { font-weight: 700; }
-    .line-mode .font-lrc, .extended .font-lrc {
-      text-shadow: 0 1px 2px var(--color-surface), 0 0 8px var(--color-surface);
     }
   }
 
   .lyricSelectline { opacity: var(--lyric-idle-opacity); }
   .lyricSelectline.lrcActive {
     opacity: 1;
-    font-weight: 700;
   }
 }
 .lyric {
@@ -316,7 +311,7 @@ export default {
           transition: opacity var(--duration-normal) var(--ease-standard);
           font-size: 1em;
           background-repeat: no-repeat;
-          background-color: var(--lyric-unsung-color, var(--lyric-idle-color, var(--color-450)));
+          background-color: var(--lyric-idle-color, var(--color-450));
           background-image: -webkit-linear-gradient(top, var(--lyric-active-color, var(--color-primary-dark-200)), var(--lyric-active-color, var(--color-primary-dark-200)));
           -webkit-text-fill-color: transparent;
           -webkit-background-clip: text;
@@ -338,19 +333,20 @@ export default {
   // }
 }
 .lrcActiveZoom {
+  --lyric-active-scale: 1.14;
   :global {
     .line-content {
-      .line {
-        transform-origin: var(--lyric-transform-origin, center) center;
-        transition: transform var(--duration-normal) var(--ease-standard);
+      // Reserve width and keep row layout stable while the whole lyric group scales.
+      width: calc(100% / var(--lyric-active-scale));
+      margin-inline: var(--lyric-zoom-margins, auto);
+      transform: scale(1);
+      transform-origin: var(--lyric-transform-origin, center) center;
+      transition: transform var(--duration-slow) var(--ease-standard), color var(--duration-slow) var(--ease-standard), opacity var(--duration-slow) var(--ease-standard);
+      .font-lrc {
+        transition-duration: var(--duration-slow);
       }
       &.active {
-        .extended {
-          font-size: .94em;
-        }
-        .line {
-          transform: scale(1.1);
-        }
+        transform: scale(var(--lyric-active-scale));
       }
     }
   }
@@ -416,7 +412,7 @@ export default {
   }
   .lrcActive {
     color: var(--lyric-active-color, var(--color-primary));
-    font-weight: 500;
+    font-weight: var(--playDetail-font-weight, 400);
   }
 }
 

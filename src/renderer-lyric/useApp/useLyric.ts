@@ -1,7 +1,7 @@
 import { watch } from '@common/utils/vueTools'
 import { setLyric, setVertical, setPlaybackRate } from '@lyric/core/lyric'
 import { getStatus } from '@lyric/core/mainWindowChannel'
-import { isPlay, setting } from '@lyric/store/state'
+import { isPlay, miniPlayer, setting } from '@lyric/store/state'
 
 export default () => {
   const handleLyricSettingChanged = () => {
@@ -20,8 +20,16 @@ export default () => {
       })
     }
   })
-  watch(() => setting['desktopLyric.direction'], (direction) => {
-    setVertical(direction == 'vertical')
+  watch([
+    () => !setting['desktopLyric.singleLine'] && setting['desktopLyric.direction'] == 'vertical',
+    () => setting['desktopLyric.singleLine'],
+  ], ([isVertical], [wasVertical]) => {
+    if (isVertical !== wasVertical) setVertical(isVertical)
     getStatus()
+  })
+  // A paused seek changes the player snapshot without emitting a play event.
+  // Request its authoritative position once for the single current row.
+  watch(() => miniPlayer.position, () => {
+    if (setting['desktopLyric.singleLine'] && !miniPlayer.isPlay) getStatus()
   })
 }

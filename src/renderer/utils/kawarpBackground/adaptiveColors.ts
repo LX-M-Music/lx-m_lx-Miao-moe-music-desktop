@@ -13,24 +13,52 @@ interface BackgroundFrame {
 export const createAdaptiveColors = (background: HTMLElement, themeChanged: () => void) => {
   const root = document.getElementById('root')!
   const controls = createControlRegions(root, background)
-  const original = new Map<string, { value: string, priority: string }>()
-  const values = new Map<string, string>()
+  interface ColorScope {
+    element: HTMLElement
+    original: Map<string, { value: string, priority: string }>
+    values: Map<string, string>
+    attribute: string | null
+    darkText?: boolean
+  }
+  const scopes = new Map<HTMLElement, ColorScope>()
+  const scopeFor = (element: HTMLElement) => {
+    let scope = scopes.get(element)
+    if (!scope) {
+      scope = { element, original: new Map(), values: new Map(), attribute: element.getAttribute('data-ambient-controls') }
+      scopes.set(element, scope)
+    }
+    return scope
+  }
   let enabled = false
+  let includeLibrary = true
   let lastSample = -Infinity
-  let darkText: boolean | undefined
   let artwork: RGB | undefined
   let regionColors: RGB[] = []
   let sampler: HTMLCanvasElement | undefined
   let context: CanvasRenderingContext2D | null = null
-  const clear = () => {
-    for (const [key, { value, priority }] of original) {
-      if (value) root.style.setProperty(key, value, priority)
-      else root.style.removeProperty(key)
+  const backgroundColors = () => {
+    const theme = getComputedStyle(document.documentElement)
+    const style = getComputedStyle(background)
+    const surface = style.getPropertyValue('--ambient-surface-color').trim()
+    return {
+      base: parseColor(theme.getPropertyValue('--color-surface')),
+      detailBase: parseColor(style.getPropertyValue('--ambient-detail-base')),
+      libraryOpacity: Number(style.getPropertyValue('--ambient-library-opacity').trim() || 0.3),
+      detailOpacity: Number(style.getPropertyValue('--ambient-detail-opacity').trim() || 0.3),
+      shade: surface || theme.getPropertyValue('--color-content-background'),
     }
-    original.clear()
-    values.clear()
-    delete root.dataset.ambientControls
-    darkText = undefined
+  }
+  const clearScope = (scope: ColorScope) => {
+    for (const [key, { value, priority }] of scope.original) {
+      if (value) scope.element.style.setProperty(key, value, priority)
+      else scope.element.style.removeProperty(key)
+    }
+    if (scope.attribute == null) delete scope.element.dataset.ambientControls
+    else scope.element.setAttribute('data-ambient-controls', scope.attribute)
+    scopes.delete(scope.element)
+  }
+  const clear = () => {
+    for (const scope of scopes.values()) clearScope(scope)
     artwork = undefined
     regionColors = []
     lastSample = -Infinity
@@ -38,7 +66,7 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
   const themeObserver = new MutationObserver(() => {
     lastSample = -Infinity
     // Keep the background's shading independent of the foreground palette.
-    background.style.setProperty('--ambient-shade-color', getComputedStyle(document.documentElement).getPropertyValue('--color-content-background'))
+    background.style.setProperty('--ambient-shade-color', backgroundColors().shade)
     // The renderer's gradient follows the theme even when adaptive controls
     // are disabled; static snapshots must be refreshed as well.
     themeChanged()
@@ -46,11 +74,11 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
   const themeStyle = (window as Window & { dom_style?: HTMLStyleElement }).dom_style
   if (themeStyle) themeObserver.observe(themeStyle, { childList: true, characterData: true, subtree: true })
 
-  const write = (key: string, value: string) => {
-    if (!original.has(key)) original.set(key, { value: root.style.getPropertyValue(key), priority: root.style.getPropertyPriority(key) })
-    if (values.get(key) === value) return
-    values.set(key, value)
-    root.style.setProperty(key, value)
+  const write = (scope: ColorScope, key: string, value: string) => {
+    if (!scope.original.has(key)) scope.original.set(key, { value: scope.element.style.getPropertyValue(key), priority: scope.element.style.getPropertyPriority(key) })
+    if (scope.values.get(key) === value) return
+    scope.values.set(key, value)
+    scope.element.style.setProperty(key, value)
   }
   const update = (frame: BackgroundFrame, canvas: HTMLCanvasElement | null, moving = false) => {
     if (!enabled || !background.isConnected) return
@@ -64,10 +92,10 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       context = sampler.getContext('2d', { willReadFrequently: true })
     }
     if (!context) return
-    const styles = getComputedStyle(document.documentElement)
-    const base = parseColor(styles.getPropertyValue('--color-surface'))
-    const shade = parseColor(styles.getPropertyValue('--color-content-background')).slice(0, 3) as RGB
-    background.style.setProperty('--ambient-shade-color', styles.getPropertyValue('--color-content-background'))
+    const backgroundColor = backgroundColors()
+    const base = backgroundColor.base
+    const shade = parseColor(backgroundColor.shade)
+    background.style.setProperty('--ambient-shade-color', backgroundColor.shade)
     const pixels: RGB[] = []
     try {
       context.clearRect(0, 0, 24, 16)
@@ -101,7 +129,7 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
         const color: RGB = [data[index], data[index + 1], data[index + 2]]
         // WebGL already contains the gradient; only CSS fallback needs it here.
         const amount = canvas ? 0 : Math.max(0, ((index / 4 % 24) / 23 - 0.12) / 1.03) * 0.1
-        pixels.push(mixColor(color, shade, amount))
+        pixels.push(mixColor(color, shade.slice(0, 3) as RGB, amount * shade[3]))
       }
     } catch {
       // A lost GPU context must not leave unreadable or stale theme overrides.
@@ -109,30 +137,47 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       context.globalAlpha = 1
       context.filter = 'none'
     }
-    const opacity = frame.opacity * Number(getComputedStyle(background).opacity)
-    const backgrounds = compositeBackgrounds(pixels, base, opacity)
     const currentArtwork = artwork = stabilizeColor(artwork, frame.opacity ? artworkColor(pixels) : [125, 125, 125], moving)
-    const palette = createAdaptivePalette(backgrounds, currentArtwork, darkText)
-    darkText = palette.darkText
-    for (const [key, value] of Object.entries(palette.colors)) write(key, value)
-    controlRegions(pixels, 24, 16).forEach((region, index) => {
-      const color = regionColors[index] = stabilizeColor(regionColors[index], frame.opacity ? artworkColor(region) : currentArtwork, moving)
-      const colors = createControlColors(compositeBackgrounds(region, base, opacity), color, palette)
-      write(`--ambient-zone-${index}-accent`, rgb(colors.accent))
-      write(`--ambient-zone-${index}-lyric-accent`, rgb(colors.lyricAccent))
-      write(`--ambient-zone-${index}-on-accent`, rgb(colors.onAccent))
+    const regions = controlRegions(pixels, 24, 16)
+    regions.forEach((region, index) => {
+      regionColors[index] = stabilizeColor(regionColors[index], frame.opacity ? artworkColor(region) : currentArtwork, moving)
     })
-    root.dataset.ambientControls = darkText ? 'light' : 'dark'
+    // Both screens can be visible during expansion. Keep their own contrast
+    // palettes instead of recoloring the fading screen to match the incoming one.
+    const publish = (element: HTMLElement, surface: ReturnType<typeof parseColor>, targetOpacity: number) => {
+      const opacity = frame.opacity * targetOpacity
+      const scope = scopeFor(element)
+      const palette = createAdaptivePalette(compositeBackgrounds(pixels, surface, opacity), currentArtwork, scope.darkText)
+      scope.darkText = palette.darkText
+      for (const [key, value] of Object.entries(palette.colors)) write(scope, key, value)
+      regions.forEach((region, index) => {
+        const colors = createControlColors(compositeBackgrounds(region, surface, opacity), regionColors[index], palette)
+        write(scope, `--ambient-zone-${index}-accent`, rgb(colors.accent))
+        write(scope, `--ambient-zone-${index}-lyric-accent`, rgb(colors.lyricAccent))
+        write(scope, `--ambient-zone-${index}-on-accent`, rgb(colors.onAccent))
+        write(scope, `--ambient-zone-${index}-text`, rgb(colors.text))
+        write(scope, `--ambient-zone-${index}-secondary`, rgb(colors.secondary))
+      })
+      element.dataset.ambientControls = palette.darkText ? 'light' : 'dark'
+    }
+    if (includeLibrary) publish(root, base, backgroundColor.libraryOpacity)
+    const detail = root.querySelector<HTMLElement>('[data-player-detail]')
+    if (detail) publish(detail, backgroundColor.detailBase, backgroundColor.detailOpacity)
+    for (const scope of scopes.values()) {
+      if (!scope.element.isConnected || (scope.element !== root && scope.element !== detail)) clearScope(scope)
+    }
     controls.refresh()
   }
   return {
     update,
     invalidate() { lastSample = -Infinity },
-    setEnabled(value: boolean) {
+    setEnabled(value: boolean, library = true) {
       enabled = value
-      controls.setEnabled(value)
+      includeLibrary = library
+      controls.setEnabled(value, library)
       lastSample = -Infinity
       if (!value) clear()
+      else if (!library && scopes.has(root)) clearScope(scopes.get(root)!)
     },
     dispose() {
       themeObserver.disconnect()

@@ -82,7 +82,7 @@ test('song lists, all player covers and media metadata share loaded artwork', { 
       await page.locator('[data-player-detail]').waitFor()
       await page.waitForFunction(src => {
         const images = [...document.querySelectorAll('[data-player-detail] img')]
-        return images.length >= 3 && images.every(image => image.src === src && image.naturalWidth === 640)
+        return images.length > 0 && images.every(image => image.src === src && image.naturalWidth === 640)
       }, src)
       await showDetail(page, false)
       await settled(page)

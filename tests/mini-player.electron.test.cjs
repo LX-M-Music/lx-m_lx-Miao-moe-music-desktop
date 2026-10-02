@@ -51,7 +51,19 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
     return window
   }
   const button = async key => mini.getByRole('button', { name: await label(page, key), exact: true })
+  const pointerInside = async inside => {
+    const window = await app.browserWindow(mini)
+    try {
+      const bounds = await window.evaluate(window => window.getContentBounds())
+      await app.evaluate((_, { inside, bounds }) => {
+        const point = inside ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 } : { x: -10000, y: -10000 }
+        global.__miniPointer = point
+        if (global.__miniLockPoint) global.__miniLockPoint = point
+      }, { inside, bounds })
+    } finally { await window.dispose() }
+  }
   const options = async() => {
+    await pointerInside(true)
     await mini.mouse.move(80, 20)
     await (await button('mini_player__options')).click()
     await mini.locator('#mini-options').waitFor()
@@ -59,6 +71,7 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
   const closeOptions = async() => {
     await mini.locator('#mini-options').getByRole('button', { name: await label(page, 'close'), exact: true }).click()
     await mini.locator('#mini-options').waitFor({ state: 'hidden' })
+    await pointerInside(false)
   }
   const headerIs = async visible => mini.waitForFunction(visible => getComputedStyle(document.querySelector('.mini-header')).opacity === (visible ? '1' : '0'), visible)
   const trackIs = async index => {
@@ -78,12 +91,16 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
   try {
     page.setDefaultTimeout(8000)
     // Synthetic renderer hover must not conflict with the user's actual pointer.
-    await app.evaluate(({ screen }) => { screen.getCursorScreenPoint = () => ({ x: -10000, y: -10000 }) })
+    await app.evaluate(({ screen }) => {
+      global.__miniPointer = { x: -10000, y: -10000 }
+      screen.getCursorScreenPoint = () => global.__miniPointer
+    })
     await page.evaluate(songs => require('electron').ipcRenderer.invoke('player_list_data_overwire', { defaultList: [], loveList: songs, tempList: [], userList: [] }), songs)
     await route(page, '/list?id=love')
     await settled(page)
     await page.locator('[data-song-id="mini-0"] [data-music-cell="index"]').dblclick()
     await page.waitForFunction(() => !window.__lxPluginHost.player.getAudioElement().paused && window.__lxPluginHost.player.getDuration() > 0)
+    await update(page, { 'desktopLyric.style.backgroundOpacity': 92 })
     await page.locator('#player').getByRole('button', { name: /开启迷你播放器/ }).click()
     mini = await getMini()
 
@@ -151,7 +168,7 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
       await (await button('player__pause')).click()
     })
 
-    await t.test('lyrics remain readable with the pointer outside and options stay discoverable in both directions', async() => {
+    await t.test('lyrics remain readable with hidden options outside in both directions', async() => {
       await update(page, { 'desktopLyric.showPlayer': false, 'desktopLyric.autoHideControls': true, 'desktopLyric.style.backgroundOpacity': 0, 'desktopLyric.pauseHide': true, 'desktopLyric.isHoverHide': true })
       for (const direction of ['horizontal', 'vertical']) {
         await update(page, { 'desktopLyric.direction': direction })
@@ -165,13 +182,14 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
           return opacity
         })
         assert(effectiveOpacity >= 0.65, 'paused text must remain readable outside the window')
-        assert.equal(await mini.locator('[data-mini-recovery]').evaluate(el => getComputedStyle(el).opacity), '0.85')
+        assert.equal(await mini.locator('[data-mini-recovery]').evaluate(el => getComputedStyle(el).opacity), '0')
         await mini.screenshot({ path: path.join(profilePath, `mini-player-outside-${direction}.png`), omitBackground: true })
         await page.locator('#player').getByRole('button', { name: await label(page, 'player__play'), exact: true }).click()
         await mini.waitForFunction(() => !document.querySelector('[data-mini-lyrics]').classList.contains('paused') && getComputedStyle(document.querySelector('[data-mini-lyrics]')).opacity === '1')
         assert.equal(await mini.locator('#container').evaluate(el => getComputedStyle(el).opacity), '1')
         await page.locator('#player').getByRole('button', { name: await label(page, 'player__pause'), exact: true }).click()
       }
+      await pointerInside(true)
       await mini.locator('[data-mini-recovery]').click()
       await mini.locator('#mini-options').waitFor()
       assert(await mini.evaluate(() => document.querySelector('.mini-window-buttons').getBoundingClientRect().right < document.querySelector('[data-mini-recovery]').getBoundingClientRect().left), 'the corner button must not overlap the close button')
@@ -218,6 +236,10 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
       await closeOptions()
       await mini.locator('[data-mini-lyrics]').hover()
       await headerIs(false)
+      // The lyrics-only options button is deliberately unavailable outside.
+      // Bring the system pointer inside before exercising its keyboard access.
+      await pointerInside(true)
+      await mini.waitForFunction(() => document.querySelector('[data-mini-recovery]').classList.contains('native-window-hover'))
       await mini.keyboard.press('Tab')
       await headerIs(true)
       await (await button('mini_player__options')).focus()
@@ -553,6 +575,10 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
         await mini.locator('[data-mini-track]').waitFor()
         await mini.mouse.move(80, 20)
         await headerIs(true)
+        // Screen-lock boundary checks above can leave the reopened window at
+        // an edge. Start inside the screen to test unlocking, not clamping.
+        await update(page, { 'desktopLyric.x': 140, 'desktopLyric.y': 140, 'desktopLyric.width': 450, 'desktopLyric.height': 300 })
+        await mini.waitForTimeout(650)
         const movement = await dragWindow(app, mini, '.mini-brand', { dx: -20, dy: -20 })
         if (movement) assert.equal(movement.x, -20, 'unlocking restores native dragging')
         await options()

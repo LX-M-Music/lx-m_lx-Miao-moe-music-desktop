@@ -62,6 +62,7 @@
         <label><input type="checkbox" :checked="setting['desktopLyric.style.backgroundOpacity'] === 0" @change="setTransparent"><span>{{ $t('mini_player__transparent') }}</span></label>
         <label><input type="checkbox" :checked="setting['desktopLyric.autoHideControls']" @change="updateSetting({ 'desktopLyric.autoHideControls': $event.target.checked })"><span>{{ $t('mini_player__hide_controls') }}</span></label>
         <label><input type="checkbox" :checked="!setting['desktopLyric.showPlayer']" @change="updateSetting({ 'desktopLyric.showPlayer': !$event.target.checked })"><span>{{ $t('mini_player__lyrics_only') }}</span></label>
+        <label :title="$t('setting__desktop_lyric_single_line_tip')"><input type="checkbox" :checked="setting['desktopLyric.singleLine']" @change="updateSetting({ 'desktopLyric.singleLine': $event.target.checked })"><span>{{ $t('setting__desktop_lyric_single_line') }}</span></label>
         <label class="mini-opacity-control">
           <span class="mini-opacity-heading"><span>{{ $t('mini_player__lyric_transparency') }}</span><span aria-hidden="true">{{ lyricTransparency }}%</span></span>
           <input
@@ -84,7 +85,7 @@
   </section>
   <teleport to="#root">
     <button
-      v-if="showRecovery" ref="optionsButton" type="button" class="mini-recovery" data-mini-recovery :style="recoveryStyle"
+      v-if="showRecovery" ref="optionsButton" type="button" class="mini-recovery" :class="{ 'hover-only': !setting['desktopLyric.showPlayer'], 'native-window-hover': nativePointer !== null }" data-mini-recovery :style="recoveryStyle"
       :title="$t('mini_player__options')" :aria-label="$t('mini_player__options')" :aria-expanded="optionsOpen" aria-controls="mini-options"
       @click="optionsOpen = !optionsOpen"
     >

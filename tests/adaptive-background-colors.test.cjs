@@ -60,6 +60,14 @@ test('fully faded artwork uses the base surface and translucent bases include bo
   assert.deepEqual(parseColor('rgba(19, 19, 19, 0.9)'), [19, 19, 19, 0.9])
 })
 
+test('a minified CSS detail surface keeps dark artwork text readable', () => {
+  const backgrounds = compositeBackgrounds(covers, parseColor('#131313'), 0.3)
+  const palette = createAdaptivePalette(backgrounds, [40, 120, 130])
+  assert.equal(palette.darkText, false)
+  readable(palette.text, backgrounds, 'detail text after CSS minification')
+  readable(palette.secondary, backgrounds, 'detail labels after CSS minification')
+})
+
 test('moving colors change controls at their own positions even with an unchanged global average', () => {
   const red = [230, 45, 65]
   const blue = [35, 105, 235]
@@ -87,4 +95,30 @@ test('colorful regions keep their saturation; black-and-white artwork stays neut
   assert.equal(toHsl(neutral)[1], 0)
   assert.deepEqual(stabilizeColor([90, 120, 180], [91, 121, 181], true), [90, 120, 180])
   assert.deepEqual(stabilizeColor([90, 120, 180], [240, 40, 60], false), [240, 40, 60])
+})
+
+test('subtle reading surfaces keep full-panel text and regional widget text readable', () => {
+  for (const theme of themes) {
+    for (const cover of [...covers.map(color => [color]), covers]) {
+      const backgrounds = compositeBackgrounds(cover, theme, 0.3)
+      const palette = createAdaptivePalette(backgrounds, artworkColor(cover))
+      const surface = parseColor(palette.colors['--ambient-reading-surface'])
+      const readingBackgrounds = backgrounds.map(background => mixColor(background, surface.slice(0, 3), surface[3]))
+      readable(palette.text, readingBackgrounds, 'reading body text')
+      readable(palette.secondary, readingBackgrounds, 'reading labels')
+      // Wide panels use the full-frame palette; only individual widgets use
+      // their own sampled region now that masks are deliberately subtle.
+      for (let index = 0; index < cover.length; index++) {
+        const region = compositeBackgrounds([cover[index]], theme, 0.3)
+        const local = createControlColors(region, cover[index], palette)
+        readable(local.text, region, 'local reading body text')
+        readable(local.secondary, region, 'local reading labels')
+        readable(local.accent, [...region, palette.surface, palette.hover, palette.active], 'local control text')
+        for (const background of [palette.surface, palette.hover, palette.active]) {
+          readable(local.text, [background], 'input and popup body text')
+          readable(local.secondary, [background], 'input and popup labels')
+        }
+      }
+    }
+  }
 })

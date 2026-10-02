@@ -57,21 +57,13 @@ dd
       base-btn.btn(min @click="isShowQualityCheckModal = true") {{ $t('setting__basic_source_check_quality') }}
 
 dd
-  h3#basic_window_size {{ $t('setting__basic_window_size') }}
-  div.setting-options
-    base-checkbox.gap-left(
-      v-for="item in windowSizeList" :id="`setting_window_size_${item.id}`" :key="item.id"
-      name="setting_window_size" need :model-value="appSetting['common.windowSizeId']" :disabled="isFullscreen" :value="item.id" :label="$t('setting__basic_window_size_' + item.name)"
-      @update:model-value="updateSetting({'common.windowSizeId': $event})")
-
-dd
   h3#basic_font_size {{ $t('setting__basic_font_size') }}
   div.setting-options
     //- base-selection.gap-teft(:list="fontSizeList" :model-value="appSetting['common.fontSize']" @update:model-value="updateSetting({'common.fontSize': $event})")
     base-checkbox.gap-left(
       v-for="item in fontSizeList" :id="`setting_basic_font_size_${item.id}`" :key="item.id"
       name="setting_basic_font_size" need :model-value="appSetting['common.fontSize']" :value="item.id"
-      :label="item.label" :disabled="isFullscreen" @update:model-value="updateSetting({'common.fontSize': $event})")
+      :label="item.label" @update:model-value="updateSetting({'common.fontSize': $event})")
 
 setting-fonts
 
@@ -117,7 +109,7 @@ quality-check-modal(v-model="isShowQualityCheckModal")
 <script>
 import { formatError } from '@common/utils/errorMessage'
 import { computed, ref, watch, reactive, shallowReactive } from '@common/utils/vueTools'
-import { windowSizeList, userApi, isFullscreen, themeId, themeInfo } from '@renderer/store'
+import { userApi, themeId, themeInfo } from '@renderer/store'
 import { langList, useI18n } from '@root/lang'
 import { saveTheme, showSelectDialog } from '@renderer/utils/ipc'
 import apiSourceInfo from '@renderer/utils/musicSdk/api-source-info'
@@ -413,11 +405,9 @@ export default {
       apiSources,
       isShowUserApiModal,
       isShowQualityCheckModal,
-      windowSizeList,
       langList,
       sourceNameTypes,
       controlBtnPositionList,
-      isFullscreen,
       toggleTheme,
       themeId,
       handleRefreshTheme,

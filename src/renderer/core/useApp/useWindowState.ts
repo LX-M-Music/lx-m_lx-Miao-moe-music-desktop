@@ -1,8 +1,7 @@
 import { onBeforeUnmount, watch } from '@common/utils/vueTools'
-import { type WindowState, windowSizeList } from '@common/config'
+import { type WindowState } from '@common/config'
 import { isFullscreen, isMaximized, isWindowVisible, windowFontSize } from '@renderer/store'
 import { appSetting } from '@renderer/store/setting'
-import { getFontSizeWithScreen } from '@renderer/utils'
 import { getWindowState, onWindowStateChanged } from '@renderer/utils/ipc'
 
 export default () => {
@@ -14,11 +13,8 @@ export default () => {
     root.classList.toggle('transparent', !window.dt && !expanded)
     root.classList.toggle('disableTransparent', window.dt && !expanded)
 
-    // Use the current viewport, including display scaling and short, wide screens.
-    const preferredSize = expanded ? getFontSizeWithScreen(window.innerWidth) : appSetting['common.fontSize']
-    const minWindowSize = windowSizeList[0]
-    const fittedSize = 16 * Math.min(window.innerWidth / minWindowSize.width, window.innerHeight / minWindowSize.height)
-    windowFontSize.value = Math.max(12, Math.min(preferredSize, Math.floor(fittedSize * 100) / 100))
+    // Keep the user's font choice independent of window size and state.
+    windowFontSize.value = appSetting['common.fontSize']
     root.style.fontSize = `${windowFontSize.value}px`
     window.lx.rootOffset = parseFloat(getComputedStyle(root).paddingLeft) || 0
   }

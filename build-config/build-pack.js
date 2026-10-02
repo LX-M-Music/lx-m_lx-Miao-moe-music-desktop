@@ -289,6 +289,20 @@ const build = async(target, arch, packageType, publishType) => {
     return
   }
   const targetInfo = createTarget[target](arch, packageType)
+  const portableContexts = []
+  const isGreen = packageType === 'green' || packageType === 'win7_green'
+  const differentialOptions = target === 'win' ? {
+    afterPack: async(context) => {
+      await afterPack(context)
+      const edition = packageType === 'portable' ? 'single-file' : isGreen ? 'portable' : 'installed'
+      await require('node:fs/promises').writeFile(require('node:path').join(context.appOutDir, 'resources/lx-update-runtime.json'), JSON.stringify({
+        schema: 1, appId: 'com.lx-m.music.desktop', edition, arch: builder.Arch[context.arch], win7: isWin7Build, version: context.packager.appInfo.version,
+      }))
+      await require('./portable-update.cjs').writeInventory(context.appOutDir)
+      if (isGreen) portableContexts.push(context)
+    },
+    ...(isGreen ? { afterAllArtifactBuild: require('./portable-update.cjs').portableArtifactHook(portableContexts, isWin7Build) } : {}),
+  } : {}
   // Promise is returned
   await builder.build({
     ...targetInfo.buildOptions,
@@ -297,7 +311,7 @@ const build = async(target, arch, packageType, publishType) => {
     ia32: arch == 'x86' || arch == 'x86_64',
     arm64: arch == 'arm64',
     armv7l: arch == 'armv7l',
-    config: { ...options, ...targetInfo.options },
+    config: { ...options, ...targetInfo.options, ...differentialOptions },
   })
   // .then((result) => {
   //   console.log(JSON.stringify(result))

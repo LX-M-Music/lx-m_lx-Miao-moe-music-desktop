@@ -1,6 +1,7 @@
 import { drawSpectrum } from './spectrum'
 import { createRadialRenderer } from './radial'
 import { normalizeStyle, type VisualizerStyle } from './styles'
+import { getPerformancePolicy, isLowPowerMode } from './performance'
 
 interface Bounds { x: number, y: number, width: number, height: number }
 interface Options { style: VisualizerStyle, desktop?: boolean, preview?: boolean, time?: number, bounds?: Bounds }
@@ -26,7 +27,8 @@ export const createVisualizerRenderer = (canvas: HTMLCanvasElement) => {
     draw(data: Uint8Array, options: Options) {
       if (!context) return
       // CSS dimensions come from ResizeObserver; only the cheap DPR value is checked per frame.
-      const ratio = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8_000_000 / Math.max(1, width * height)))
+      const policy = getPerformancePolicy(isLowPowerMode())
+      const ratio = Math.min(window.devicePixelRatio || 1, policy.visualizerDpr, Math.sqrt(policy.visualizerPixels / Math.max(1, width * height)))
       const pixelWidth = Math.round(width * ratio)
       const pixelHeight = Math.round(height * ratio)
       if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {

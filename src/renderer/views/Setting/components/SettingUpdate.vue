@@ -16,7 +16,7 @@ dd
     .p.small.gap-top
       | {{ $t('setting__update_latest_label') }}{{ versionInfo.newVersion && versionInfo.newVersion.version != '0.0.0' ? versionInfo.newVersion.version : $t('setting__update_unknown') }}
     .p.small(v-if="downloadProgress" style="line-height: 1.5;")
-      | {{ $t('setting__update_downloading') }}
+      | {{ updateLabel }}
       br
       | {{ $t('setting__update_progress') }}{{ downloadProgress }}
     template(v-if="versionInfo.newVersion")
@@ -24,7 +24,7 @@ dd
         span {{ $t('setting__update_latest') }}
       .p(v-else-if="versionInfo.isUnknown")
         span {{ $t('setting__update_unknown_tip') }}
-      .p(v-else-if="versionInfo.status != 'downloading'")
+      .p(v-else-if="!['testing', 'downloading', 'preparing', 'verifying', 'installing'].includes(versionInfo.status)")
         span {{ $t('setting__update_new_version') }}
       .p
         base-btn.btn.gap-left(min @click="showUpdateModal") {{ $t('setting__update_open_version_modal_btn') }}
@@ -64,7 +64,13 @@ export default {
       lastClickTime = window.performance.now()
     }
 
+    const updateLabel = computed(() => t(versionInfo.status == 'testing' ? 'setting__update_testing' : versionInfo.status == 'preparing' ? 'setting__update_preparing' : 'setting__update_downloading'))
     const downloadProgress = computed(() => {
+      if (versionInfo.status == 'testing') {
+        const info = versionInfo.downloadProgress
+        return info?.totalSources ? t('setting__update_tested', { tested: info.testedSources ?? 0, total: info.totalSources }) : t('setting__update_init')
+      }
+      if (versionInfo.status == 'preparing') return t('setting__update_init')
       return versionInfo.status == 'downloading'
         ? versionInfo.downloadProgress
           ? `${versionInfo.downloadProgress.progress.toFixed(2)}% - ${sizeFormate(versionInfo.downloadProgress.transferred)}/${sizeFormate(versionInfo.downloadProgress.total)} - ${sizeFormate(versionInfo.downloadProgress.bytesPerSecond)}/s`
@@ -79,6 +85,7 @@ export default {
     return {
       versionInfo,
       downloadProgress,
+      updateLabel,
       handleOpenDevTools,
       showUpdateModal,
       appSetting,

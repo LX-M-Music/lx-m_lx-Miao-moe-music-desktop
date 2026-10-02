@@ -12,6 +12,9 @@ declare global {
        * 窗口大小id
        */
       'common.windowSizeId': number
+      /** 拖动缩放后记住的窗口尺寸，0 表示沿用旧版尺寸预设 */
+      'common.windowWidth': number
+      'common.windowHeight': number
 
       /**
        * 窗口大小id
@@ -315,6 +318,9 @@ declare global {
        */
       'playDetail.style.fontSize': number
 
+      /** 播放详情页-字体粗细，100-900，400 为标准 */
+      'playDetail.style.fontWeight': number
+
       /**
        * 播放详情页-歌词对齐方式
        */
@@ -332,6 +338,8 @@ declare global {
       'desktopLyric.enable': boolean
       /** 显示迷你播放器的封面、歌曲和播放控制；关闭后仅显示歌词 */
       'desktopLyric.showPlayer': boolean
+      /** 只显示当前一句原文，横向单行并直接换句 */
+      'desktopLyric.singleLine': boolean
       /** 鼠标移出窗口后隐藏控制，悬停或键盘聚焦时恢复 */
       'desktopLyric.autoHideControls': boolean
 
@@ -779,6 +787,9 @@ declare global {
        */
       'cookie.enableFavListSync': boolean
 
+      /** 降低视觉渲染和闲置内存缓存开销，保留播放与服务功能 */
+      'ui.lowPowerMode': boolean
+
       /**
        * 是否启用平滑动画（页面切换/列表项过渡/弹窗淡入）
        */
@@ -791,6 +802,8 @@ declare global {
 
       /** 专辑封面动态背景的总开关与性能档位 */
       'ui.ambientBackground': boolean
+      /** 在播放详情页的动态背景上显示黑色遮罩 */
+      'ui.ambientBackgroundPlayDetailMask': boolean
       /** 仅在播放详情页显示专辑封面动态背景 */
       'ui.ambientBackgroundOnlyPlayDetail': boolean
       /** 根据动态背景调整按钮与选中文字的颜色 */

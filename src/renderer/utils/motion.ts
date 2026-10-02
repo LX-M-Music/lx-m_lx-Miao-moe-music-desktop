@@ -52,6 +52,37 @@ export const finishMotions = () => {
   finishTasks.clear()
 }
 
+/** Scroll on the same browser timing curve as the lyric scale transition. */
+export const scrollWithMotion = (element: HTMLElement, target: number, kind: MotionKind = 'slow') => {
+  const to = Math.max(0, Math.min(target, element.scrollHeight - element.clientHeight))
+  const from = element.scrollTop
+  const animation = playMotion(element, [], kind)
+  if (!animation) {
+    element.scrollTop = to
+    return () => {}
+  }
+  let frame = 0
+  const cancel = () => {
+    cancelAnimationFrame(frame)
+    finishTasks.delete(finish)
+    animation.cancel()
+  }
+  const finish = () => {
+    element.scrollTop = to
+    cancel()
+  }
+  finishTasks.add(finish)
+  const step = () => {
+    if (!element.isConnected) { cancel(); return }
+    if (animation.playState === 'finished') { finish(); return }
+    const progress = animation.effect?.getComputedTiming().progress
+    if (progress != null) element.scrollTop = from + (to - from) * progress
+    frame = requestAnimationFrame(step)
+  }
+  frame = requestAnimationFrame(step)
+  return cancel
+}
+
 /** Damped lyric scrolling, cancellable as soon as the user takes control. */
 export const scrollWithSpring = (element: HTMLElement, target: number) => {
   const to = Math.max(0, Math.min(target, element.scrollHeight - element.clientHeight))

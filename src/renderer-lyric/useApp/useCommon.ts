@@ -7,4 +7,8 @@ export default () => {
     window.i18n.setLanguage(id)
     window.setLang(id)
   })
+  watch(() => setting['ui.lowPowerMode'], enabled => {
+    document.documentElement.dataset.lowPowerMode = String(enabled)
+    window.dispatchEvent(new Event('lx-performance-change'))
+  }, { immediate: true })
 }

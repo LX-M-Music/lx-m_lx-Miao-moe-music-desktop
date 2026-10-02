@@ -1,13 +1,16 @@
 <template>
   <div id="background" :style="{ opacity: backgroundOpacity }" aria-hidden="true" />
-  <div id="container" :class="[{ lock: setting['desktopLyric.isLock'] }, { hide: isHoverHide }, { transparent: backgroundOpacity === 0 }]">
+  <div id="container" :class="[{ lock: setting['desktopLyric.isLock'] }, { hide: isHoverHide }, { transparent: backgroundOpacity === 0, 'native-window-hover': nativePointer !== null }]">
     <div id="main">
-      <mini-player />
-      <div class="mini-lyrics" :class="{ 'native-lyric-drag': !isShowResize && !setting['desktopLyric.isLock'], 'with-player': setting['desktopLyric.showPlayer'], 'align-start': setting['desktopLyric.scrollAlign'] === 'top', paused: !setting['desktopLyric.showPlayer'] && isHide, vertical: setting['desktopLyric.direction'] === 'vertical' }" data-mini-lyrics>
+      <div class="mini-lyrics" :class="{ 'native-lyric-drag': !isShowResize && !setting['desktopLyric.isLock'], 'with-player': setting['desktopLyric.showPlayer'], 'single-line': setting['desktopLyric.singleLine'], 'align-start': setting['desktopLyric.scrollAlign'] === 'top', paused: !setting['desktopLyric.showPlayer'] && isHide, vertical: !setting['desktopLyric.singleLine'] && setting['desktopLyric.direction'] === 'vertical' }" data-mini-lyrics>
         <span class="mini-lyric-drag-surface" aria-hidden="true" />
-        <layout-lyric-vertical v-if="setting['desktopLyric.direction'] == 'vertical'" />
+        <layout-lyric-single-line v-if="setting['desktopLyric.singleLine']" />
+        <layout-lyric-vertical v-else-if="setting['desktopLyric.direction'] == 'vertical'" />
         <layout-lyric-horizontal v-else />
       </div>
+      <!-- Windows applies native drag regions in DOM order. Keep the header
+           after offscreen lyrics so their no-drag regions cannot block it. -->
+      <mini-player />
       <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut">
         <common-audio-visualizer v-if="setting['desktopLyric.audioVisualization']" />
       </transition>
@@ -98,6 +101,18 @@ body {
   height: 100%;
   transition: opacity .3s ease;
   opacity: 1;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    border-radius: 14px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease;
+  }
+  &.transparent.native-window-hover::after { opacity: 1; }
   &.hide {
     opacity: .04;
 
@@ -204,6 +219,8 @@ body {
   display: flex;
   flex-direction: column;
 
+  > .mini-player { order: -1; }
+
 }
 
 .mini-lyrics {
@@ -234,6 +251,10 @@ body {
     }
   }
   // Paused lyrics should remain readable even with a fully transparent window.
+  &.single-line {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
   &.paused { opacity: .7; }
   .mini-lyric-drag-surface { display: none; }
   &.native-lyric-drag {
@@ -258,9 +279,7 @@ body {
 
 // Native captions consume clicks before the renderer. Let menu controls and
 // clicks that dismiss keyboard focus reach the page before enabling dragging.
-.mini-player:has(.mini-options) ~ .mini-lyrics .mini-lyric-drag-surface,
-.mini-player:has(.mini-controls :focus-visible) ~ .mini-lyrics .mini-lyric-drag-surface,
-.mini-player:has(.mini-header:hover, .mini-track:hover) ~ .mini-lyrics .mini-lyric-drag-surface,
+#main:has(.mini-player .mini-options, .mini-player .mini-controls :focus-visible, .mini-player .mini-header:hover, .mini-player .mini-track:hover) .mini-lyrics .mini-lyric-drag-surface,
 #root:has(.mini-recovery:focus-visible) .mini-lyrics .mini-lyric-drag-surface {
   // Removing the surface also removes its native region on Chromium 108;
   // a no-drag exclusion here can otherwise cover the floating header.
@@ -292,6 +311,19 @@ body {
   &:focus-visible { outline: 2px solid var(--color-primary, #56cc9b); outline-offset: 1px; }
   svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 }
-@media (prefers-reduced-motion: reduce) { .mini-unlock, .mini-recovery, .mini-lyrics { transition: none; } }
+.mini-recovery.hover-only {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .18s ease, visibility 0s linear .18s;
+  &.native-window-hover {
+    opacity: .85;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity .18s ease;
+    &:hover, &:focus-visible { opacity: 1; }
+  }
+}
+@media (prefers-reduced-motion: reduce) { .mini-unlock, .mini-recovery, .mini-lyrics, #container::after { transition: none !important; } }
 
 </style>

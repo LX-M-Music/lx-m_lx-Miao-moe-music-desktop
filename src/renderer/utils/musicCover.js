@@ -21,6 +21,16 @@ const MAX_CONCURRENT = 5
 
 // 全局封面显示缓存（跨组件持久化）
 const coverDisplayCache = reactive(new Map())
+let memoryLimit = Infinity
+const trimMemory = () => {
+  for (const cache of [coverCache, coverDisplayCache]) {
+    while (cache.size > memoryLimit) cache.delete(cache.keys().next().value)
+  }
+}
+export const setCoverUrlMemoryLimit = entries => {
+  memoryLimit = Math.max(1, Math.floor(entries))
+  trimMemory()
+}
 onArtworkCacheCleared(() => {
   coverCache.clear()
   coverDisplayCache.clear()
@@ -43,7 +53,7 @@ export const getCachedCoverUrl = (item) => {
   // 尝试从底层缓存获取
   if (coverCache.has(key)) {
     const url = coverCache.get(key)
-    if (url) coverDisplayCache.set(key, url)
+    if (url) { coverDisplayCache.set(key, url); trimMemory() }
     return url
   }
   return ''
@@ -186,6 +196,7 @@ const getSourceCoverUrl = (info) => {
     if (url && generation === artworkCacheGeneration()) {
       coverCache.set(key, url)
       coverDisplayCache.set(key, url)
+      trimMemory()
     }
     return url
   })

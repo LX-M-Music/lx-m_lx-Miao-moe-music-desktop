@@ -50,8 +50,11 @@ const scrollToLine = async(page, index, fraction = 0.5) => {
     return { x: viewport.x + viewport.width / 2, y: viewport.y + viewport.height / 2,
       delta: row.top + row.height * fraction - viewport.top - viewport.height / 2 }
   }, { index, fraction })
+  // Chromium 108 multiplies CDP wheel deltas by the display scale. Supply CSS
+  // pixels on both supported Electron runtimes without changing actual input.
+  const wheelScale = await page.evaluate(() => Number(process.versions.chrome.split('.')[0]) === 108 ? devicePixelRatio : 1)
   await page.mouse.move(position.x, position.y)
-  await page.mouse.wheel(0, Math.abs(position.delta) < 1 ? 1 : position.delta)
+  await page.mouse.wheel(0, (Math.abs(position.delta) < 1 ? 1 : position.delta) / wheelScale)
   await page.locator(guideSelector).waitFor({ state: 'visible' })
   await page.waitForTimeout(100)
 }

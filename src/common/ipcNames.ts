@@ -73,6 +73,7 @@ const modules = {
     change_tray: 'change_tray',
     quit_update: 'quit_update',
     update_check: 'update_check',
+    update_get_runtime: 'update_get_runtime',
     update_download_update: 'update_download_update',
     update_cancel_update: 'update_cancel_update',
     update_available: 'update_available',

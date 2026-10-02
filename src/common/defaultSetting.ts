@@ -9,6 +9,8 @@ const defaultSetting: LX.AppSetting = {
   version: '2.2.0',
 
   'common.windowSizeId': 3,
+  'common.windowWidth': 0,
+  'common.windowHeight': 0,
   'common.fontSize': 16,
   'common.startInFullscreen': false,
   'common.langId': null,
@@ -69,14 +71,16 @@ const defaultSetting: LX.AppSetting = {
   'player.soundEffect.panner.speed': 25,
   'player.soundEffect.pitchShifter.playbackRate': 1,
 
-  'playDetail.isZoomActiveLrc': false,
+  'playDetail.isZoomActiveLrc': true,
   'playDetail.isShowLyricProgressSetting': true,
   'playDetail.style.fontSize': 140,
+  'playDetail.style.fontWeight': 400,
   'playDetail.style.align': 'center',
   'playDetail.isDelayScroll': true,
 
   'desktopLyric.enable': false,
   'desktopLyric.showPlayer': true,
+  'desktopLyric.singleLine': false,
   'desktopLyric.autoHideControls': false,
   'desktopLyric.isLock': false,
   'desktopLyric.isAlwaysOnTop': false,
@@ -197,9 +201,11 @@ const defaultSetting: LX.AppSetting = {
   'sync.platform.selection': '{}',
 
   // ===== UI 增强 =====
+  'ui.lowPowerMode': false,
   'ui.smoothAnimation': true,
   'ui.animationSpeed': 1.0,
   'ui.ambientBackground': true,
+  'ui.ambientBackgroundPlayDetailMask': true,
   'ui.ambientBackgroundOnlyPlayDetail': false,
   'ui.ambientBackgroundAutoContrast': false,
   'ui.ambientBackgroundQuality': 'gentle',

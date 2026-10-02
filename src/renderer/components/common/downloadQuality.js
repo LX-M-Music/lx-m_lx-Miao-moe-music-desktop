@@ -56,6 +56,10 @@ export const getDownloadQualityOptions = (musicInfo, sourceQualityList) => {
       if (EXTRA_QUALITYS.has(type) && !options.has(type)) options.set(type, { type, size: musicInfo.meta?._qualitys?.[type]?.size || null })
     }
   }
+  // Explicit Master downloads also accept lossless songs without a 24-bit flag.
+  if (supported.has('master') && songQualitys.some(quality => quality.type == 'flac') && !options.has('master')) {
+    options.set('master', { type: 'master', size: musicInfo.meta?._qualitys?.master?.size || null })
+  }
   if (!options.size && supported.has('128k')) options.set('128k', { type: '128k', size: null })
   return [...options.values()].sort((a, b) => QUALITY_ORDER.indexOf(a.type) - QUALITY_ORDER.indexOf(b.type))
 }

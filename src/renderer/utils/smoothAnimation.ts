@@ -8,7 +8,7 @@ export const useSmoothAnimation = () => {
   const update = () => {
     const requestedSpeed = Number(appSetting['ui.animationSpeed'])
     const speed = Number.isFinite(requestedSpeed) ? Math.max(0.5, Math.min(1.5, requestedSpeed)) : 1
-    const enabled = appSetting['ui.smoothAnimation'] && isShowAnimation.value
+    const enabled = appSetting['ui.smoothAnimation'] && isShowAnimation.value && !appSetting['ui.lowPowerMode']
     root.dataset.motionEnabled = String(enabled)
     root.dataset.motionSpeed = String(speed)
     root.style.setProperty('--motion-speed', String(speed))
@@ -25,6 +25,7 @@ export const useSmoothAnimation = () => {
   watch([
     () => appSetting['ui.animationSpeed'],
     () => appSetting['ui.smoothAnimation'],
+    () => appSetting['ui.lowPowerMode'],
     isShowAnimation,
   ], update, { immediate: true })
   onBeforeUnmount(finishMotions)

@@ -3,6 +3,7 @@ import { ipcRenderer } from 'electron'
 import { computed, reactive, shallowRef } from '@common/utils/vueTools'
 import { PLUGIN_IPC, type PluginPackageFormat, type PluginId, type PluginStoreSnapshot, type PluginTransferLabels, type PluginTransferResult } from '@common/optionalPlugins'
 import { createPluginRuntime } from '@common/optionalPluginRuntime'
+import * as performancePolicy from '@common/performance'
 import * as player from '@renderer/plugins/player'
 import * as settings from './setting'
 import { isPlay, musicInfo, isShowPlayerDetail } from './player/state'
@@ -17,6 +18,7 @@ import { isBuiltinPlugin } from '@common/builtinPlugins'
 import { initBuiltinPlugins } from './builtinPlugins'
 
 export const pluginRuntime = createPluginRuntime({
+  performance: performancePolicy,
   player,
   settings,
   downloadFiles,

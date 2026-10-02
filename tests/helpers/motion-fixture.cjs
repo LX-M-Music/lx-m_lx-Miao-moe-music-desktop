@@ -106,7 +106,7 @@ require(${JSON.stringify(path.join(project, 'dist/main.js'))});`)
   await page.emulateMedia({ reducedMotion })
   await page.waitForFunction(() => {
     const setting = window.lxData.appSetting
-    const enabled = setting['common.isShowAnimation'] && setting['ui.smoothAnimation']
+    const enabled = setting['common.isShowAnimation'] && setting['ui.smoothAnimation'] && !setting['ui.lowPowerMode']
     return document.documentElement.dataset.motionEnabled === String(enabled)
   })
   return { app, page, errors, output }

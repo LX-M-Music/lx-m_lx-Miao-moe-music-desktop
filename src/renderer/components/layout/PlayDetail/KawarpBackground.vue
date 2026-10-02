@@ -4,11 +4,11 @@
     :data-ambient-state="state" :data-ambient-renderer="backend" aria-hidden="true"
   >
     <div ref="visual" :class="$style.visual">
-      <div :class="$style.fallback" :style="fallbackStyle" :hidden="backend == 'kawarp' && !!preview" />
-      <div v-if="previousPreview" ref="previousLayer" :class="$style.fallback" :style="previousFallbackStyle" :hidden="backend == 'kawarp'" />
-      <canvas ref="canvas" :class="$style.canvas" :hidden="backend != 'kawarp' || !preview || !!snapshot" />
+      <div :class="$style.fallback" :style="fallbackStyle" :hidden="backend != 'fallback' && !!preview" />
+      <div v-if="previousPreview" ref="previousLayer" :class="$style.fallback" :style="previousFallbackStyle" :hidden="backend != 'fallback'" />
+      <canvas ref="canvas" :class="$style.canvas" :hidden="backend == 'fallback' || !preview || !!snapshot" />
       <img v-if="snapshot" :class="$style.canvas" :src="snapshot" data-ambient-snapshot alt="" draggable="false">
-      <div v-if="preview && backend != 'kawarp'" :class="$style.shade" />
+      <div v-if="preview && backend == 'fallback'" :class="$style.shade" />
     </div>
   </div>
 </template>
@@ -23,6 +23,7 @@ import { isMotionEnabled } from '@renderer/utils/motion'
 import { loadArtwork, type Artwork } from '@renderer/utils/kawarpBackground/artwork'
 import { normalizeQuality, surfaceSize } from '@renderer/utils/kawarpBackground/options'
 import { createKawarpRenderer } from '@renderer/utils/kawarpBackground/renderer'
+import { createLowPowerBackgroundRenderer, lowPowerSurfaceSize } from '@renderer/utils/kawarpBackground/lowPowerRenderer'
 import { createArtworkTransition } from '@renderer/utils/kawarpBackground/transition'
 import { createAdaptiveColors } from '@renderer/utils/kawarpBackground/adaptiveColors'
 import { createStillFrame } from '@renderer/utils/kawarpBackground/stillFrame'
@@ -31,6 +32,8 @@ import { parseColor } from '@renderer/utils/kawarpBackground/contrast'
 
 const props = defineProps({
   cover: { type: String as PropType<string | null>, default: '' },
+  detail: { type: Boolean, default: false },
+  detailVisible: { type: Boolean, default: false },
 })
 const root = ref<HTMLElement | null>(null)
 const visual = ref<HTMLElement | null>(null)
@@ -47,8 +50,10 @@ const previousFallbackStyle = computed(() => ({ backgroundImage: `url("${previou
 const motion = ref(isMotionEnabled())
 const hidden = ref(document.hidden)
 const visible = computed(() => isWindowVisible.value && !hidden.value)
-const quality = computed(() => normalizeQuality(appSetting['ui.ambientBackgroundQuality']))
+const lowPower = computed(() => appSetting['ui.lowPowerMode'])
+const quality = computed(() => lowPower.value ? 'static' : normalizeQuality(appSetting['ui.ambientBackgroundQuality']))
 const canMove = computed(() => motion.value && quality.value != 'static')
+const adaptiveEnabled = computed(() => props.detailVisible || appSetting['ui.ambientBackgroundAutoContrast'])
 
 let renderer: ReturnType<typeof createKawarpRenderer> = null
 let adaptiveColors: ReturnType<typeof createAdaptiveColors> | undefined
@@ -96,12 +101,12 @@ const step = (now: number) => {
   const requestedSpeed = Number(appSetting['ui.animationSpeed'])
   const speed = Number.isFinite(requestedSpeed) ? Math.max(0.5, Math.min(1.5, requestedSpeed)) : 1
   time += dt * velocity * speed
-  const size = surfaceSize(width, height, quality.value, window.devicePixelRatio)
+  const size = lowPower.value ? lowPowerSurfaceSize(width, height) : surfaceSize(width, height, quality.value, window.devicePixelRatio)
   if (preview.value) renderer?.draw(size.width, size.height, time, !current.done, quality.value == 'gentle')
   paintOpacity(current)
   // Always sample the final frame before pausing, including static-quality covers.
   if (!playing && velocity <= 0.005 && current.done) adaptiveColors?.invalidate()
-  adaptiveColors?.update(current, backend.value == 'kawarp' ? canvas.value : null, playing || velocity > 0.005 || !current.done)
+  adaptiveColors?.update(current, backend.value != 'fallback' ? canvas.value : null, playing || velocity > 0.005 || !current.done)
   if (current.done) {
     transition.finish()
     updateSources()
@@ -117,7 +122,7 @@ const step = (now: number) => {
     // encoding job on every intermediate window size.
     snapshotTimer = setTimeout(() => {
       snapshotTimer = undefined
-      if (renderer && preview.value && canvas.value) void stillFrame.capture(canvas.value)
+      if (!lowPower.value && renderer && preview.value && canvas.value) void stillFrame.capture(canvas.value)
     }, 80)
   }
 }
@@ -133,7 +138,8 @@ function refresh() {
   }
   // Resume drawing before changing the image, size, motion settings or theme.
   stillFrame.clear()
-  renderer?.setShade(parseColor(getComputedStyle(document.documentElement).getPropertyValue('--color-content-background')))
+  const surface = getComputedStyle(root.value).getPropertyValue('--ambient-surface-color').trim()
+  renderer?.setShade(parseColor(surface || getComputedStyle(document.documentElement).getPropertyValue('--color-content-background')))
   if (!canMove.value) {
     velocity = 0
     transition.finish()
@@ -187,10 +193,14 @@ watch([visible, () => props.cover], ([active, cover]) => {
   void loadArtwork(src, current.signal).then(apply).catch(() => { apply(null) })
 }, { immediate: true })
 watch([visible, canMove, quality, isPlay], refresh)
-watch(() => appSetting['ui.ambientBackgroundAutoContrast'], value => {
-  adaptiveColors?.setEnabled(value)
-  refresh()
-})
+watch([adaptiveEnabled, () => appSetting['ui.ambientBackgroundAutoContrast'], () => props.detail], ([value, library, detail], previous) => {
+  adaptiveColors?.setEnabled(value, library)
+  // Restoring foreground styles after exit needs no new background frame.
+  if (value || detail !== previous[2]) refresh()
+}, { flush: 'post' })
+watch(() => appSetting['ui.ambientBackgroundPlayDetailMask'], () => {
+  if (props.detailVisible) refresh()
+}, { flush: 'post' })
 
 const resize = () => {
   width = root.value?.clientWidth ?? 1
@@ -210,14 +220,14 @@ const contextLost = (event: Event) => {
 }
 const contextRestored = () => {
   if (!canvas.value || disposed) return
-  renderer = createKawarpRenderer(canvas.value)
-  backend.value = renderer ? 'kawarp' : 'fallback'
+  renderer = lowPower.value ? createLowPowerBackgroundRenderer(canvas.value) : createKawarpRenderer(canvas.value)
+  backend.value = renderer ? lowPower.value ? 'low-power' : 'kawarp' : 'fallback'
   sourceDirty = true
   refresh()
 }
 onMounted(() => {
   adaptiveColors = createAdaptiveColors(root.value!, refresh)
-  adaptiveColors.setEnabled(appSetting['ui.ambientBackgroundAutoContrast'])
+  adaptiveColors.setEnabled(adaptiveEnabled.value, appSetting['ui.ambientBackgroundAutoContrast'])
   canvas.value!.addEventListener('webglcontextlost', contextLost)
   canvas.value!.addEventListener('webglcontextrestored', contextRestored)
   contextRestored()
@@ -251,7 +261,8 @@ onBeforeUnmount(() => {
   overflow: hidden;
   pointer-events: none;
   contain: strict;
-  opacity: .30;
+  opacity: var(--ambient-background-opacity, .30);
+  transition: opacity var(--duration-detail) var(--ease-standard);
 }
 .visual { position: absolute; inset: 0; opacity: 0; }
 .canvas, .fallback, .shade { position: absolute; inset: 0; width: 100%; height: 100%; }

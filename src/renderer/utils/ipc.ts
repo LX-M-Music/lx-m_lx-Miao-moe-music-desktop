@@ -100,8 +100,16 @@ export const checkUpdate = () => {
   rendererSend(WIN_MAIN_RENDERER_EVENT_NAME.update_check)
 }
 
+export const getUpdateRuntime = async() => rendererInvoke<LX.UpdateRuntime>(WIN_MAIN_RENDERER_EVENT_NAME.update_get_runtime)
+
 export const downloadUpdate = (info: LX.UpdateDownloadInfo) => {
-  rendererSend<LX.UpdateDownloadInfo>(WIN_MAIN_RENDERER_EVENT_NAME.update_download_update, info)
+  const asset = (value: LX.UpdateAsset): LX.UpdateAsset => ({ downloadUrl: value.downloadUrl, fileName: value.fileName, size: value.size, digest: value.digest })
+  // Nested release metadata comes from the reactive store. Copy its primitive
+  // fields so Electron receives plain objects rather than Vue proxies.
+  rendererSend<LX.UpdateDownloadInfo>(WIN_MAIN_RENDERER_EVENT_NAME.update_download_update, {
+    ...info,
+    differential: info.differential ? { manifest: asset(info.differential.manifest), payload: asset(info.differential.payload) } : undefined,
+  })
 }
 
 export const quitUpdate = () => {

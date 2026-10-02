@@ -2,6 +2,7 @@
   <div
     v-if="detailMounted" v-show="detailDisplayed" ref="detailRoot" data-player-detail
     :class="[$style.container, { fullscreen: isFullscreen, [$style.ambientDetail]: appSetting['ui.ambientBackground'] && !pluginPlayDetail }]" :aria-hidden="!isShowPlayerDetail"
+    :style="{ '--playDetail-font-weight': appSetting['playDetail.style.fontWeight'] }"
     :inert="!isShowPlayerDetail ? '' : null" @contextmenu="handleContextMenu"
   >
     <div :class="$style.bg" />
@@ -207,6 +208,7 @@ export default {
   overflow: hidden;
   border-radius: @radius-border;
   color: var(--color-font);
+  font-weight: var(--playDetail-font-weight, 400);
   // border-left: 12px solid var(--color-primary-alpha-900);
   -webkit-app-region: no-drag;
   contain: strict;

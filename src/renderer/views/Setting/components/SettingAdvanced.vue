@@ -4,6 +4,17 @@ dt#advanced
   svg-icon.help-icon(name="help-circle-outline" :aria-label="[$t('setting__advanced_desc'), $t('setting__advanced_nav_tip')].join(String.fromCharCode(10))")
 
 dd
+  h3#advanced_low_power {{ $t('setting__advanced_low_power') }}
+  .gap-top
+    base-checkbox(
+      id="setting_advanced_low_power_enabled"
+      :model-value="appSetting['ui.lowPowerMode']"
+      :label="$t('setting__advanced_low_power_enabled')"
+      @update:model-value="updateSetting({ 'ui.lowPowerMode': $event })"
+    )
+    svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_low_power_tip')")
+
+dd
   h3#advanced_ui {{ $t('setting__advanced_ui') }}
   div
     .gap-top
@@ -48,6 +59,14 @@ dd
       @update:model-value="updateSetting({ 'ui.ambientBackground': $event })"
     )
   common-setting-reveal(:show="appSetting['ui.ambientBackground']" depends="setting_advanced_background_enabled")
+    .gap-top
+      base-checkbox(
+        id="setting_advanced_background_play_detail_mask"
+        :model-value="appSetting['ui.ambientBackgroundPlayDetailMask']"
+        :label="$t('setting__advanced_background_play_detail_mask')"
+        @update:model-value="updateSetting({ 'ui.ambientBackgroundPlayDetailMask': $event })"
+      )
+      svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_background_play_detail_mask_tip')")
     .gap-top
       base-checkbox(
         id="setting_advanced_background_only_play_detail"
@@ -115,7 +134,8 @@ dd
     )
     svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_experimental_new_home_tip')")
 
-dd
+//- 暂时隐藏窗口控制按钮设置，保留选项、预览和相关代码。
+dd(v-if="false")
   h3#advanced_window_controls {{ $t('setting__advanced_window_controls') }}
   div.setting-options
     base-checkbox(

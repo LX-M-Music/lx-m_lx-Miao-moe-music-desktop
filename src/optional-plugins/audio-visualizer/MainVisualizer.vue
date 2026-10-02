@@ -8,6 +8,7 @@ import { isPlay } from '@renderer/store/player/state'
 import { getFrequencyData } from './analyser'
 import { createVisualizerRenderer } from './renderer'
 import { preferences } from './preferences'
+import { requestVisualFrame, cancelVisualFrame } from './performance'
 
 const canvas = ref(null)
 let frame = null
@@ -29,14 +30,14 @@ const updateBounds = () => {
   }
 }
 const stop = () => {
-  if (frame != null) cancelAnimationFrame(frame)
+  cancelVisualFrame(frame)
   frame = null
 }
 const render = (time = performance.now()) => {
   frame = null
   if (!mounted) return
   renderer.draw(getFrequencyData(preferences.main), { style: preferences.main, time, bounds: lyricBounds })
-  if (isPlay.value && !document.hidden) frame = requestAnimationFrame(render)
+  if (isPlay.value && !document.hidden) frame = requestVisualFrame(render)
 }
 const refresh = () => { stop(); if (mounted) { updateBounds(); render() } }
 watch(isPlay, refresh)
@@ -52,14 +53,15 @@ onMounted(() => {
     if (surface) renderer.resize(surface.contentRect.width, surface.contentRect.height)
     updateBounds()
     stop()
-    frame = requestAnimationFrame(render)
+    frame = requestVisualFrame(render)
   })
   observer.observe(canvas.value)
   if (lyrics) observer.observe(lyrics)
   document.addEventListener('visibilitychange', refresh)
+  window.addEventListener('lx-performance-change', refresh)
   render()
 })
-onBeforeUnmount(() => { mounted = false; stop(); observer?.disconnect(); renderer?.dispose(); document.removeEventListener('visibilitychange', refresh) })
+onBeforeUnmount(() => { mounted = false; stop(); observer?.disconnect(); renderer?.dispose(); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('lx-performance-change', refresh) })
 </script>
 
 <style lang="less" module>

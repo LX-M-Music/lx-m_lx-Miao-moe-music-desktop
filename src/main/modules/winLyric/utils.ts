@@ -52,6 +52,7 @@ export const getLyricWindowBounds = (bounds: Electron.Rectangle, { x, y, w, h }:
 export const watchConfigKeys = [
   'desktopLyric.enable',
   'desktopLyric.showPlayer',
+  'desktopLyric.singleLine',
   'desktopLyric.autoHideControls',
   'desktopLyric.isLock',
   'desktopLyric.isAlwaysOnTop',
@@ -84,6 +85,7 @@ export const watchConfigKeys = [
   'desktopLyric.style.isFontWeightExtended',
   'desktopLyric.style.isZoomActiveLrc',
   'common.langId',
+  'ui.lowPowerMode',
   'player.isShowLyricTranslation',
   'player.isShowLyricRoma',
   'player.isSwapLyricTranslationAndRoma',

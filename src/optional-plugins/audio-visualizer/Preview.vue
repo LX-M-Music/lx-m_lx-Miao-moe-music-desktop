@@ -9,6 +9,7 @@ import { acquirePreview, getFrequencyData } from './analyser'
 import { createVisualizerRenderer } from './renderer'
 import { demoSpectrum } from './styles'
 import { demoRadialData } from './radialData'
+import { requestVisualFrame, cancelVisualFrame } from './performance'
 
 const props = defineProps({ kind: { type: String, required: true }, live: Boolean })
 const canvas = ref(null)
@@ -17,13 +18,13 @@ let mounted = false
 let observer
 let release
 let renderer
-const stop = () => { if (frame != null) cancelAnimationFrame(frame); frame = null }
+const stop = () => { cancelVisualFrame(frame); frame = null }
 const draw = (time = 1400) => {
   frame = null
   if (!mounted) return
   const data = props.live && isPlay.value ? getFrequencyData(props.kind) : props.kind === 'radial' ? demoRadialData(time) : demoSpectrum(time)
   renderer.draw(data, { style: props.kind, preview: true, time })
-  if (props.live && !document.hidden) frame = requestAnimationFrame(draw)
+  if (props.live && !document.hidden) frame = requestVisualFrame(draw)
 }
 const refresh = () => { stop(); draw() }
 watch(() => props.kind, () => {
@@ -41,10 +42,11 @@ onMounted(() => {
     const size = entries[0].contentRect
     renderer.resize(size.width, size.height)
     stop()
-    frame = requestAnimationFrame(draw)
+    frame = requestVisualFrame(draw)
   })
   observer.observe(canvas.value)
   document.addEventListener('visibilitychange', refresh)
+  window.addEventListener('lx-performance-change', refresh)
   draw()
 })
 onBeforeUnmount(() => {
@@ -54,6 +56,7 @@ onBeforeUnmount(() => {
   release?.()
   renderer?.dispose()
   document.removeEventListener('visibilitychange', refresh)
+  window.removeEventListener('lx-performance-change', refresh)
 })
 </script>
 

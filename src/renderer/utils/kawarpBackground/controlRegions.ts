@@ -1,13 +1,14 @@
 import { CONTROL_COLUMNS, CONTROL_ROWS } from './contrast'
 
 const selector = 'button, [role="tab"], [role="checkbox"], [role="radio"], [role="slider"], input, select, textarea, .list-item .select, [data-player-detail] .font-lrc'
-const properties = ['--ambient-local-accent', '--ambient-local-on-accent', '--ambient-local-lyric-accent'] as const
+const properties = ['--ambient-local-accent', '--ambient-local-on-accent', '--ambient-local-lyric-accent', '--ambient-local-text', '--ambient-local-secondary'] as const
 
-// Bind visible controls to the background area behind them. Palette changes only
-// update 24 sets of shared variables; they do not rewrite each button's styles.
+// Wide reading panels inherit the whole-background palette; widgets follow the
+// area behind them. Palette changes only update 24 shared variable sets.
 export const createControlRegions = (root: HTMLElement, background: HTMLElement) => {
   const bindings = new Map<HTMLElement, { zone: number, attribute: string | null, styles: Array<{ value: string, priority: string }> }>()
   let enabled = false
+  let includeLibrary = true
   let pending = 0
   const restore = (element: HTMLElement, binding: { attribute: string | null, styles: Array<{ value: string, priority: string }> }) => {
     if (binding.attribute == null) element.removeAttribute('data-ambient-zone')
@@ -28,6 +29,7 @@ export const createControlRegions = (root: HTMLElement, background: HTMLElement)
     const visible = (rect: DOMRect) => rect.width > 0 && rect.height > 0 && rect.right > frame.left && rect.left < frame.right && rect.bottom > frame.top && rect.top < frame.bottom
     // Read all geometry before applying styles, including virtual/scrolling lists.
     for (const element of root.querySelectorAll<HTMLElement>(selector)) {
+      if (!includeLibrary && !element.closest('[data-player-detail]')) continue
       const row = element.closest('.list-item, .line-content')
       if (row) {
         if (!rows.has(row)) rows.set(row, visible(row.getBoundingClientRect()))
@@ -56,6 +58,8 @@ export const createControlRegions = (root: HTMLElement, background: HTMLElement)
       element.style.setProperty(properties[0], `var(--ambient-zone-${zone}-accent)`)
       element.style.setProperty(properties[1], `var(--ambient-zone-${zone}-on-accent)`)
       element.style.setProperty(properties[2], `var(--ambient-zone-${zone}-lyric-accent)`)
+      element.style.setProperty(properties[3], `var(--ambient-zone-${zone}-text)`)
+      element.style.setProperty(properties[4], `var(--ambient-zone-${zone}-secondary)`)
     }
   }
   const schedule = () => { if (enabled && !pending && !document.hidden) pending = requestAnimationFrame(sync) }
@@ -72,8 +76,9 @@ export const createControlRegions = (root: HTMLElement, background: HTMLElement)
   }
   return {
     refresh: schedule,
-    setEnabled(value: boolean) {
+    setEnabled(value: boolean, library = true) {
       enabled = value
+      includeLibrary = library
       if (enabled) schedule()
       else clear()
     },

@@ -116,6 +116,8 @@ export const versionInfo = window.lxData.versionInfo = reactive<{
     fileName?: string
     size?: number
     digest?: string
+    edition?: LX.UpdateEdition
+    differential?: LX.UpdateDifferential
   } | null
   showModal: boolean
   isUnknown: boolean

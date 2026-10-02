@@ -9,7 +9,8 @@ export const createLockControls = (window: BrowserWindow, onPointerChange?: (poi
   let previousWidth = 0
   let previousHeight = 0
   const needsPointerTracking = () => global.lx.appSetting['desktopLyric.isLock'] ||
-    global.lx.appSetting['desktopLyric.autoHideControls'] || !global.lx.appSetting['desktopLyric.showPlayer']
+    global.lx.appSetting['desktopLyric.autoHideControls'] || !global.lx.appSetting['desktopLyric.showPlayer'] ||
+    global.lx.appSetting['desktopLyric.style.backgroundOpacity'] === 0
 
   const stop = () => {
     if (timer) clearInterval(timer)

@@ -9,12 +9,24 @@ export interface Artwork {
 // Keep a small, origin-clean image for both Kawarp and the static fallback.
 // Loading happens outside Kawarp so a cancelled request cannot update a disposed renderer.
 const cache = new Map<string, Artwork>()
+let memoryLimit = 6
+const trimMemory = () => {
+  while (cache.size > memoryLimit) cache.delete(cache.keys().next().value!)
+}
+export const setArtworkMemoryLimit = (entries: number) => {
+  memoryLimit = Math.max(1, Math.floor(entries))
+  trimMemory()
+}
 onArtworkCacheCleared(() => { cache.clear() })
 export const loadArtwork = async(src: string, signal: AbortSignal): Promise<Artwork | null> => {
   if (signal.aborted) throw new Error('Artwork request cancelled')
   if (!src) return null
   const cached = cache.get(src)
-  if (cached) return cached
+  if (cached) {
+    cache.delete(src)
+    cache.set(src, cached)
+    return cached
+  }
   // Share the player's download, but keep the old background while it is pending.
   const cover = await acquireMusicCover(src)
   if (signal.aborted) { cover.release(); throw new Error('Artwork request cancelled') }
@@ -51,7 +63,7 @@ export const loadArtwork = async(src: string, signal: AbortSignal): Promise<Artw
         context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, 0, 0, 256, 256)
         const artwork = { image: canvas, preview: canvas.toDataURL('image/png') }
         cache.set(src, artwork)
-        while (cache.size > 6) cache.delete(cache.keys().next().value!)
+        trimMemory()
         finished = true
         cleanup()
         resolve(artwork)

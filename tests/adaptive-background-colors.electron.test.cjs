@@ -12,7 +12,7 @@ const settingKey = 'ui.ambientBackgroundAutoContrast'
 const update = (page, values) => page.evaluate(values => window.lxData.updateSetting(values), values)
 const colorState = page => page.locator('#root').evaluate(root => {
   const styles = getComputedStyle(root)
-  return Object.fromEntries(['color-primary', 'color-button-font', 'color-font', 'color-hover', 'color-selected', 'color-content-background', 'adaptive-selection-text', 'adaptive-selection-background'].map(key => [key, styles.getPropertyValue('--' + key).trim()]))
+  return Object.fromEntries(['color-primary', 'color-button-font', 'color-font', 'color-font-label', 'color-hover', 'color-selected', 'color-content-background', 'ambient-reading-surface', 'adaptive-selection-text', 'adaptive-selection-background'].map(key => [key, styles.getPropertyValue('--' + key).trim()]))
 })
 const theme = async(page, id) => {
   const value = themes.find(value => value.id === id)
@@ -33,7 +33,7 @@ const cover = async(page, value) => {
 
 // Inspect actual DOM colors (including hover/selection surfaces and inherited opacity),
 // against samples from the shared WebGL output and the original theme surface.
-const audit = async(page, selector) => {
+const audit = async(page, selector, minimumContrast = 4.5) => {
   const result = await page.evaluate(({ selector, background }) => {
     const root = document.querySelector(background)
     const canvas = root.querySelector('canvas')
@@ -65,7 +65,7 @@ const audit = async(page, selector) => {
       ]
       return { label: element.getAttribute('aria-label') || element.textContent.trim().slice(0, 32) || element.tagName, color: getComputedStyle(foreground).color, stack, opacity, area }
     }).filter(element => element.opacity > 0.1)
-    return { elements, pixels, opacity: Number(getComputedStyle(root).opacity) * Number(root.firstElementChild.style.opacity), base: getComputedStyle(document.documentElement).getPropertyValue('--color-surface') }
+    return { elements, pixels, opacity: Number(getComputedStyle(root).opacity) * Number(root.firstElementChild.style.opacity), base: getComputedStyle(root).getPropertyValue('--ambient-surface-color').trim() || getComputedStyle(document.documentElement).getPropertyValue('--color-surface') }
   }, { selector, background })
   const pixels = result.pixels.reduce((pixels, value, index) => { if (index % 4 === 0) pixels.push(result.pixels.slice(index, index + 3)); return pixels }, [])
   const failures = []
@@ -84,9 +84,9 @@ const audit = async(page, selector) => {
       }
       return contrastRatio(mixColor(background, foreground.slice(0, 3), foreground[3] * element.opacity), background)
     })
-    if (Math.min(...ratios) < 4.5) failures.push({ ...element, ratio: Math.min(...ratios) })
+    if (Math.min(...ratios) < minimumContrast) failures.push({ ...element, ratio: Math.min(...ratios) })
   }
-  assert.deepEqual(failures, [], 'visible enabled controls and selected text retain at least 4.5:1 contrast')
+  assert.deepEqual(failures, [], `visible text retains at least ${minimumContrast}:1 contrast`)
   return result.elements.length
 }
 
@@ -129,12 +129,25 @@ test('adaptive background colors cover app controls and selections, restore them
       await page.locator('label[for="setting_advanced_background_auto_contrast"] [role="checkbox"]').hover()
       assert.equal(await page.locator('label[for="setting_advanced_background_auto_contrast"] svg').evaluate(svg => getComputedStyle(svg).zIndex), '1')
       assert(await audit(page, '#view [role="checkbox"], #view select, #left [role="tab"], #player button, #toolbar button') > 12)
+      const panels = await page.evaluate(() => ['#left', '#toolbar', '#view > [data-motion-outlet]', '#player'].map(selector => {
+        const style = getComputedStyle(document.querySelector(selector))
+        return { surface: style.backgroundColor, body: style.getPropertyValue('--color-font'), label: style.getPropertyValue('--color-font-label') }
+      }))
+      for (const panel of panels) {
+        const alpha = parseColor(panel.surface)[3]
+        assert(alpha > 0 && alpha <= 0.2, 'reading surfaces stay subtle rather than hiding artwork')
+        assert(panel.body.trim() && panel.label.trim(), 'plain text and labels inherit adaptive colors')
+      }
+      assert(await audit(page, '#view h3, #view .setting-label > span, #view .setting-value, #view label[for="setting_advanced_background_quality"]') > 3)
+      assert(await page.locator('#view input').first().evaluate(input => getComputedStyle(input, '::placeholder').opacity === '1'))
       await page.screenshot({ path: path.join(output, 'adaptive-settings.png') })
     })
     await t.test('turning it off restores every overridden color exactly', async() => {
       await update(page, { [settingKey]: false })
       await page.locator(flag).waitFor({ state: 'detached' })
       assert.deepEqual(await colorState(page), original)
+      assert.equal(await page.locator('[data-ambient-zone]').count(), 0)
+      assert.equal(await page.locator('#root').evaluate(root => root.style.getPropertyValue('--ambient-reading-surface')), '')
       const before = await page.evaluate(() => window.__adaptiveSamples)
       await cover(page, '#2346ee')
       assert.equal(await page.evaluate(() => window.__adaptiveSamples), before)
@@ -159,6 +172,8 @@ test('adaptive background colors cover app controls and selections, restore them
         for (const color of ['#030508', '#fcfafa', '#ed3040', '#204ee8']) {
           await cover(page, color)
           assert(await audit(page, '#view .list-item button, #view .list-item.active .select, #left [role="tab"], #player button, #toolbar button') > 20)
+          assert(await audit(page, '#view [data-music-cell="name"] > span, #view [data-music-cell="singer"] > span, #view [data-music-cell="album"] > span, #view [data-music-cell="time"] > span, #view [data-music-cell="index"] .num') > 20)
+          assert(await page.locator('#view .label-source').first().evaluate(element => getComputedStyle(element).opacity === '1'))
         }
         await page.screenshot({ path: path.join(output, `adaptive-list-${id}.png`) })
       }
@@ -177,6 +192,7 @@ test('adaptive background colors cover app controls and selections, restore them
       await page.locator('#view .list-item').first().getByRole('button', { name: await label('list__add_to'), exact: true }).click()
       await page.locator('#view header button').last().waitFor()
       assert(await audit(page, '#view header button, #view [data-motion-button]') > 0)
+      assert(await page.getByRole('button', { name: await label('lists__new_list_btn'), exact: true }).evaluateAll(elements => elements.length > 0 && elements.every(element => getComputedStyle(element).opacity === '1')))
       await page.screenshot({ path: path.join(output, 'adaptive-modal.png') })
       await page.locator('#view header').getByRole('button', { name: await label('close'), exact: true }).click()
     })
@@ -186,7 +202,11 @@ test('adaptive background colors cover app controls and selections, restore them
       await showDetail(page, true)
       await settled(page)
       await seedLyrics(page)
-      assert(await audit(page, '[data-player-detail] button, [data-player-detail] .font-lrc') > 5)
+      assert(await audit(page, '[data-player-detail] button, [data-player-detail] .line-content.active .font-lrc') > 5)
+      // Surrounding rows are deliberately subdued; active lyrics and controls keep the full contrast requirement.
+      assert(await audit(page, '[data-player-detail] .line-content:not(.active) .font-lrc', 3) > 0)
+      assert(await audit(page, '[data-player-detail] [data-detail-part="info"] p, [data-player-detail] [data-detail-part="controls"] span') > 3)
+      assert(await page.locator('[data-detail-part="info"]').evaluate(element => getComputedStyle(element).backgroundImage.includes('gradient')))
       const colors = await page.locator('[data-player-detail] .font-lrc').first().evaluate(element => {
         const selection = getSelection()
         const range = document.createRange()

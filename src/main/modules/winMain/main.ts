@@ -4,7 +4,7 @@ import { registerIpcWindow } from '@main/utils/ipcPolicy'
 import path from 'node:path'
 import { type WindowState, windowSizeList } from '@common/config'
 import { WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
-import { createTaskBarButtons, getWindowSizeInfo } from './utils'
+import { createTaskBarButtons, getWindowSizeInfo, getWindowSizing } from './utils'
 import { getPlatform, isLinux, isWin, log } from '@common/utils'
 import { getProxy, openDevTools as handleOpenDevTools } from '@main/utils'
 import { mainSend } from '@common/mainIpc'
@@ -14,6 +14,7 @@ import { encodePath } from '@common/utils/electron'
 let browserWindow: Electron.BrowserWindow | null = null
 let maximizedRestoreBounds: Electron.Rectangle | null = null
 let windowFullscreen = false
+let windowAspectRatio = 0
 let rendererRecoveryAttempts = 0
 let rendererRecoveryResetTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -32,8 +33,9 @@ const sendWindowState = () => {
 
 const fitWindowBounds = (bounds: Electron.Rectangle): Electron.Rectangle => {
   const area = screen.getDisplayMatching(bounds).workArea
-  const width = Math.min(bounds.width, area.width)
-  const height = Math.min(bounds.height, area.height)
+  const scale = Math.min(1, area.width / bounds.width, area.height / bounds.height)
+  const width = Math.max(1, Math.round(bounds.width * scale))
+  const height = Math.max(1, Math.round(bounds.height * scale))
   return {
     width,
     height,
@@ -42,8 +44,21 @@ const fitWindowBounds = (bounds: Electron.Rectangle): Electron.Rectangle => {
   }
 }
 
+const updateWindowResizeMode = () => {
+  if (!browserWindow) return
+  const expanded = windowFullscreen || getWindowState().isMaximized
+  if (browserWindow.isResizable() === expanded) browserWindow.setResizable(!expanded)
+  browserWindow.setAspectRatio(expanded ? 0 : windowAspectRatio)
+  if (!expanded) {
+    const area = screen.getDisplayMatching(browserWindow.getBounds()).workArea
+    const { minWidth, minHeight } = getWindowSizing({ width: windowAspectRatio, height: 1 }, area)
+    browserWindow.setMinimumSize(minWidth, minHeight)
+  }
+}
+
 const updateMaximizedBounds = () => {
   if (!browserWindow || !maximizedRestoreBounds || windowFullscreen) return
+  updateWindowResizeMode()
   const area = screen.getDisplayMatching(browserWindow.getBounds()).workArea
   browserWindow.setMinimumSize(Math.min(windowSizeList[0].width, area.width), Math.min(windowSizeList[0].height, area.height))
   browserWindow.setBounds(area)
@@ -52,8 +67,30 @@ const updateMaximizedBounds = () => {
 
 const winEvent = () => {
   if (!browserWindow) return
+  const window = browserWindow
+  let saveSizeTimer: ReturnType<typeof setTimeout> | undefined
+  let userResized = false
+  const saveWindowSize = () => {
+    clearTimeout(saveSizeTimer)
+    saveSizeTimer = undefined
+    if (!userResized) return
+    userResized = false
+    if (window.isDestroyed() || window.isMinimized() || windowFullscreen || getWindowState().isMaximized) return
+    const { width, height } = window.getBounds()
+    void global.lx.event_app.update_config({ 'common.windowWidth': width, 'common.windowHeight': height })
+  }
+  window.on('will-resize', () => {
+    if (!windowFullscreen && !getWindowState().isMaximized) userResized = true
+  })
+  window.on('resize', () => {
+    if (!userResized) return
+    clearTimeout(saveSizeTimer)
+    saveSizeTimer = setTimeout(saveWindowSize, 250)
+  })
+  window.on('resized', saveWindowSize)
 
   browserWindow.on('close', event => {
+    if (saveSizeTimer) saveWindowSize()
     if (global.lx.isSkipTrayQuit || !global.lx.appSetting['tray.enable']) {
       browserWindow!.setProgressBar(-1)
       // global.lx.mainWindowClosed = true
@@ -66,6 +103,7 @@ const winEvent = () => {
   })
 
   browserWindow.on('closed', () => {
+    clearTimeout(saveSizeTimer)
     // global.lx.mainWindowClosed = true
     browserWindow = null
     maximizedRestoreBounds = null
@@ -74,8 +112,9 @@ const winEvent = () => {
     screen.removeListener('display-removed', updateMaximizedBounds)
   })
 
-  browserWindow.on('maximize', sendWindowState)
-  browserWindow.on('unmaximize', sendWindowState)
+  const windowModeChanged = () => { updateWindowResizeMode(); sendWindowState() }
+  browserWindow.on('maximize', windowModeChanged)
+  browserWindow.on('unmaximize', windowModeChanged)
   browserWindow.on('minimize', sendWindowState)
   browserWindow.on('restore', sendWindowState)
   browserWindow.on('show', sendWindowState)
@@ -83,13 +122,14 @@ const winEvent = () => {
   browserWindow.on('enter-full-screen', () => {
     // Transparent Windows windows emit this event but can report isFullScreen() as false.
     windowFullscreen = true
+    updateWindowResizeMode()
     global.lx.event_app.main_window_fullscreen(true)
     sendWindowState()
   })
   browserWindow.on('leave-full-screen', () => {
     windowFullscreen = false
-    if (isLinux && !global.envParams.cmdParams.dt) browserWindow?.setResizable(false)
     updateMaximizedBounds()
+    updateWindowResizeMode()
     global.lx.event_app.main_window_fullscreen(false)
     sendWindowState()
   })
@@ -160,10 +200,9 @@ export const createWindow = () => {
   closeWindow()
   maximizedRestoreBounds = null
   windowFullscreen = global.lx.appSetting['common.startInFullscreen']
-  const windowSizeInfo = getWindowSizeInfo(global.lx.appSetting['common.windowSizeId'])
+  const windowSizeInfo = getWindowSizeInfo(global.lx.appSetting['common.windowSizeId'], global.lx.appSetting['common.windowWidth'], global.lx.appSetting['common.windowHeight'])
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
-  const width = Math.min(windowSizeInfo.width, area.width)
-  const height = Math.min(windowSizeInfo.height, area.height)
+  const { width, height, minWidth, minHeight } = getWindowSizing(windowSizeInfo, area)
 
   const { shouldUseDarkColors, theme } = global.lx.theme
   const ses = session.fromPartition('persist:win-main')
@@ -175,18 +214,19 @@ export const createWindow = () => {
    */
   const options: Electron.BrowserWindowConstructorOptions = {
     height,
-    useContentSize: true,
+    // Saved dimensions are getBounds() dimensions, including any native border.
+    useContentSize: false,
     width,
     x: area.x + Math.floor((area.width - width) / 2),
     y: area.y + Math.floor((area.height - height) / 2),
-    minWidth: Math.min(windowSizeList[0].width, area.width),
-    minHeight: Math.min(windowSizeList[0].height, area.height),
+    minWidth,
+    minHeight,
     frame: false,
     transparent: !global.envParams.cmdParams.dt,
     hasShadow: global.envParams.cmdParams.dt,
     // enableRemoteModule: false,
     // icon: join(global.__static, isWin ? 'icons/256x256.ico' : 'icons/512x512.png'),
-    resizable: !!global.envParams.cmdParams.dt,
+    resizable: true,
     maximizable: true,
     fullscreenable: true,
     roundedCorners: global.envParams.cmdParams.dt,
@@ -209,6 +249,21 @@ export const createWindow = () => {
     if (isLinux) options.resizable = true
   }
   browserWindow = new BrowserWindow(options)
+  // Fractional display scaling can round initial bounds outward. Correct the
+  // requested size before locking its ratio so restarts cannot accumulate it.
+  if (!windowFullscreen) {
+    let requestedWidth = width
+    let requestedHeight = height
+    for (let attempt = 0; attempt < 3; attempt++) {
+      browserWindow.setBounds({ width: requestedWidth, height: requestedHeight })
+      const actual = browserWindow.getBounds()
+      if (actual.width === width && actual.height === height) break
+      requestedWidth += width - actual.width
+      requestedHeight += height - actual.height
+    }
+  }
+  windowAspectRatio = width / height
+  updateWindowResizeMode()
   observeWindowLoadErrors(browserWindow)
 
   const winURL = process.env.NODE_ENV !== 'production' ? 'http://localhost:9080' : `file://${path.join(encodePath(__dirname), 'index.html')}`
@@ -295,6 +350,7 @@ export const unmaximize = () => {
     const bounds = fitWindowBounds(maximizedRestoreBounds)
     maximizedRestoreBounds = null
     browserWindow.setBounds(bounds)
+    updateWindowResizeMode()
     sendWindowState()
     return
   }
@@ -333,6 +389,13 @@ export const setWindowBounds = (options: Partial<Electron.Rectangle>) => {
   if (!browserWindow || windowFullscreen) return
   if (getWindowState().isMaximized) unmaximize()
   browserWindow.setBounds(fitWindowBounds({ ...browserWindow.getBounds(), ...options }))
+  const [width, height] = browserWindow.getContentSize()
+  windowAspectRatio = width / height
+  updateWindowResizeMode()
+  if (options.width != null || options.height != null) {
+    const bounds = browserWindow.getBounds()
+    void global.lx.event_app.update_config({ 'common.windowWidth': bounds.width, 'common.windowHeight': bounds.height })
+  }
   sendWindowState()
 }
 export const setProgressBar = (progress: number, options?: Electron.ProgressBarOptions) => {

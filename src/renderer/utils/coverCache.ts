@@ -10,13 +10,13 @@ const retiredImages = new Set<CachedImage>()
 let memoryGeneration = 0
 const pending = new Map()
 const scheduleDownload = createRequestLimiter(6)
-const MAX_MEMORY_BYTES = 32 * 1024 * 1024
-const MAX_MEMORY_ENTRIES = 256
+let maxMemoryBytes = 32 * 1024 * 1024
+let maxMemoryEntries = 256
 
 const trimMemory = () => {
   let bytes = [...images.values()].reduce((total, image) => total + image.bytes, 0)
   for (const [key, image] of images) {
-    if (images.size <= MAX_MEMORY_ENTRIES && bytes <= MAX_MEMORY_BYTES) break
+    if (images.size <= maxMemoryEntries && bytes <= maxMemoryBytes) break
     if (image.users || pending.has(key)) continue
     images.delete(key)
     bytes -= image.bytes
@@ -33,6 +33,12 @@ export const clearCoverMemory = () => {
   }
   images.clear()
   pending.clear()
+}
+
+export const setCoverMemoryLimits = (bytes: number, entries: number) => {
+  maxMemoryBytes = Math.max(0, Math.floor(bytes))
+  maxMemoryEntries = Math.max(0, Math.floor(entries))
+  trimMemory()
 }
 onArtworkCacheCleared(clearCoverMemory)
 

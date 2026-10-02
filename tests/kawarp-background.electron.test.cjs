@@ -193,7 +193,7 @@ test('Kawarp replaces the old effects, follows artwork without analysing audio, 
         }
       }
     })
-    await t.test('static quality survives page switches without redrawing, and pause and playback still work', async() => {
+    await t.test('static quality refreshes changed page shading once, stays stopped, and still supports playback', async() => {
       await update(page, { 'ui.ambientBackgroundQuality': 'static' })
       await state(page, main, 'static')
       const snapshot = page.locator(main + ' [data-ambient-snapshot]')
@@ -217,15 +217,22 @@ test('Kawarp replaces the old effects, follows artwork without analysing audio, 
         return max
       })
       assert.equal(difference, 0, 'the cached image must preserve every rendered pixel')
-      const before = await count(page, main)
       const uploads = await page.locator(main + ' canvas').evaluate(canvas => canvas.__kawarpUploads)
       for (const opened of [false, true]) {
+        const before = await count(page, main)
+        const previousSnapshot = await snapshot.getAttribute('src')
         await showDetail(page, opened)
         await settled(page)
-        assert.equal(await count(page, main), before)
+        // Detail always uses its dark surface; changing screens must repaint
+        // that shading once, then return to a stopped, decoded PNG.
+        assert.equal(await count(page, main), before + 1)
+        const after = await count(page, main)
+        await page.waitForTimeout(200)
+        assert.equal(await count(page, main), after, 'exit cleanup must not redraw or resume polling')
         assert.equal(await page.locator(main + ' canvas').evaluate(canvas => canvas.__kawarpUploads), uploads)
         assert.equal(await page.locator(main + ' canvas').evaluate(canvas => canvas === window.__sharedBackgroundCanvas), true)
-        assert.equal(await snapshot.getAttribute('src'), snapshotUrl, 'interface motion must reuse the static image')
+        assert.notEqual(await snapshot.getAttribute('src'), previousSnapshot, 'cache the single frame with the new surface shading')
+        assert.equal(await page.locator(main + ' canvas').isHidden(), true)
       }
       const win = await app.browserWindow(page)
       const bounds = await win.evaluate(win => win.getBounds())
@@ -254,6 +261,8 @@ test('Kawarp replaces the old effects, follows artwork without analysing audio, 
       await state(page, main, 'playing')
     })
     await t.test('the merged gradient follows theme changes in static mode without adaptive controls', async() => {
+      await showDetail(page, false)
+      await settled(page)
       await update(page, { 'ui.ambientBackgroundQuality': 'static', 'ui.ambientBackgroundAutoContrast': false })
       const snapshot = page.locator(main + ' [data-ambient-snapshot]')
       await snapshot.waitFor()

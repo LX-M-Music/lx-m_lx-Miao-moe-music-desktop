@@ -68,9 +68,9 @@ const uninstall = async(page, id) => {
   await card.getByRole('button', { name: await label(page, 'setting__plugins_uninstall'), exact: true }).click()
   await card.getByRole('button', { name: await label(page, 'setting__plugins_install'), exact: true }).waitFor()
 }
-const startSilentAudio = async page => {
+const startSilentAudio = async(page, duration = 2) => {
   const sampleRate = 44100
-  const count = sampleRate * 2
+  const count = sampleRate * duration
   const bytes = Buffer.alloc(44 + count * 2)
   bytes.write('RIFF', 0)
   bytes.writeUInt32LE(bytes.length - 8, 4)

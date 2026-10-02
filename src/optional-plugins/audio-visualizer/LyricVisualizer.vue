@@ -8,6 +8,7 @@ import { useEvent, getAnalyserDataArray } from '@lyric/core/mainWindowChannel'
 import { isPlay } from '@lyric/store/state'
 import { createVisualizerRenderer } from './renderer'
 import { preferences } from './preferences'
+import { requestVisualFrame, cancelVisualFrame, isLowPowerMode } from './performance'
 
 const canvas = ref(null)
 let mounted = false
@@ -19,12 +20,12 @@ let renderer
 let lastData = new Uint8Array()
 const draw = () => { if (mounted) renderer.draw(lastData, { desktop: true, style: preferences.desktop, time: performance.now() }) }
 const stop = () => {
-  if (frame != null) cancelAnimationFrame(frame)
+  cancelVisualFrame(frame)
   frame = null
 }
 const request = () => {
   frame = null
-  if (!mounted || pending) return
+  if (!mounted || pending || (isLowPowerMode() && document.hidden)) return
   pending = true
   getAnalyserDataArray()
 }
@@ -34,9 +35,10 @@ useEvent(event => {
   lastData = event.data
   draw()
   stop()
-  if (isPlay.value) frame = requestAnimationFrame(request)
+  if (isPlay.value && (!isLowPowerMode() || !document.hidden)) frame = requestVisualFrame(request)
 })
-watch(isPlay, playing => { stop(); if (playing) request() })
+const refresh = () => { stop(); if (isPlay.value) request(); else draw() }
+watch(isPlay, refresh)
 watch(() => preferences.desktop, () => {
   lastData = new Uint8Array()
   draw()
@@ -49,13 +51,24 @@ onMounted(() => {
   observer = new ResizeObserver(entries => {
     const size = entries[0].contentRect
     renderer.resize(size.width, size.height)
-    if (resizeFrame != null) cancelAnimationFrame(resizeFrame)
-    resizeFrame = requestAnimationFrame(() => { resizeFrame = null; draw() })
+    cancelVisualFrame(resizeFrame)
+    resizeFrame = requestVisualFrame(() => { resizeFrame = null; draw() })
   })
   observer.observe(canvas.value)
+  document.addEventListener('visibilitychange', refresh)
+  window.addEventListener('lx-performance-change', refresh)
   if (isPlay.value) request()
 })
-onBeforeUnmount(() => { mounted = false; stop(); if (resizeFrame != null) cancelAnimationFrame(resizeFrame); observer?.disconnect(); renderer?.dispose(); lastData = new Uint8Array() })
+onBeforeUnmount(() => {
+  mounted = false
+  stop()
+  cancelVisualFrame(resizeFrame)
+  observer?.disconnect()
+  renderer?.dispose()
+  lastData = new Uint8Array()
+  document.removeEventListener('visibilitychange', refresh)
+  window.removeEventListener('lx-performance-change', refresh)
+})
 </script>
 
 <style lang="less" module>

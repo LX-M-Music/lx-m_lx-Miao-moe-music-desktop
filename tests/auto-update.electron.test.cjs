@@ -12,13 +12,15 @@ const { launch } = require('./helpers/motion-fixture.cjs')
 const load = require('./helpers/load-typescript.cjs')
 
 const project = path.resolve(__dirname, '..')
+const runtimeProject = process.env.LX_TEST_PROJECT ? path.resolve(process.env.LX_TEST_PROJECT) : project
+const legacyRuntime = require(path.join(runtimeProject, 'node_modules/electron/package.json')).version.startsWith('22.')
 const cache = path.join(process.env.LOCALAPPDATA ?? '', 'electron-builder', 'Cache', 'nsis')
 const nsis = process.env.LX_TEST_MAKENSIS || (fs.existsSync(cache) && fs.readdirSync(cache)
   .map(dir => path.join(cache, dir, 'Bin', 'makensis.exe')).find(file => fs.existsSync(file)))
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "lx-update-nsis-测试 & user's "))
-  const exe = path.join(root, `LX-M Music-v9.0.0-${process.env.LX_TEST_PROJECT ? 'win7_' : ''}x64-Setup.exe`)
+  const exe = path.join(root, `LX-M Music-v9.0.0-${legacyRuntime ? 'win7_' : ''}x64-Setup.exe`)
   const result = path.join(root, 'nsis-result.txt')
   const installDirectory = path.join(root, "音乐 & user's app")
   const cleanup = []
@@ -109,7 +111,7 @@ test('update choices require a click, show progress, cancel downloads and silent
     const getPath = app.getPath.bind(app)
     app.getPath = name => name == 'exe' ? exe : getPath(name)
     Object.defineProperty(app, 'isPackaged', { value: true, configurable: true })
-    const fs = process.mainModule.require('fs')
+    const fs = process.mainModule.require('original-fs')
     const mkdtemp = fs.mkdtempSync
     global.__updateTestDirectories = []
     fs.mkdtempSync = (...args) => {
@@ -125,6 +127,7 @@ test('update choices require a click, show progress, cancel downloads and silent
     Object.assign(state.newVersion, info)
     Object.assign(state, { isLatest: false, isUnknown: false, reCheck: false, status: 'idle', showModal: true })
     window.lxData.appSetting['common.tryAutoUpdate'] = true
+    window.lxData.appSetting['common.showErrorDialog'] = true
   }, {
     version: '9.0.0',
     desc: '## v9.0.0\n\n### 修复\n\n- 更新测试',
@@ -211,7 +214,7 @@ test('update choices require a click, show progress, cancel downloads and silent
   await checkProgress()
   const window = await app.browserWindow(page)
   await window.evaluate(window => {
-    const fs = process.mainModule.require('fs')
+    const fs = process.mainModule.require('original-fs')
     const originalLstat = fs.promises.lstat
     const originalSend = window.webContents.send.bind(window.webContents)
     const held = []
@@ -266,7 +269,7 @@ test('update choices require a click, show progress, cancel downloads and silent
   await auto().click()
   await checkProgress()
   downloadedFiles = await app.evaluate(() => global.__updateTestDirectories.map(dir => {
-    const fs = process.mainModule.require('fs')
+    const fs = process.mainModule.require('original-fs')
     const path = process.mainModule.require('path')
     return fs.existsSync(dir) ? fs.readdirSync(dir).map(name => path.join(dir, name)) : []
   }).flat())

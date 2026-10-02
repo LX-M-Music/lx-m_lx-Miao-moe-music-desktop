@@ -1,6 +1,6 @@
 <template>
-  <div id="container" class="view-container" :data-ambient-enabled="ambientBackgroundEnabled ? '' : null" :data-player-detail-open="isShowPlayerDetail ? '' : null">
-    <KawarpBackground v-if="ambientBackgroundEnabled" :cover="musicInfo.pic" />
+  <div id="container" class="view-container" :data-ambient-enabled="ambientBackgroundEnabled ? '' : null" :data-player-detail-open="isShowPlayerDetail ? '' : null" :data-player-detail-mask="appSetting['ui.ambientBackgroundPlayDetailMask'] ? null : 'off'">
+    <KawarpBackground v-if="ambientBackgroundEnabled" :key="appSetting['ui.lowPowerMode'] ? 'low-power' : 'normal'" :cover="musicInfo.pic" :detail="isShowPlayerDetail" :detail-visible="isPlayerDetailDisplayed" />
     <layout-aside id="left" :inert="isShowPlayerDetail ? '' : null" />
     <div id="right" :inert="isShowPlayerDetail ? '' : null">
       <layout-toolbar id="toolbar" />
@@ -25,10 +25,10 @@ import useApp from '@renderer/core/useApp'
 import { useSmoothAnimation } from '@renderer/utils/smoothAnimation'
 import KawarpBackground from '@renderer/components/layout/PlayDetail/KawarpBackground.vue'
 import { appSetting } from '@renderer/store/setting'
-import { musicInfo, isShowPlayerDetail } from '@renderer/store/player/state'
+import { musicInfo, isShowPlayerDetail, isPlayerDetailDisplayed } from '@renderer/store/player/state'
 
 const ambientBackgroundEnabled = computed(() => appSetting['ui.ambientBackground'] &&
-  (!appSetting['ui.ambientBackgroundOnlyPlayDetail'] || isShowPlayerDetail.value))
+  (!appSetting['ui.ambientBackgroundOnlyPlayDetail'] || isPlayerDetailDisplayed.value))
 
 useApp()
 
@@ -176,6 +176,12 @@ body {
   background-color: var(--color-surface);
   --setting-search-background: transparent;
   --player-control-opacity: 1;
+  --ambient-library-opacity: .30;
+  --ambient-detail-opacity: .30;
+  --ambient-background-opacity: var(--ambient-library-opacity);
+  --ambient-detail-surface: rgb(19, 19, 19);
+  --ambient-detail-base: var(--ambient-detail-surface);
+  transition: opacity var(--duration-normal) var(--ease-standard), background-color var(--duration-detail) var(--ease-standard);
 
   // The same canvas stays behind both screens throughout player expansion.
   > [data-ambient-background] { z-index: -1; }
@@ -184,16 +190,49 @@ body {
   > #left, > #right {
     transition: opacity var(--duration-detail) var(--ease-standard), background-color var(--duration-normal) var(--ease-standard);
   }
+  &[data-player-detail-mask="off"] {
+    --ambient-detail-opacity: 1;
+    --ambient-detail-surface: transparent;
+    --ambient-detail-base: var(--color-surface);
+  }
   &[data-player-detail-open] {
+    --ambient-background-opacity: var(--ambient-detail-opacity);
+    --ambient-surface-color: var(--ambient-detail-surface);
+    background-color: var(--ambient-surface-color);
     > #left, > #right { opacity: 0; pointer-events: none; }
   }
 }
 
-#root[data-ambient-controls] {
+#root[data-ambient-controls], [data-player-detail][data-ambient-controls] {
   color-scheme: var(--adaptive-color-scheme);
+  #container[data-ambient-enabled] {
+    #left, #toolbar, #view [data-motion-outlet], #player {
+      color: var(--color-font);
+    }
+    // Shared reading surfaces protect all inherited text without changing the
+    // background renderer, typography, or individual control hover surfaces.
+    #left, #toolbar, #view > [data-motion-outlet], #player {
+      background-color: var(--ambient-reading-surface);
+    }
+  }
   // Controls inherit the live color at their own position. Shared background
   // samples drive these tokens; modal/input surfaces keep their readable base.
   [data-ambient-zone] {
+    --color-font: var(--ambient-local-text);
+    --color-text: var(--ambient-local-text);
+    --color-850: var(--ambient-local-text);
+    --color-primary-light-400-alpha-200: var(--ambient-local-text);
+    --color-font-label: var(--ambient-local-secondary);
+    --color-text-muted: var(--ambient-local-secondary);
+    --color-text-secondary: var(--ambient-local-secondary);
+    --color-200: var(--ambient-local-secondary);
+    --color-300: var(--ambient-local-secondary);
+    --color-400: var(--ambient-local-secondary);
+    --color-450: var(--ambient-local-secondary);
+    --color-500: var(--ambient-local-secondary);
+    --color-550: var(--ambient-local-secondary);
+    --color-650: var(--ambient-local-secondary);
+    --color-700: var(--ambient-local-secondary);
     --color-primary: var(--ambient-local-accent);
     --color-accent: var(--ambient-local-accent);
     --color-nav-font: var(--ambient-local-accent);
@@ -219,6 +258,17 @@ body {
     --adaptive-selection-background: var(--ambient-local-accent);
   }
   button[data-ambient-zone] { --color-font-label: var(--ambient-local-accent); }
+  // Muted colors already encode the secondary hierarchy. Fading enabled text
+  // again can undo its measured contrast, particularly on bright artwork.
+  button[data-ambient-zone]:not(:disabled):not(.disabled):not([aria-disabled="true"]),
+  [role="tab"][data-ambient-zone]:not(.disabled):not([aria-disabled="true"]),
+  .label-source, .setting-value {
+    opacity: 1;
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--color-font-label);
+    opacity: 1;
+  }
   ::selection {
     color: var(--adaptive-selection-text);
     -webkit-text-fill-color: var(--adaptive-selection-text);
@@ -226,6 +276,21 @@ body {
     text-shadow: none;
   }
   input, textarea { caret-color: var(--color-accent); }
+}
+
+[data-player-detail][data-ambient-controls] {
+  [data-detail-part="info"], [data-detail-part="controls"], [data-detail-part="chrome"] {
+    color: var(--color-font);
+    background-image: radial-gradient(ellipse closest-side at center, var(--ambient-reading-surface), transparent 100%);
+  }
+}
+
+#root [data-player-detail][data-detail-entering] {
+  // The page already fades in. Interpolating its initial icon color from the
+  // library palette would expose a second flash during the same transition.
+  button, button svg {
+    transition-property: background-color, opacity, transform, box-shadow, scale;
+  }
 }
 
 .view-container {

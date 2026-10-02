@@ -3,8 +3,24 @@ import path from 'node:path'
 import { type WindowSize, windowSizeList } from '@common/config'
 import { nativeImage } from 'electron'
 
-export const getWindowSizeInfo = (windowSizeId: number | string): WindowSize => {
-  return windowSizeList.find(i => i.id == windowSizeId) ?? windowSizeList[0]
+export const getWindowSizeInfo = (windowSizeId: number | string, width = 0, height = 0): WindowSize => {
+  const preset = windowSizeList.find(i => i.id == windowSizeId) ?? windowSizeList[0]
+  return Number.isFinite(width) && Number.isFinite(height) && width >= 1 && height >= 1 && width <= 32768 && height <= 32768
+    ? { ...preset, width: Math.round(width), height: Math.round(height) }
+    : preset
+}
+
+export const getWindowSizing = (size: Pick<WindowSize, 'width' | 'height'>, area: Pick<Electron.Rectangle, 'width' | 'height'>) => {
+  const minimumScale = Math.max(windowSizeList[0].width / size.width, windowSizeList[0].height / size.height)
+  const maximumScale = Math.min(area.width / size.width, area.height / size.height)
+  const scale = Math.min(Math.max(1, minimumScale), maximumScale)
+  const minimum = Math.min(minimumScale, maximumScale)
+  return {
+    width: Math.max(1, Math.round(size.width * scale)),
+    height: Math.max(1, Math.round(size.height * scale)),
+    minWidth: Math.max(1, Math.floor(size.width * minimum)),
+    minHeight: Math.max(1, Math.floor(size.height * minimum)),
+  }
 }
 
 const getIconPath = (name: string): Electron.NativeImage => {

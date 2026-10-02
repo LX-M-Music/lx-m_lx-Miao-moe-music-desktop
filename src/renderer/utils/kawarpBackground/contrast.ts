@@ -6,6 +6,11 @@ export const rgb = (color: RGB) => `rgb(${color.map(value => Math.round(value)).
 const rgba = (color: RGB, alpha: number) => `rgba(${color.map(value => Math.round(value)).join(', ')}, ${alpha})`
 
 export const parseColor = (value: string): RGBA => {
+  const hex = /^#([\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i.exec(value.trim())?.[1]
+  if (hex) {
+    const full = hex.length < 5 ? [...hex].map(char => char + char).join('') : hex
+    return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16), full.length == 8 ? parseInt(full.slice(6, 8), 16) / 255 : 1]
+  }
   const parts = value.match(/[\d.]+/g)?.map(Number)
   if (!parts || parts.length < 3) return [255, 255, 255, value == 'transparent' ? 0 : 1]
   return [parts[0], parts[1], parts[2], parts[3] ?? 1]
@@ -122,10 +127,10 @@ export const createAdaptivePalette = (backgrounds: RGB[], artwork: RGB, previous
   const hover = mixColor(surface, tint, 0.10)
   const active = mixColor(surface, tint, 0.18)
   const range = bounds([...backgrounds, surface, hover, active])
-  const target = Math.min(7, contrastScore(darkText ? black : white, range) * 0.97)
+  const target = Math.min(6.5, contrastScore(darkText ? black : white, range) * 0.97)
   const accent = contrastColor(artwork, range, darkText, 5.2, true)
   const text = contrastColor([110, 116, 124], range, darkText, target)
-  const secondary = contrastColor([128, 133, 141], range, darkText, Math.min(4.8, target))
+  const secondary = contrastColor([128, 133, 141], range, darkText, Math.min(5, target))
   const onAccent = contrastRatio(accent, white) >= contrastRatio(accent, black) ? white : black
   const colors: Record<string, string> = {}
   const assign = (value: string, names: string[]) => { for (const name of names) colors[`--${name}`] = value }
@@ -137,9 +142,10 @@ export const createAdaptivePalette = (backgrounds: RGB[], artwork: RGB, previous
   ])
   assign(rgb(text), ['color-font', 'color-text', 'color-850', 'color-primary-light-400-alpha-200'])
   assign(rgb(secondary), ['color-font-label', 'color-text-muted', 'color-text-secondary', 'color-200', 'color-300', 'color-400', 'color-450', 'color-500', 'color-550', 'color-650', 'color-700'])
+  colors['--ambient-reading-surface'] = rgba(surface, 0.12)
   assign(rgb(onAccent), ['color-000', 'adaptive-selection-text'])
   assign(rgb(accent), ['adaptive-selection-background'])
-  assign(rgb(contrastColor(artwork, range, darkText, 10, true)), ['ambient-lyric-accent'])
+  assign(rgb(contrastColor(artwork, range, darkText, 7, true)), ['ambient-lyric-accent'])
   assign(rgb(surface), ['color-content-background', 'color-surface-elevated', 'color-button-background', 'color-primary-background', 'color-primary-light-600-alpha-100', 'color-primary-light-900-alpha-200'])
   assign(rgb(hover), [
     'color-hover', 'color-button-background-hover', 'color-primary-background-hover', 'color-primary-light-100-alpha-100',
@@ -177,9 +183,11 @@ export const controlRegions = (pixels: RGB[], width: number, height: number): RG
 export const createControlColors = (backgrounds: RGB[], artwork: RGB, palette: ReturnType<typeof createAdaptivePalette>) => {
   const range = bounds([...backgrounds, palette.surface, palette.hover, palette.active])
   const accent = contrastColor(artwork, range, palette.darkText, 5.2, true)
-  const lyricAccent = contrastColor(artwork, range, palette.darkText, 10, true)
+  const lyricAccent = contrastColor(artwork, range, palette.darkText, 7, true)
+  const text = contrastColor([110, 116, 124], range, palette.darkText, 6.5)
+  const secondary = contrastColor([128, 133, 141], range, palette.darkText, 5)
   const white: RGB = [255, 255, 255]
   const black: RGB = [0, 0, 0]
   const onAccent = contrastRatio(accent, white) >= contrastRatio(accent, black) ? white : black
-  return { accent, onAccent, lyricAccent }
+  return { accent, onAccent, lyricAccent, text, secondary }
 }

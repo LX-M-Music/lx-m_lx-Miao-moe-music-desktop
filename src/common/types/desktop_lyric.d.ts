@@ -3,6 +3,7 @@ declare namespace LX {
     interface Config {
       'desktopLyric.enable': LX.AppSetting['desktopLyric.enable']
       'desktopLyric.showPlayer': LX.AppSetting['desktopLyric.showPlayer']
+      'desktopLyric.singleLine': LX.AppSetting['desktopLyric.singleLine']
       'desktopLyric.autoHideControls': LX.AppSetting['desktopLyric.autoHideControls']
       'desktopLyric.isLock': LX.AppSetting['desktopLyric.isLock']
       'desktopLyric.isAlwaysOnTop': LX.AppSetting['desktopLyric.isAlwaysOnTop']
@@ -35,6 +36,7 @@ declare namespace LX {
       'desktopLyric.style.isFontWeightExtended': LX.AppSetting['desktopLyric.style.isFontWeightExtended']
       'desktopLyric.style.isZoomActiveLrc': LX.AppSetting['desktopLyric.style.isZoomActiveLrc']
       'common.langId': LX.AppSetting['common.langId']
+      'ui.lowPowerMode': LX.AppSetting['ui.lowPowerMode']
       'player.isShowLyricTranslation': LX.AppSetting['player.isShowLyricTranslation']
       'player.isShowLyricRoma': LX.AppSetting['player.isShowLyricRoma']
       'player.isSwapLyricTranslationAndRoma': LX.AppSetting['player.isSwapLyricTranslationAndRoma']
