@@ -17,6 +17,7 @@
         </button>
       </div>
     </header>
+    <div class="mini-header-no-drag" aria-hidden="true" />
     <template v-if="setting['desktopLyric.showPlayer']">
       <div class="mini-track" data-mini-track @pointerdown="dragWindow">
         <div class="mini-cover">
@@ -232,16 +233,25 @@ onBeforeUnmount(() => {
   input:focus-visible { outline: 2px solid var(--mini-accent); outline-offset: 2px; }
 }
 .mini-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 30px; cursor: move; }
+.mini-header-no-drag { display: none; position: absolute; top: 0; left: 0; right: 0; height: 44px; pointer-events: none; -webkit-app-region: no-drag; }
 .native-drag {
   .mini-header, .mini-track { -webkit-app-region: drag; user-select: none; }
   .mini-window-buttons, .mini-options, button, input { -webkit-app-region: no-drag; }
   &.auto-hide-controls .mini-header, &.lyrics-only .mini-header { -webkit-app-region: no-drag; }
+  // Chromium 108 can retain a lyric caption over an opacity-zero header.
+  // Keep its exclusion outside the faded controls and remove it when they show.
+  &.auto-hide-controls, &.lyrics-only { .mini-header-no-drag { display: block; } }
 }
 #main:hover .native-drag:not(.lyrics-only) .mini-header,
 .native-drag.native-controls-hover .mini-header,
 .native-drag:has(.mini-controls :focus-visible) .mini-header,
 .native-drag.options-open .mini-header,
 .native-drag.lyrics-only .mini-header:hover { -webkit-app-region: drag; }
+#main:hover .native-drag:not(.lyrics-only) .mini-header-no-drag,
+.native-drag.native-controls-hover .mini-header-no-drag,
+.native-drag:has(.mini-controls :focus-visible) .mini-header-no-drag,
+.native-drag.options-open .mini-header-no-drag,
+.native-drag.lyrics-only .mini-header:hover ~ .mini-header-no-drag { display: none; }
 .mini-brand { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--mini-accent); white-space: nowrap; pointer-events: none; span { margin-left: 6px; font-weight: 400; letter-spacing: 0; color: rgba(255,255,255,.6); } }
 .mini-window-buttons { display: flex; gap: 2px; }
 .mini-track { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 12px 0 8px; cursor: move; }
