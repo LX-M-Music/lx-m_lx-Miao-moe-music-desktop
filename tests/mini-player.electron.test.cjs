@@ -374,21 +374,43 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
             }, { showPlayer, direction })
             await lyricCentered(direction === 'vertical')
             const rect = await mini.locator('[data-mini-lyrics]').boundingBox()
+            await mini.mouse.move(rect.x + rect.width / 2, rect.y + rect.height - 12)
+            await mini.evaluate(() => document.activeElement?.blur())
+            await mini.waitForFunction(() => getComputedStyle(document.querySelector('.mini-lyric-drag-surface')).display !== 'none')
             for (const x of [12, rect.width - 12]) {
-              const position = { x, y: rect.height / 2 }
+              const position = await mini.locator('[data-mini-lyrics]').evaluate((el, x) => {
+                const rect = el.getBoundingClientRect()
+                const surface = el.querySelector('.mini-lyric-drag-surface').getBoundingClientRect()
+                const excluded = [...el.querySelectorAll('.font-lrc, .extended')].map(el => el.getBoundingClientRect())
+                for (let y = Math.max(12, surface.top - rect.top + 12); y < rect.height - 12; y += 4) {
+                  const point = { x: rect.left + x, y: rect.top + y }
+                  if (!excluded.some(rect => point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom)) return { x, y }
+                }
+                return null
+              }, x)
+              assert(position, `${direction}, player=${showPlayer}: the lyric margin has visible blank space`)
               const movement = await dragWindow(app, mini, '[data-mini-lyrics]', { dx: x === 12 ? 30 : -30, dy: 0, position, stallRenderer: showPlayer && direction === 'horizontal' && x === 12 })
               assert.equal(movement.x, movement.expectedX, `${direction}, player=${showPlayer}: blank margin movement follows the pointer exactly`)
               assert.equal(movement.y, 0)
               assert.deepEqual([movement.width, movement.height], [movement.expectedWidth, movement.expectedHeight])
             }
             const text = '[data-mini-lyrics] .line-content.active .font-lrc'
-            assert.equal(await nativeHitTest(app, mini, text), 1, 'lyric text remains available for scrolling')
+            const line = await mini.locator(text).first().boundingBox()
+            const viewport = await mini.locator('[data-mini-lyrics]').boundingBox()
+            // Long lines can start outside the clipped viewport. Probe the visible
+            // text rather than its offscreen edge, which can hit a resize border.
+            const visible = {
+              left: Math.max(line.x, viewport.x), right: Math.min(line.x + line.width, viewport.x + viewport.width),
+              top: Math.max(line.y, viewport.y), bottom: Math.min(line.y + line.height, viewport.y + viewport.height),
+            }
+            assert(visible.right > visible.left && visible.bottom > visible.top)
+            const point = { x: (visible.left + visible.right) / 2, y: (visible.top + visible.bottom) / 2 }
+            assert.equal(await nativeHitTest(app, mini, text, { x: point.x - line.x, y: point.y - line.y }), 1, 'visible lyric text remains available for scrolling')
             const before = await window.evaluate(window => window.getBounds())
             const scrollBefore = await mini.locator('[data-mini-lyrics] > div').evaluate(el => [el.scrollLeft, el.scrollTop])
-            const line = await mini.locator(text).first().boundingBox()
-            await mini.mouse.move(line.x + line.width / 2, line.y + line.height / 2)
+            await mini.mouse.move(point.x, point.y)
             await mini.mouse.down()
-            await mini.mouse.move(line.x + line.width / 2 + (direction === 'vertical' ? 25 : 0), line.y + line.height / 2 + (direction === 'horizontal' ? -25 : 0), { steps: 5 })
+            await mini.mouse.move(point.x + (direction === 'vertical' ? 25 : 0), point.y + (direction === 'horizontal' ? -25 : 0), { steps: 5 })
             await mini.mouse.up()
             const scrollAfter = await mini.locator('[data-mini-lyrics] > div').evaluate(el => [el.scrollLeft, el.scrollTop])
             const axis = direction === 'vertical' ? 0 : 1
