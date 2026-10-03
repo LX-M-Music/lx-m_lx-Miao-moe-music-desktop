@@ -1,5 +1,5 @@
 <template>
-  <div ref="dom_btns" :class="[$style.controlBtn, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]">
+  <div ref="dom_btns" :class="[$style.controlBtn, { [$style.custom]: isCustomStyle, [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]">
     <button v-if="isFullscreen" type="button" :class="[$style.btn, $style.min]" :aria-label="$t('fullscreen_exit')" ignore-tip :title="$t('fullscreen_exit')" @click="setFullScreen(false)">
       <svg :class="$style.controlBtniIcon" xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 24 24">
         <use xlink:href="#icon-fullscreen-exit" />
@@ -33,7 +33,7 @@ import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
 
-const { isTrafficStyle, isIconAlways } = useWindowControls()
+const { isCustomStyle, isTrafficStyle, isIconAlways } = useWindowControls()
 
 const cssModule = useCssModule()
 
@@ -99,24 +99,28 @@ onBeforeUnmount(() => {
   padding: 1px;
   cursor: pointer;
   border-radius: 50%;
-  // 图标使用中性灰、圆滑样式（与原版 lx-music-desktop 一致）
-  color: var(--color-500);
-  // 中性灰圆点（默认风格）
-  background-color: var(--color-450);
+  color: var(--color-font);
   transition: background-color 0.2s ease-in-out;
 
-  &:hover {
-    background-color: var(--color-500);
-  }
   &.min {
-    background-color: var(--color-450);
+    background-color: var(--color-btn-min);
   }
   &.max {
-    background-color: var(--color-450);
+    background-color: var(--color-btn-max, #e7aa36);
   }
   &.close {
+    background-color: var(--color-btn-close);
+  }
+}
+
+.custom .btn {
+  color: var(--color-500);
+  &.min, &.max, &.close {
     background-color: var(--color-450);
-    &:hover {
+  }
+  &:hover {
+    background-color: var(--color-500);
+    &.close {
       background-color: #e5776f;
     }
   }

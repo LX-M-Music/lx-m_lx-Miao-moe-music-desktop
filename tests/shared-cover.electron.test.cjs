@@ -1,8 +1,33 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs/promises')
 const http = require('node:http')
 const path = require('node:path')
 const { test } = require('node:test')
 const { launch, route, settled, showDetail } = require('./helpers/motion-fixture.cjs')
+const themes = require('../src/common/theme/index.json')
+
+const coverPixels = async page => {
+  const screenshot = await page.screenshot()
+  return page.evaluate(async data => {
+    const cover = document.querySelector('[data-player-detail] img')
+    const rect = cover.getBoundingClientRect()
+    const screenshot = new Image()
+    screenshot.src = 'data:image/png;base64,' + data
+    await screenshot.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = screenshot.width
+    canvas.height = screenshot.height
+    const context = canvas.getContext('2d')
+    context.drawImage(screenshot, 0, 0)
+    const points = [[0.2, 0.2], [0.5, 0.5], [0.8, 0.8]]
+    const rendered = points.map(([x, y]) => [...context.getImageData(Math.floor((rect.x + rect.width * x) * devicePixelRatio), Math.floor((rect.y + rect.height * y) * devicePixelRatio), 1, 1).data].slice(0, 3))
+    canvas.width = cover.naturalWidth
+    canvas.height = cover.naturalHeight
+    context.drawImage(cover, 0, 0)
+    const source = points.map(([x, y]) => [...context.getImageData(Math.floor(canvas.width * x), Math.floor(canvas.height * y), 1, 1).data].slice(0, 3))
+    return { rendered, source, opacity: getComputedStyle(cover).opacity }
+  }, screenshot.toString('base64'))
+}
 
 const artwork = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="#297c88"/></svg>'
 const song = (id, url) => ({ id, source: 'wy', name: id, singer: 'Shared artwork', interval: '03:40', meta: { picUrl: url, songId: id, albumName: 'Shared cover', qualitys: [], _qualitys: {} } })
@@ -90,6 +115,36 @@ test('song lists, all player covers and media metadata share loaded artwork', { 
     await page.waitForFunction(src => navigator.mediaSession.metadata?.artwork[0]?.src === src, src)
     assert.equal(requests.get('/first.svg'), 1)
     assert.equal(await page.evaluate(() => window.lxData.musicInfo.pic), first.meta.picUrl, 'original metadata remains portable')
+  })
+
+  await t.test('rendered detail artwork keeps its original pixels across every built-in theme', async() => {
+    const output = path.resolve(process.env.LX_COVER_THEME_OUTPUT ?? 'output/playwright/detail-cover-theme-brightness/ordinary')
+    await fs.mkdir(output, { recursive: true })
+    const ambient = await page.evaluate(() => window.lxData.appSetting['ui.ambientBackground'])
+    const results = []
+    try {
+      await updateSettings(page, { 'ui.ambientBackground': false })
+      await seedPlayer(page, first)
+      await playerSrc(page)
+      await showDetail(page, true)
+      await settled(page)
+      for (const theme of themes) {
+        await page.evaluate(colors => window.setTheme(colors), { ...theme.config.themeColors, ...theme.config.extInfo })
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+        const result = { id: theme.id, ...await coverPixels(page) }
+        results.push(result)
+        if (['green', 'black', 'china_ink'].includes(theme.id)) await page.screenshot({ path: path.join(output, `detail-${theme.id}.png`) })
+      }
+      await fs.writeFile(path.join(output, 'cover-pixels.json'), JSON.stringify(results, null, 2))
+      const failures = results.filter(result => result.rendered.some((pixel, index) => pixel.some((channel, component) => Math.abs(channel - result.source[index][component]) > 2)))
+      assert.deepEqual(failures, [], 'the foreground artwork must retain its source colors, independently of the theme behind it')
+    } finally {
+      await showDetail(page, false)
+      await settled(page)
+      const theme = themes[0]
+      await page.evaluate(colors => window.setTheme(colors), { ...theme.config.themeColors, ...theme.config.extInfo })
+      await updateSettings(page, { 'ui.ambientBackground': ambient })
+    }
   })
 
   await t.test('a cover loaded by playback is reused by a newly opened list', async() => {

@@ -338,6 +338,8 @@ declare global {
       'desktopLyric.enable': boolean
       /** 显示迷你播放器的封面、歌曲和播放控制；关闭后仅显示歌词 */
       'desktopLyric.showPlayer': boolean
+      /** 显示迷你播放器边框 */
+      'desktopLyric.showBorder': boolean
       /** 只显示当前一句原文，横向单行并直接换句 */
       'desktopLyric.singleLine': boolean
       /** 鼠标移出窗口后隐藏控制，悬停或键盘聚焦时恢复 */
@@ -824,7 +826,9 @@ declare global {
 
       /** 实验性：新版聚合首页（登录态、收藏歌单、继续播放） */
       'experimental.newHome': boolean
-      /** 窗口控制按钮风格：default 中性灰 / traffic 红绿灯 */
+      /** 启用自定义窗口控制按钮风格，关闭后使用默认样式 */
+      'ui.windowControlsEnabled': boolean
+      /** 自定义窗口控制按钮风格：default 中性灰 / traffic 红绿灯 */
       'ui.windowControlStyle': 'default' | 'traffic'
       /** 窗口控制按钮图标显示：always 常亮 / hover 悬停显示 */
       'ui.windowControlsIconMode': 'always' | 'hover'

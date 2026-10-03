@@ -325,7 +325,8 @@ export default {
   min-width: 100%;
   box-shadow: 0 0 6px var(--color-primary-alpha-500);
   border-radius: 6px;
-  opacity: .8;
+  // Keep artwork colors independent of the theme behind the image.
+  opacity: 1;
   transition: transform var(--duration-normal) var(--ease-standard);
 }
 .coverTravelling {

@@ -1,6 +1,6 @@
 <template lang="pug">
 div(:class="$style.header")
-  div(ref="dom_btns" :class="[$style.controBtn, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]")
+  div(ref="dom_btns" :class="[$style.controBtn, { [$style.custom]: isCustomStyle, [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]")
     button(type="button" :class="$style.hide" :aria-label="$t('player__hide_detail_tip')" ignore-tip :title="$t('player__hide_detail_tip')" @click="hide")
       svg(:class="$style.controBtnIcon" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" width="80%" viewBox="0 0 30.727 30.727" space="preserve")
         use(xlink:href="#icon-window-hide")
@@ -29,7 +29,7 @@ import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
 
-const { isTrafficStyle, isIconAlways } = useWindowControls()
+const { isCustomStyle, isTrafficStyle, isIconAlways } = useWindowControls()
 
 const cssModule = useCssModule()
 
@@ -142,23 +142,33 @@ const fullscreenExit = () => {
       width: @control-btn-width;
       height: @control-btn-width;
       border-radius: 50%;
-      // 图标使用中性灰、圆滑样式（与原版 lx-music-desktop 一致）
-      color: var(--color-500);
+      color: var(--color-font);
       + button {
         margin-right: (@control-btn-width / 2);
       }
 
       &.hide {
-        background-color: var(--color-450);
+        background-color: var(--color-btn-hide);
       }
       &.min, &.fullscreenExit {
-        background-color: var(--color-450);
+        background-color: var(--color-btn-min);
       }
       &.max {
+        background-color: var(--color-btn-max, #e7aa36);
+      }
+      &.close {
+        background-color: var(--color-btn-close);
+      }
+    }
+  }
+
+  .controBtn.custom {
+    button {
+      color: var(--color-500);
+      &.hide, &.min, &.fullscreenExit, &.max, &.close {
         background-color: var(--color-450);
       }
       &.close {
-        background-color: var(--color-450);
         &:hover {
           background-color: #e5776f;
         }

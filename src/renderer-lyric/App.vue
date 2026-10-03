@@ -1,6 +1,6 @@
 <template>
   <div id="background" :style="{ opacity: backgroundOpacity }" aria-hidden="true" />
-  <div id="container" :class="[{ lock: setting['desktopLyric.isLock'] }, { hide: isHoverHide }, { transparent: backgroundOpacity === 0, 'native-window-hover': nativePointer !== null }]">
+  <div id="container" :class="[{ lock: setting['desktopLyric.isLock'] }, { hide: isHoverHide }, { transparent: backgroundOpacity === 0, 'native-window-hover': nativePointer !== null, 'show-border': setting['desktopLyric.showBorder'] }]">
     <div id="main">
       <div class="mini-lyrics" :class="{ 'native-lyric-drag': !isShowResize && !setting['desktopLyric.isLock'], 'with-player': setting['desktopLyric.showPlayer'], 'single-line': setting['desktopLyric.singleLine'], 'align-start': setting['desktopLyric.scrollAlign'] === 'top', paused: !setting['desktopLyric.showPlayer'] && isHide, vertical: !setting['desktopLyric.singleLine'] && setting['desktopLyric.direction'] === 'vertical' }" data-mini-lyrics>
         <span class="mini-lyric-drag-surface" aria-hidden="true" />
@@ -112,7 +112,7 @@ body {
     opacity: 0;
     transition: opacity .18s ease;
   }
-  &.transparent.native-window-hover::after { opacity: 1; }
+  &.show-border::after { opacity: 1; }
   &.hide {
     opacity: .04;
 
@@ -279,8 +279,7 @@ body {
 
 // Native captions consume clicks before the renderer. Let menu controls and
 // clicks that dismiss keyboard focus reach the page before enabling dragging.
-#main:has(.mini-player .mini-options, .mini-player .mini-controls :focus-visible, .mini-player .mini-header:hover, .mini-player .mini-track:hover) .mini-lyrics .mini-lyric-drag-surface,
-#root:has(.mini-recovery:focus-visible) .mini-lyrics .mini-lyric-drag-surface {
+#main:has(.mini-player .mini-options, .mini-player .mini-controls :focus-visible, .mini-player .mini-header:hover, .mini-player .mini-track:hover) .mini-lyrics .mini-lyric-drag-surface {
   // Removing the surface also removes its native region on Chromium 108;
   // a no-drag exclusion here can otherwise cover the floating header.
   display: none;
@@ -290,7 +289,7 @@ body {
   text-shadow: 0 1px 4px rgba(0, 0, 0, .8);
 }
 
-.mini-unlock, .mini-recovery {
+.mini-unlock {
   position: fixed;
   z-index: 10;
   box-sizing: border-box;
@@ -311,19 +310,6 @@ body {
   &:focus-visible { outline: 2px solid var(--color-primary, #56cc9b); outline-offset: 1px; }
   svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 }
-.mini-recovery.hover-only {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity .18s ease, visibility 0s linear .18s;
-  &.native-window-hover {
-    opacity: .85;
-    visibility: visible;
-    pointer-events: auto;
-    transition: opacity .18s ease;
-    &:hover, &:focus-visible { opacity: 1; }
-  }
-}
-@media (prefers-reduced-motion: reduce) { .mini-unlock, .mini-recovery, .mini-lyrics, #container::after { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .mini-unlock, .mini-lyrics, #container::after { transition: none !important; } }
 
 </style>

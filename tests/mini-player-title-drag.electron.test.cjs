@@ -70,7 +70,7 @@ test('offscreen lyrics cannot disable the mini-player title bar', { skip: proces
         const optionsLabel = await page.evaluate(() => window.i18n.t('mini_player__options'))
         if (!mode.showPlayer) {
           const bounds = await window.evaluate(window => window.getContentBounds())
-          await app.evaluate((_, bounds) => { global.__miniPointer = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 } }, bounds)
+          await app.evaluate((_, bounds) => { global.__miniPointer = { x: bounds.x + 90, y: bounds.y + 20 } }, bounds)
         }
         await mini.getByRole('button', { name: optionsLabel, exact: true }).click()
         await mini.locator('#mini-options').waitFor()

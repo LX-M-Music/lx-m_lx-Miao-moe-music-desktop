@@ -80,6 +80,7 @@ const defaultSetting: LX.AppSetting = {
 
   'desktopLyric.enable': false,
   'desktopLyric.showPlayer': true,
+  'desktopLyric.showBorder': false,
   'desktopLyric.singleLine': false,
   'desktopLyric.autoHideControls': false,
   'desktopLyric.isLock': false,
@@ -225,6 +226,7 @@ const defaultSetting: LX.AppSetting = {
 
   // ===== 实验性功能 =====
   'experimental.newHome': false,
+  'ui.windowControlsEnabled': true,
   'ui.windowControlStyle': 'default',
   'ui.windowControlsIconMode': 'always',
 

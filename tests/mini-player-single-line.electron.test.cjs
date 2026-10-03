@@ -11,7 +11,7 @@ const update = (page, values) => page.evaluate(values => window.lxData.updateSet
 
 test('mini-player single-line lyrics replace immediately and preserve multi-line preferences', { timeout: 100000 }, async t => {
   const profilePath = await fs.mkdtemp(path.join(os.tmpdir(), 'lx-mini-single-line-'))
-  const output = path.resolve('output/playwright/mini-player-single-line', process.env.LX_TEST_ELECTRON ? 'compatible' : 'ordinary')
+  const output = path.resolve('output/playwright/mini-player-inline-lyrics', process.env.LX_TEST_ELECTRON ? 'compatible' : 'ordinary')
   await fs.mkdir(output, { recursive: true })
   const rate = 8000
   const wav = Buffer.alloc(44 + rate * 90 * 2)
@@ -47,7 +47,7 @@ test('mini-player single-line lyrics replace immediately and preserve multi-line
     const bounds = await window.evaluate(window => window.getContentBounds())
     await window.dispose()
     await app.evaluate((_, bounds) => {
-      global.__miniSinglePoint = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+      global.__miniSinglePoint = { x: bounds.x + 70, y: bounds.y + 20 }
     }, bounds)
     await mini.mouse.move(70, 20)
     await mini.getByRole('button', { name: '外观与窗口', exact: true }).click()
@@ -65,6 +65,12 @@ test('mini-player single-line lyrics replace immediately and preserve multi-line
       console.error('Player state:', await page.evaluate(() => ({ time: window.__lxPluginHost.player.getAudioElement().currentTime, info: { lrc: window.lxData.musicInfo.lrc, tlrc: window.lxData.musicInfo.tlrc, lxlrc: window.lxData.musicInfo.lxlrc } })))
       throw error
     }
+  }
+  const extendedIs = async expected => {
+    await mini.waitForFunction(expected => {
+      const lines = [...document.querySelectorAll('[data-mini-single-line] .extended > .font-lrc')]
+      return JSON.stringify(lines.map(line => line.textContent)) === JSON.stringify(expected) && lines.every(line => line.getBoundingClientRect().width > 0)
+    }, expected)
   }
   try {
     await app.evaluate(({ screen }) => {
@@ -100,10 +106,11 @@ test('mini-player single-line lyrics replace immediately and preserve multi-line
       await page.evaluate(({ translations, romanizations }) => {
         Object.assign(window.lxData.musicInfo, { tlrc: translations, rlrc: romanizations })
       }, { translations: timed(['Translation one', 'Translation two', 'Translation three']), romanizations: timed(['Roma one', 'Roma two', 'Roma three']) })
-      await update(page, { 'desktopLyric.direction': 'vertical', 'desktopLyric.style.isZoomActiveLrc': true, 'desktopLyric.isDelayScroll': true, 'player.isShowLyricTranslation': true, 'player.isShowLyricRoma': true, 'desktopLyric.style.fontSize': 27 })
+      await update(page, { 'desktopLyric.direction': 'vertical', 'desktopLyric.style.isZoomActiveLrc': true, 'desktopLyric.isDelayScroll': true, 'player.isShowLyricTranslation': true, 'player.isShowLyricRoma': true, 'player.isSwapLyricTranslationAndRoma': false, 'desktopLyric.style.fontSize': 27 })
       await seek(31)
       await lineIs(texts[2])
-      assert.equal(await mini.locator('[data-mini-single-line] .extended:visible').count(), 0)
+      await extendedIs(['Roma three', 'Translation three'])
+      assert.equal(await mini.locator('[data-mini-single-line] .extended:visible').count(), 2)
       const metrics = await mini.locator('[data-mini-single-line] .line > .font-lrc').evaluate(el => {
         const style = getComputedStyle(el)
         const rect = el.getBoundingClientRect()
@@ -114,7 +121,7 @@ test('mini-player single-line lyrics replace immediately and preserve multi-line
       await mini.screenshot({ path: path.join(output, 'single-long-line.png') })
       assert.equal(metrics.whiteSpace, 'nowrap'); assert.equal(metrics.ellipsis, 'ellipsis'); assert.equal(metrics.fontSize, '27px')
       assert.equal(metrics.rows, 1); assert(metrics.centered); assert(metrics.width < metrics.viewportWidth); assert.equal(metrics.writingMode, 'horizontal-tb'); assert.equal(metrics.transform, 'none')
-      assert.equal(await mini.locator('[data-mini-single-line]').getAttribute('title'), texts[2])
+      assert.equal(await mini.locator('[data-mini-single-line]').getAttribute('title'), [texts[2], 'Roma three', 'Translation three'].join(' · '))
       await options()
       await mini.waitForFunction(() => getComputedStyle(document.querySelector('#mini-options')).opacity === '1')
       await mini.screenshot({ path: path.join(output, 'options.png') })
@@ -133,6 +140,57 @@ test('mini-player single-line lyrics replace immediately and preserve multi-line
       assert.equal(await page.evaluate(() => window.__lxPluginHost.player.getAudioElement().paused), true)
     })
 
+    await t.test('translation and romanization share one row and follow visibility, order and current timestamps', async() => {
+      await seek(0)
+      await lineIs(texts[0])
+      await extendedIs(['Roma one', 'Translation one'])
+      const row = await mini.locator('[data-mini-single-line] .line-content').evaluate(el => {
+        const rect = el.getBoundingClientRect()
+        const parts = [...el.querySelectorAll(':scope > .line, :scope > .extended')].map(part => {
+          const box = part.getBoundingClientRect()
+          const style = getComputedStyle(part.querySelector('.font-lrc'))
+          return { center: box.y + box.height / 2, left: box.left, right: box.right, width: box.width, whiteSpace: style.whiteSpace, ellipsis: style.textOverflow }
+        })
+        return { center: rect.y + rect.height / 2, left: rect.left, right: rect.right, parts }
+      })
+      assert.equal(row.parts.length, 3)
+      for (const part of row.parts) {
+        assert(Math.abs(part.center - row.center) < 1)
+        assert(part.width > 0 && part.left >= row.left - 1 && part.right <= row.right + 1)
+        assert.equal(part.whiteSpace, 'nowrap'); assert.equal(part.ellipsis, 'ellipsis')
+      }
+      await mini.screenshot({ path: path.join(output, 'single-inline-all.png') })
+      await update(page, { 'player.isShowLyricRoma': false })
+      await extendedIs(['Translation one'])
+      await update(page, { 'player.isShowLyricTranslation': false, 'player.isShowLyricRoma': true })
+      await extendedIs(['Roma one'])
+      await update(page, { 'player.isShowLyricRoma': false })
+      await extendedIs([])
+      assert.equal(await mini.locator('[data-mini-single-line]').getAttribute('title'), texts[0])
+      await update(page, { 'player.isShowLyricTranslation': true, 'player.isShowLyricRoma': true, 'player.isSwapLyricTranslationAndRoma': true, 'desktopLyric.style.isFontWeightExtended': true })
+      await extendedIs(['Translation one', 'Roma one'])
+      assert.equal(await mini.locator('[data-mini-single-line] .extended').first().evaluate(el => getComputedStyle(el).fontWeight), '700')
+      assert.equal(await mini.locator('[data-mini-single-line]').getAttribute('title'), [texts[0], 'Translation one', 'Roma one'].join(' · '))
+      await mini.screenshot({ path: path.join(output, 'single-inline-swapped.png') })
+      await update(page, { 'player.isSwapLyricTranslationAndRoma': false, 'desktopLyric.style.isFontWeightExtended': false })
+      await page.evaluate(({ translations, romanizations }) => {
+        Object.assign(window.lxData.musicInfo, { tlrc: translations, rlrc: romanizations })
+        window.app_event.lyricUpdated()
+      }, { translations: timed(['Translation one', '', 'Translation three']), romanizations: timed(['Roma one', 'Roma two', '']) })
+      await seek(15.1)
+      await lineIs(texts[1])
+      await extendedIs(['Roma two'])
+      await seek(30.1)
+      await lineIs(texts[2])
+      await extendedIs(['Translation three'])
+      await page.evaluate(({ translations, romanizations }) => {
+        Object.assign(window.lxData.musicInfo, { tlrc: translations, rlrc: romanizations })
+        window.app_event.lyricUpdated()
+      }, { translations: timed(['Translation one', 'Translation two', 'Translation three']), romanizations: timed(['Roma one', 'Roma two', 'Roma three']) })
+      await seek(0)
+      await extendedIs(['Roma one', 'Translation one'])
+    })
+
     await t.test('real playback changes the row at the next timestamp without delayed scrolling', async() => {
       await seek(14.7)
       await lineIs(texts[0])
@@ -147,6 +205,7 @@ test('mini-player single-line lyrics replace immediately and preserve multi-line
       })
       await mini.getByRole('button', { name: '播放', exact: true }).click()
       await lineIs(texts[1])
+      await extendedIs(['Roma two', 'Translation two'])
       const changedAt = await page.evaluate(() => window.__lxPluginHost.player.getAudioElement().currentTime)
       assert(changedAt < 15.45, `line switched at ${changedAt}s; delay-scroll preference must not delay the single row`)
       await mini.getByRole('button', { name: '暂停', exact: true }).click()
@@ -184,6 +243,7 @@ test('mini-player single-line lyrics replace immediately and preserve multi-line
       assert.equal(frames[1], '100% 100%')
       await mini.getByRole('button', { name: '暂停', exact: true }).click()
       assert.equal(await mini.locator('[data-mini-lyrics] .line-content').count(), 1)
+      await extendedIs(['Roma one', 'Translation one'])
       await mini.screenshot({ path: path.join(output, 'single-word-progress.png') })
     })
 

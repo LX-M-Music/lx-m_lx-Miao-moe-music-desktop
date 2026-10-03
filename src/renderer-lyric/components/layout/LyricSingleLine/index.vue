@@ -1,5 +1,5 @@
 <template>
-  <div :class="[$style.lyric, { [$style.fontWeightFont]: setting['desktopLyric.style.isFontWeightFont'], [$style.fontWeightLine]: setting['desktopLyric.style.isFontWeightLine'] }]" :style="lrcStyles" :title="currentLine?.text" data-mini-single-line>
+  <div :class="[$style.lyric, { [$style.fontWeightFont]: setting['desktopLyric.style.isFontWeightFont'], [$style.fontWeightLine]: setting['desktopLyric.style.isFontWeightLine'], [$style.fontWeightExtended]: setting['desktopLyric.style.isFontWeightExtended'] }]" :style="lrcStyles" :title="currentLineText" data-mini-single-line>
     <div ref="textContainer" :class="$style.text" />
   </div>
 </template>
@@ -11,11 +11,16 @@ import { setting } from '@lyric/store/state'
 
 const textContainer = ref<HTMLDivElement>()
 const currentLine = computed(() => lyric.lines[lyric.line])
+const currentLineText = computed(() => {
+  const line = currentLine.value
+  return line ? [line.text, ...line.extendedLyrics].filter(Boolean).join(' · ') : undefined
+})
 const lrcStyles = computed(() => ({
   fontFamily: setting['desktopLyric.style.font'],
   fontSize: Math.trunc(setting['desktopLyric.style.fontSize']) + 'px',
   opacity: setting['desktopLyric.style.opacity'] / 100,
   textAlign: setting['desktopLyric.style.align'],
+  '--single-line-align': setting['desktopLyric.style.align'] == 'left' ? 'flex-start' : setting['desktopLyric.style.align'] == 'right' ? 'flex-end' : 'center',
 }))
 
 const showCurrentLine = () => {
@@ -45,14 +50,22 @@ watch(() => currentLine.value?.dom_line, showCurrentLine, { flush: 'post' })
 
   :global {
     .line-content {
+      display: flex !important;
+      align-items: center;
+      gap: .5em;
+      min-width: 0;
+      max-width: 100%;
       line-height: 1.2;
       white-space: nowrap;
     }
-    .line {
+    .line, .extended {
       display: block !important;
+      flex: 0 1 auto;
+      min-width: 0;
       max-width: 100%;
     }
-    .extended, br { display: none !important; }
+    .extended { font-size: .8em; }
+    br { display: none !important; }
     .font-lrc, .shadow {
       padding: .08em .14em;
       margin: -.08em 0;
@@ -82,9 +95,12 @@ watch(() => currentLine.value?.dom_line, showCurrentLine, { flush: 'post' })
   }
 }
 .text {
+  display: flex;
+  justify-content: var(--single-line-align);
   width: 100%;
   min-width: 0;
 }
 .fontWeightFont :global(.font-mode > .line),
 .fontWeightLine :global(.line-mode > .line) { font-weight: bold; }
+.fontWeightExtended :global(.extended) { font-weight: bold; }
 </style>

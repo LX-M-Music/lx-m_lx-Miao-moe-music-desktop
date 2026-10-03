@@ -6,6 +6,8 @@ dd
   .gap-top
     base-checkbox(id="setting_mini_player_show_player" :model-value="appSetting['desktopLyric.showPlayer']" :label="$t('setting__desktop_lyric_show_player')" @update:model-value="updateSetting({ 'desktopLyric.showPlayer': $event })")
   .gap-top
+    base-checkbox(id="setting_mini_player_show_border" :model-value="appSetting['desktopLyric.showBorder']" :label="$t('setting__desktop_lyric_show_border')" @update:model-value="updateSetting({ 'desktopLyric.showBorder': $event })")
+  .gap-top
     base-checkbox(id="setting_mini_player_single_line" :model-value="appSetting['desktopLyric.singleLine']" :label="$t('setting__desktop_lyric_single_line')" @update:model-value="updateSetting({ 'desktopLyric.singleLine': $event })")
     svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__desktop_lyric_single_line_tip')")
   .gap-top

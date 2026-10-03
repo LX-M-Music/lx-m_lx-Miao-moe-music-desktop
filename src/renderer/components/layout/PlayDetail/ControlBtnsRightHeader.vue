@@ -1,6 +1,6 @@
 <template lang="pug">
 div(:class="$style.header")
-  div(ref="dom_btns" :class="[$style.controBtn, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]")
+  div(ref="dom_btns" :class="[$style.controBtn, { [$style.custom]: isCustomStyle, [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]")
     button(ref="dom_hide_btn" type="button" :class="$style.hide" :aria-label="$t('player__hide_detail_tip')" ignore-tip :title="$t('player__hide_detail_tip')" @click="hide")
       svg(:class="$style.controBtnIcon" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="35%" viewBox="0 0 30.727 30.727" space="preserve")
         use(xlink:href="#icon-window-hide")
@@ -28,7 +28,7 @@ import { closeWindow, minWindow, maxWindow, setFullScreen } from '@renderer/util
 import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
-const { isTrafficStyle, isIconAlways } = useWindowControls()
+const { isCustomStyle, isTrafficStyle, isIconAlways } = useWindowControls()
 const cssModule = useCssModule()
 
 const handle_focus = () => {
@@ -149,7 +149,9 @@ const fullscreenExit = () => {
       }
     }
 
-    .right-window-controls();
+    &.custom {
+      .right-window-controls();
+    }
   }
 }
 

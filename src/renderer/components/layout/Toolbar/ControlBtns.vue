@@ -1,5 +1,5 @@
 <template>
-  <div ref="dom_btns" :class="[$style.control, { [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]">
+  <div ref="dom_btns" :class="[$style.control, { [$style.custom]: isCustomStyle, [$style.traffic]: isTrafficStyle, [$style.iconAlways]: isIconAlways }]">
     <button v-if="isFullscreen" type="button" :class="[$style.btn, $style.max]" :aria-label="$t('fullscreen_exit')" ignore-tip :title="$t('fullscreen_exit')" @click="setFullScreen(false)">
       <svg xmlns="http://www.w3.org/2000/svg" height="60%" viewBox="0 0 24 24">
         <use xlink:href="#icon-fullscreen-exit" />
@@ -31,7 +31,7 @@ import { isFullscreen, isMaximized } from '@renderer/store'
 import { useWindowControls } from '../useWindowControls'
 
 const dom_btns = ref()
-const { isTrafficStyle, isIconAlways } = useWindowControls()
+const { isCustomStyle, isTrafficStyle, isIconAlways } = useWindowControls()
 
 const cssModule = useCssModule()
 
@@ -103,7 +103,9 @@ onBeforeUnmount(() => {
       }
     }
   }
-  .right-window-controls();
+  &.custom {
+    .right-window-controls();
+  }
 }
 
 </style>

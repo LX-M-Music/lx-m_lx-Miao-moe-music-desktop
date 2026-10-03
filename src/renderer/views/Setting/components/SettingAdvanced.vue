@@ -136,27 +136,36 @@ dd
 
 dd
   h3#advanced_window_controls {{ $t('setting__advanced_window_controls') }}
-  div.setting-options
+  .gap-top
     base-checkbox(
-      v-for="item in windowControlStyleList" :id="`setting_advanced_window_controls_${item.id}`" :key="item.id"
-      name="setting_advanced_window_controls" need :model-value="appSetting['ui.windowControlStyle']" :value="item.id"
-      :label="item.label" @update:model-value="updateSetting({'ui.windowControlStyle': $event})")
-  div.setting-options.gap-top
-    base-checkbox(
-      v-for="item in windowControlIconModeList" :id="`setting_advanced_window_controls_icon_${item.id}`" :key="item.id"
-      name="setting_advanced_window_controls_icon" need :model-value="appSetting['ui.windowControlsIconMode']" :value="item.id"
-      :label="item.label" @update:model-value="updateSetting({'ui.windowControlsIconMode': $event})")
-    svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_window_controls_icon_tip')")
-  //- 实时预览
-  div.gap-top.setting-preview-row
-    span.setting-label {{ $t('setting__advanced_window_controls_preview') }}
-    span.control-preview(:class="{ traffic: isTrafficStyle, 'icon-always': isIconAlways }")
-      span.pv-dot.pv-close
-        span.pv-icon ×
-      span.pv-dot.pv-min
-        span.pv-icon −
-      span.pv-dot.pv-max
-        span.pv-icon □
+      id="setting_advanced_window_controls_enabled"
+      :model-value="appSetting['ui.windowControlsEnabled']"
+      :label="$t('setting__advanced_window_controls_enabled')"
+      @update:model-value="updateSetting({ 'ui.windowControlsEnabled': $event })"
+    )
+    svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_window_controls_enabled_tip')")
+  common-setting-reveal(:show="isCustomStyle" depends="setting_advanced_window_controls_enabled")
+    div.setting-options.gap-top
+      base-checkbox(
+        v-for="item in windowControlStyleList" :id="`setting_advanced_window_controls_${item.id}`" :key="item.id"
+        name="setting_advanced_window_controls" need :model-value="appSetting['ui.windowControlStyle']" :value="item.id"
+        :label="item.label" @update:model-value="updateSetting({'ui.windowControlStyle': $event})")
+    div.setting-options.gap-top
+      base-checkbox(
+        v-for="item in windowControlIconModeList" :id="`setting_advanced_window_controls_icon_${item.id}`" :key="item.id"
+        name="setting_advanced_window_controls_icon" need :model-value="appSetting['ui.windowControlsIconMode']" :value="item.id"
+        :label="item.label" @update:model-value="updateSetting({'ui.windowControlsIconMode': $event})")
+      svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_window_controls_icon_tip')")
+    //- 实时预览
+    div.gap-top.setting-preview-row
+      span.setting-label {{ $t('setting__advanced_window_controls_preview') }}
+      span.control-preview(:class="{ traffic: isTrafficStyle, 'icon-always': isIconAlways }")
+        span.pv-dot.pv-close
+          span.pv-icon ×
+        span.pv-dot.pv-min
+          span.pv-icon −
+        span.pv-dot.pv-max
+          span.pv-icon □
 
 </template>
 
@@ -168,7 +177,7 @@ import { useWindowControls } from '@renderer/components/layout/useWindowControls
 export default {
   name: 'SettingAdvanced',
   setup() {
-    const { isTrafficStyle, isIconAlways } = useWindowControls()
+    const { isCustomStyle, isTrafficStyle, isIconAlways } = useWindowControls()
     const gaplessValue = ref(appSetting['player.gaplessPlayback'])
     let pendingSaves = 0
     let saveQueue = Promise.resolve()
@@ -203,6 +212,7 @@ export default {
       updateGapless,
       windowControlStyleList,
       windowControlIconModeList,
+      isCustomStyle,
       isTrafficStyle,
       isIconAlways,
     }

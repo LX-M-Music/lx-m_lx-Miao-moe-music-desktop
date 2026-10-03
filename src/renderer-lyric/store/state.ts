@@ -6,6 +6,7 @@ export const nativePointer = ref<MiniPlayerPointer>(null)
 export const setting = shallowReactive<LX.DesktopLyric.Config>({
   'desktopLyric.enable': false,
   'desktopLyric.showPlayer': true,
+  'desktopLyric.showBorder': false,
   'desktopLyric.singleLine': false,
   'desktopLyric.autoHideControls': false,
   'desktopLyric.isLock': false,

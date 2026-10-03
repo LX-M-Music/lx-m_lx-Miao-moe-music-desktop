@@ -3,6 +3,7 @@ declare namespace LX {
     interface Config {
       'desktopLyric.enable': LX.AppSetting['desktopLyric.enable']
       'desktopLyric.showPlayer': LX.AppSetting['desktopLyric.showPlayer']
+      'desktopLyric.showBorder': LX.AppSetting['desktopLyric.showBorder']
       'desktopLyric.singleLine': LX.AppSetting['desktopLyric.singleLine']
       'desktopLyric.autoHideControls': LX.AppSetting['desktopLyric.autoHideControls']
       'desktopLyric.isLock': LX.AppSetting['desktopLyric.isLock']

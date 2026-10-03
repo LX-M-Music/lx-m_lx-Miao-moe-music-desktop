@@ -32,11 +32,16 @@ const assertBetween = async(group, labels, maximized = false, middle = 'max') =>
 }
 
 test('window-control settings update all headers, preview and saved preferences', { timeout: 120000 }, async() => {
-  let fixture = await launch()
+  let fixture = await launch({ reducedMotion: 'reduce' })
   let { app, page } = fixture
   const profilePath = fixture.output
-  const output = path.resolve('output/playwright/window-control-settings', process.env.LX_TEST_ELECTRON ? 'compatible' : 'ordinary')
+  const output = path.resolve('output/playwright/window-control-style-toggle', process.env.LX_TEST_ELECTRON ? 'compatible' : 'ordinary')
   await fs.mkdir(output, { recursive: true })
+  const capture = async(group, filename) => {
+    const clip = await group.boundingBox()
+    assert.ok(clip && clip.width > 0 && clip.height > 0)
+    await page.screenshot({ path: path.join(output, filename), clip, animations: 'disabled' })
+  }
   const update = async values => {
     await page.evaluate(values => window.lxData.updateSetting(values), values)
     await page.waitForFunction(values => Object.entries(values).every(([key, value]) => window.lxData.appSetting[key] === value), values)
@@ -69,10 +74,11 @@ test('window-control settings update all headers, preview and saved preferences'
   })
   try {
     page.setDefaultTimeout(7000)
-    await update({ 'common.langId': 'zh-cn' })
+    await update({ 'common.langId': 'zh-cn', 'common.isAgreePact': true, 'common.showChangeLog': false })
     await route(page, '/setting?name=SettingAdvanced')
     await page.locator('[data-setting-tab="SettingAdvanced"]').click()
     const section = page.locator('#advanced_window_controls').locator('..')
+    assert.equal(await page.locator('#setting_advanced_window_controls_enabled').isChecked(), true)
     const filter = page.getByPlaceholder('搜索设置项', { exact: true })
     await filter.fill('窗口控制按钮')
     await page.locator('#advanced_window_controls').waitFor({ state: 'visible' })
@@ -87,7 +93,7 @@ test('window-control settings update all headers, preview and saved preferences'
         await page.waitForFunction(({ style, mode }) => window.lxData.appSetting['ui.windowControlStyle'] === style && window.lxData.appSetting['ui.windowControlsIconMode'] === mode, { style, mode })
         await park()
         await page.waitForFunction(visible => [...document.querySelectorAll('.control-preview .pv-icon')].every(icon => visible ? Number(getComputedStyle(icon).opacity) > 0.99 : Number(getComputedStyle(icon).opacity) < 0.01), mode === 'always')
-        await section.screenshot({ path: path.join(output, `settings-${style}-${mode}.png`) })
+        await capture(section, `settings-${style}-${mode}.png`)
         await section.locator('.control-preview').hover()
         await page.waitForFunction(() => [...document.querySelectorAll('.control-preview .pv-icon')].every(icon => Number(getComputedStyle(icon).opacity) > 0.99))
         for (const position of ['left', 'right']) {
@@ -111,7 +117,7 @@ test('window-control settings update all headers, preview and saved preferences'
               })
               return style === 'traffic' ? JSON.stringify(colors) === JSON.stringify(['rgb(254, 188, 46)', 'rgb(40, 200, 64)', 'rgb(255, 95, 87)']) : colors.every(color => color && color === colors[0] && color !== 'rgba(0, 0, 0, 0)')
             }, { selector, names, style })
-            await min.locator('..').screenshot({ path: path.join(output, `${style}-${mode}-${position}-${detail ? 'detail' : 'main'}.png`) })
+            await capture(min.locator('..'), `${style}-${mode}-${position}-${detail ? 'detail' : 'main'}.png`)
             await min.hover()
             await waitIcons(selector, names, true)
             await park()
@@ -127,25 +133,92 @@ test('window-control settings update all headers, preview and saved preferences'
       }
     }
     for (const locale of ['zh-tw', 'en-us', 'zh-cn']) {
-      const expected = require(`../src/lang/${locale}.json`).setting__advanced_window_controls_default
+      const messages = require(`../src/lang/${locale}.json`)
       await update({ 'common.langId': locale })
-      await page.waitForFunction(expected => document.querySelector('label[for="setting_advanced_window_controls_default"]').textContent.trim() === expected, expected)
+      await page.waitForFunction(messages =>
+        document.querySelector('label[for="setting_advanced_window_controls_default"]').textContent.trim() === messages.setting__advanced_window_controls_default &&
+        document.querySelector('label[for="setting_advanced_window_controls_enabled"]').textContent.trim() === messages.setting__advanced_window_controls_enabled, messages)
     }
     await page.locator('label[for="setting_advanced_window_controls_icon_hover"]').click()
     await page.waitForFunction(() => window.lxData.appSetting['ui.windowControlsIconMode'] === 'hover')
+
+    await page.locator('label[for="setting_advanced_window_controls_enabled"]').click()
+    await page.waitForFunction(() => window.lxData.appSetting['ui.windowControlsEnabled'] === false)
+    await page.locator('.control-preview').waitFor({ state: 'hidden' })
+    await capture(section, 'settings-disabled.png')
+    for (const position of ['left', 'right']) {
+      await update({ 'common.controlBtnPosition': position })
+      for (const detail of [false, true]) {
+        await showDetail(page, detail)
+        await settled(page)
+        const selector = detail ? '[data-player-detail] [data-detail-part="chrome"]' : position === 'left' ? '#left' : '#toolbar'
+        const min = page.locator(selector).getByRole('button', { name: labels.min, exact: true })
+        await park()
+        await waitIcons(selector, names, position === 'right')
+        const restoredHandle = await page.waitForFunction(({ selector, names, position }) => {
+          const scope = document.querySelector(selector)
+          const root = [...scope.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === names[0])?.parentElement
+          if (!root) return false
+          const probe = document.createElement('span')
+          root.appendChild(probe)
+          const backgrounds = ['var(--color-btn-min)', 'var(--color-btn-max, #e7aa36)', 'var(--color-btn-close)']
+          const buttons = names.map((name, index) => {
+            const button = [...root.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === name)
+            const dot = getComputedStyle(button, '::before')
+            const style = getComputedStyle(button)
+            probe.style.backgroundColor = backgrounds[index]
+            return {
+              noDot: dot.content === 'none' || dot.content === 'normal',
+              background: style.backgroundColor,
+              expected: position === 'left' ? getComputedStyle(probe).backgroundColor : 'rgba(0, 0, 0, 0)',
+              width: button.getBoundingClientRect().width,
+              height: button.getBoundingClientRect().height,
+            }
+          })
+          probe.remove()
+          return buttons.every(button => button.noDot && button.background === button.expected) && buttons
+        }, { selector, names, position })
+        const restored = await restoredHandle.jsonValue()
+        await restoredHandle.dispose()
+        for (const button of restored) {
+          assert.equal(button.noDot, true)
+          assert.equal(button.background, button.expected)
+          if (position === 'right') {
+            assert.equal(button.width, 46)
+            assert.equal(button.height, 30)
+          }
+        }
+        await capture(min.locator('..'), `disabled-${position}-${detail ? 'detail' : 'main'}.png`)
+        await min.hover()
+        await waitIcons(selector, names, true)
+      }
+      await showDetail(page, false)
+      await settled(page)
+    }
     await page.reload()
-    await page.waitForFunction(() => window.lxData?.appSetting?.['ui.windowControlStyle'] === 'traffic' && window.lxData.appSetting['ui.windowControlsIconMode'] === 'hover')
+    await page.waitForFunction(() => window.lxData?.appSetting?.['ui.windowControlsEnabled'] === false && window.lxData.appSetting['ui.windowControlStyle'] === 'traffic' && window.lxData.appSetting['ui.windowControlsIconMode'] === 'hover')
+    await park()
+    await waitIcons('#toolbar', names, true)
     assert.deepEqual(fixture.errors, [])
     await app.close()
-    fixture = await launch({ profilePath }); app = fixture.app; page = fixture.page
+    fixture = await launch({ profilePath, reducedMotion: 'reduce' }); app = fixture.app; page = fixture.page
     await route(page, '/setting?name=SettingAdvanced')
     await page.locator('[data-setting-tab="SettingAdvanced"]').click()
+    assert.equal(await page.locator('#setting_advanced_window_controls_enabled').isChecked(), false)
     assert.equal(await page.locator('#setting_advanced_window_controls_traffic').isChecked(), true)
     assert.equal(await page.locator('#setting_advanced_window_controls_icon_hover').isChecked(), true)
+    await page.locator('.control-preview').waitFor({ state: 'hidden' })
+    await park()
+    await waitIcons('#toolbar', names, true)
+    await page.locator('label[for="setting_advanced_window_controls_enabled"]').click()
+    await page.waitForFunction(() => window.lxData.appSetting['ui.windowControlsEnabled'] === true)
+    await page.locator('.control-preview').waitFor({ state: 'visible' })
     await park()
     await waitIcons('#toolbar', names, false)
+    await page.locator('.control-preview').scrollIntoViewIfNeeded()
+    await capture(page.locator('#advanced_window_controls').locator('..'), 'settings-reenabled.png')
     assert.deepEqual(fixture.errors, [])
-    await fs.writeFile(path.join(output, 'result.json'), JSON.stringify({ electron: await app.evaluate(() => process.versions.electron), combinations: 4, controlGroups: 4, persisted: true, errors: fixture.errors }, null, 2))
+    await fs.writeFile(path.join(output, 'result.json'), JSON.stringify({ electron: await app.evaluate(() => process.versions.electron), combinations: 4, controlGroups: 4, persisted: true, disabledControlGroups: 4, disabledPersisted: true, preferencesRestored: true, errors: fixture.errors }, null, 2))
   } finally {
     await app.close()
   }

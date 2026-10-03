@@ -51,19 +51,19 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
     return window
   }
   const button = async key => mini.getByRole('button', { name: await label(page, key), exact: true })
-  const pointerInside = async inside => {
+  const pointerInside = async(inside, atHeader = false) => {
     const window = await app.browserWindow(mini)
     try {
       const bounds = await window.evaluate(window => window.getContentBounds())
-      await app.evaluate((_, { inside, bounds }) => {
-        const point = inside ? { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 } : { x: -10000, y: -10000 }
+      await app.evaluate((_, { inside, atHeader, bounds }) => {
+        const point = inside ? { x: bounds.x + (atHeader ? 80 : bounds.width / 2), y: bounds.y + (atHeader ? 20 : bounds.height / 2) } : { x: -10000, y: -10000 }
         global.__miniPointer = point
         if (global.__miniLockPoint) global.__miniLockPoint = point
-      }, { inside, bounds })
+      }, { inside, atHeader, bounds })
     } finally { await window.dispose() }
   }
   const options = async() => {
-    await pointerInside(true)
+    await pointerInside(true, true)
     await mini.mouse.move(80, 20)
     await (await button('mini_player__options')).click()
     await mini.locator('#mini-options').waitFor()
@@ -116,6 +116,51 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
       assert.notEqual(await mini.locator('[data-mini-lyrics]').evaluate(el => getComputedStyle(el).webkitMaskImage), 'none', 'lyric edge fading works on Chromium 108 too')
       await lyricCentered()
       await mini.screenshot({ path: path.join(profilePath, 'mini-player.png') })
+    })
+
+    await t.test('border defaults off and both settings surfaces synchronize in opaque and transparent windows', async() => {
+      assert.equal(await page.evaluate(() => window.lxData.appSetting['desktopLyric.showBorder']), false)
+      assert.equal(await mini.locator('#container').evaluate(el => getComputedStyle(el, '::after').opacity), '0')
+      await route(page, '/setting')
+      await page.locator('[data-setting-tab="SettingDesktopLyric"]').click()
+      const mainBorder = page.locator('#setting_mini_player_show_border')
+      await mainBorder.waitFor({ state: 'attached' })
+      assert.equal(await mainBorder.isChecked(), false)
+      await page.locator('label[for="setting_mini_player_show_border"]').scrollIntoViewIfNeeded()
+      await page.screenshot({ path: path.join(profilePath, 'mini-player-border-settings.png') })
+      const lyricsBefore = await mini.locator('[data-mini-lyrics]').boundingBox()
+      await options()
+      const localBorder = mini.getByLabel(await label(page, 'setting__desktop_lyric_show_border'), { exact: true })
+      assert.equal(await localBorder.isChecked(), false)
+      await localBorder.check()
+      await page.waitForFunction(() => window.lxData.appSetting['desktopLyric.showBorder'] && document.querySelector('#setting_mini_player_show_border').checked)
+      await mini.locator('#mini-options').evaluate(el => { el.scrollTop = 0 })
+      await mini.screenshot({ path: path.join(profilePath, 'mini-player-border-options.png') })
+      await closeOptions()
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '1')
+      assert.deepEqual(await mini.locator('[data-mini-lyrics]').boundingBox(), lyricsBefore, 'the border must not change lyric layout')
+      assert.equal(await mini.locator('#container').evaluate(el => getComputedStyle(el, '::after').pointerEvents), 'none')
+      if (process.platform === 'win32') assert.equal(await nativeHitTest(app, mini, '.mini-window-buttons button'), 1, 'the enabled border must not intercept window controls')
+      await mini.screenshot({ path: path.join(profilePath, 'mini-player-border-opaque.png') })
+      await update(page, { 'desktopLyric.style.backgroundOpacity': 0 })
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#background')).opacity === '0' && getComputedStyle(document.querySelector('#container'), '::after').opacity === '1')
+      await mini.screenshot({ path: path.join(profilePath, 'mini-player-border-transparent.png'), omitBackground: true })
+      await page.locator('label[for="setting_mini_player_show_border"]').click()
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '0')
+      await options()
+      assert.equal(await localBorder.isChecked(), false)
+      assert.equal(await mini.locator('#container').evaluate(el => getComputedStyle(el, '::after').opacity), '0', 'hover must not show a disabled border')
+      await closeOptions()
+      await page.locator('label[for="setting_mini_player_show_border"]').click()
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '1')
+      await options()
+      assert.equal(await localBorder.isChecked(), true)
+      await localBorder.uncheck()
+      await page.waitForFunction(() => !window.lxData.appSetting['desktopLyric.showBorder'] && !document.querySelector('#setting_mini_player_show_border').checked)
+      await closeOptions()
+      await update(page, { 'desktopLyric.style.backgroundOpacity': 92 })
+      await route(page, '/list?id=love')
+      await settled(page)
     })
 
     await t.test('pause and play affect audio without hiding the player', async() => {
@@ -182,17 +227,16 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
           return opacity
         })
         assert(effectiveOpacity >= 0.65, 'paused text must remain readable outside the window')
-        assert.equal(await mini.locator('[data-mini-recovery]').evaluate(el => getComputedStyle(el).opacity), '0')
+        assert.equal(await mini.locator('[data-mini-recovery]').count(), 0)
+        assert.equal(await (await button('mini_player__options')).evaluate(el => !!el.closest('.mini-header')), true)
         await mini.screenshot({ path: path.join(profilePath, `mini-player-outside-${direction}.png`), omitBackground: true })
         await page.locator('#player').getByRole('button', { name: await label(page, 'player__play'), exact: true }).click()
         await mini.waitForFunction(() => !document.querySelector('[data-mini-lyrics]').classList.contains('paused') && getComputedStyle(document.querySelector('[data-mini-lyrics]')).opacity === '1')
         assert.equal(await mini.locator('#container').evaluate(el => getComputedStyle(el).opacity), '1')
         await page.locator('#player').getByRole('button', { name: await label(page, 'player__pause'), exact: true }).click()
       }
-      await pointerInside(true)
-      await mini.locator('[data-mini-recovery]').click()
-      await mini.locator('#mini-options').waitFor()
-      assert(await mini.evaluate(() => document.querySelector('.mini-window-buttons').getBoundingClientRect().right < document.querySelector('[data-mini-recovery]').getBoundingClientRect().left), 'the corner button must not overlap the close button')
+      await options()
+      assert.equal(await (await button('mini_player__options')).evaluate(el => !!el.closest('.mini-window-buttons')), true, 'the settings entry stays with the other title-bar buttons')
       for (const key of ['mini_player__lyrics_only', 'mini_player__hide_controls', 'mini_player__transparent']) await mini.getByLabel(await label(page, key), { exact: true }).uncheck()
       await closeOptions()
       await update(page, { 'desktopLyric.direction': 'horizontal', 'desktopLyric.isHoverHide': false })
@@ -236,10 +280,8 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
       await closeOptions()
       await mini.locator('[data-mini-lyrics]').hover()
       await headerIs(false)
-      // The lyrics-only options button is deliberately unavailable outside.
-      // Bring the system pointer inside before exercising its keyboard access.
-      await pointerInside(true)
-      await mini.waitForFunction(() => document.querySelector('[data-mini-recovery]').classList.contains('native-window-hover'))
+      // Keyboard focus reveals the title bar and its settings entry together.
+      await pointerInside(false)
       await mini.keyboard.press('Tab')
       await headerIs(true)
       await (await button('mini_player__options')).focus()
@@ -597,19 +639,27 @@ test('mini player replaces desktop lyrics and controls the real player in a sepa
       await options()
       await mini.getByLabel(await label(page, 'mini_player__transparent'), { exact: true }).check()
       await mini.getByLabel(await label(page, 'mini_player__hide_controls'), { exact: true }).check()
+      await mini.getByLabel(await label(page, 'setting__desktop_lyric_show_border'), { exact: true }).check()
       await closeOptions()
-      await page.waitForFunction(() => window.lxData.appSetting['desktopLyric.autoHideControls'] && window.lxData.appSetting['desktopLyric.style.backgroundOpacity'] === 0)
+      await page.waitForFunction(() => window.lxData.appSetting['desktopLyric.autoHideControls'] && window.lxData.appSetting['desktopLyric.style.backgroundOpacity'] === 0 && window.lxData.appSetting['desktopLyric.showBorder'])
       await route(page, '/setting')
       await page.locator('[data-setting-tab="SettingDesktopLyric"]').click()
       await page.locator('#setting_mini_player_show_player').waitFor({ state: 'attached' })
       assert.match(await page.locator('#desktop_lyric').textContent(), /迷你播放器/)
+      assert.equal(await page.locator('#setting_mini_player_show_border').isChecked(), true)
       assert.deepEqual(fixture.errors, [])
       await app.close()
       fixture = await launch({ profilePath, rendererPath: path.resolve('dist/index.html') })
       app = fixture.app; page = fixture.page
       mini = await getMini()
-      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#background')).opacity === '0' && document.querySelector('.mini-player').classList.contains('auto-hide-controls'))
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#background')).opacity === '0' && document.querySelector('.mini-player').classList.contains('auto-hide-controls') && getComputedStyle(document.querySelector('#container'), '::after').opacity === '1')
       assert.equal(await mini.locator('[data-mini-track]').count(), 1)
+      assert.equal(await page.evaluate(() => window.lxData.appSetting['desktopLyric.showBorder']), true)
+      await mini.screenshot({ path: path.join(profilePath, 'mini-player-border-restart.png'), omitBackground: true })
+      await route(page, '/setting')
+      await page.locator('[data-setting-tab="SettingDesktopLyric"]').click()
+      await page.locator('label[for="setting_mini_player_show_border"]').click()
+      await mini.waitForFunction(() => getComputedStyle(document.querySelector('#container'), '::after').opacity === '0')
     })
     assert.deepEqual(errors, [])
     assert.deepEqual(fixture.errors, [])
