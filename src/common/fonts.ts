@@ -36,6 +36,13 @@ export const makeFontStack = (primary: string, fallback: string) => {
   return [...new Set([primary || 'system-ui', fallback].filter(Boolean))].map(quoteFontFamily).join(', ')
 }
 
+export const getLyricDetailFontFamily = (value: string, enabled: boolean | undefined) => {
+  // Hosts without the independent detail switch retain their original font stack.
+  if (enabled === undefined) return value
+  const [, secondary] = fontChoices(value)
+  return enabled && secondary ? quoteFontFamily(secondary) : ''
+}
+
 export const fontError = (code: string, message: string) => Object.assign(new Error(message), { code })
 export const identifyFont = (data: Uint8Array): CustomFont['format'] => {
   if (!data.length || data.length > MAX_FONT_BYTES) throw fontError('FONT_SIZE_LIMIT', '字体文件为空或超过 32 MB，请选择较小的字体文件。')

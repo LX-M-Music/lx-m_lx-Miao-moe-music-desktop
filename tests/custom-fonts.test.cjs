@@ -4,7 +4,7 @@ const path = require('node:path')
 const os = require('node:os')
 const { test } = require('node:test')
 const load = require('./helpers/load-typescript.cjs')()
-const { parseFontStack, makeFontStack, fontChoices, MAX_FONT_BYTES } = load('src/common/fonts.ts')
+const { parseFontStack, makeFontStack, fontChoices, getLyricDetailFontFamily, MAX_FONT_BYTES } = load('src/common/fonts.ts')
 const { FontLibrary } = load('src/main/utils/customFonts.ts')
 
 test('font names round-trip commas, quotes, escapes and generic families', () => {
@@ -14,6 +14,15 @@ test('font names round-trip commas, quotes, escapes and generic families', () =>
   assert.deepEqual(parseFontStack('"Microsoft YaHei", "Segoe UI"'), ['Microsoft YaHei', 'Segoe UI'])
   assert.equal(makeFontStack('Same', 'Same'), '"Same"')
   assert.equal(makeFontStack('', 'serif'), 'system-ui, serif')
+})
+
+test('lyric details isolate secondary families and preserve hosts without a detail switch', () => {
+  const stack = makeFontStack('Primary Font', 'Secondary, "quoted" Font')
+  assert.deepEqual(parseFontStack(getLyricDetailFontFamily(stack, true)), ['Secondary, "quoted" Font'])
+  assert.equal(getLyricDetailFontFamily(stack, false), '')
+  assert.equal(getLyricDetailFontFamily(makeFontStack('Primary Font', ''), true), '')
+  assert.equal(getLyricDetailFontFamily(makeFontStack('', 'serif'), true), 'serif')
+  assert.equal(getLyricDetailFontFamily(stack, undefined), stack)
 })
 
 test('imported fonts are copied, deduplicated and remain readable after restart', async t => {

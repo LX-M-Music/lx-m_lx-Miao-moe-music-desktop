@@ -1,6 +1,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from '@common/utils/vueTools'
 import { appSetting } from '@renderer/store/setting'
-import { parseFontStack } from '@common/fonts'
+import { getLyricDetailFontFamily, parseFontStack } from '@common/fonts'
 import { HOTKEY_COMMON } from '@common/hotKey'
 import { musicInfo, isPlay, isShowPlayerDetail } from '@renderer/store/player/state'
 import { lyric } from '@renderer/store/player/lyric'
@@ -25,8 +25,7 @@ export default (element: Ref<HTMLIFrameElement | null>, preview: boolean) => {
   let disposed = false
   let buffering = false
   const audio = getAudioElement()
-  // Older hosts do not have the detail font setting yet; keep their selected font.
-  const fontFamily = computed(() => (appSetting as Partial<LX.AppSetting>)['playDetail.useAppFont'] === false ? '' : appSetting['common.font'])
+  const fontFamily = computed(() => getLyricDetailFontFamily(appSetting['common.font'], (appSetting as Partial<LX.AppSetting>)['playDetail.useAppFont']))
   const fontFamilies = computed(() => parseFontStack(fontFamily.value))
   const demoStart = performance.now()
   const offset = () => (lyric.offset + lyric.tempOffset) / 1000
