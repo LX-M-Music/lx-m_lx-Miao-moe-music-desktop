@@ -1,6 +1,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } from '@common/utils/vueTools'
 import { appSetting } from '@renderer/store/setting'
 import { parseFontStack } from '@common/fonts'
+import { HOTKEY_COMMON } from '@common/hotKey'
 import { musicInfo, isPlay, isShowPlayerDetail } from '@renderer/store/player/state'
 import { lyric } from '@renderer/store/player/lyric'
 import { playProgress } from '@renderer/store/player/playProgress'
@@ -24,13 +25,19 @@ export default (element: Ref<HTMLIFrameElement | null>, preview: boolean) => {
   let disposed = false
   let buffering = false
   const audio = getAudioElement()
-  const fontFamilies = computed(() => parseFontStack(appSetting['common.font']))
+  // Older hosts do not have the detail font setting yet; keep their selected font.
+  const fontFamily = computed(() => (appSetting as Partial<LX.AppSetting>)['playDetail.useAppFont'] === false ? '' : appSetting['common.font'])
+  const fontFamilies = computed(() => parseFontStack(fontFamily.value))
   const demoStart = performance.now()
   const offset = () => (lyric.offset + lyric.tempOffset) / 1000
   const send = (type: string, data: unknown) => {
     if (ready.value && !disposed) element.value?.contentWindow?.postMessage({ channel: FOLIA_CHANNEL, type, data }, '*')
   }
   const stateSender = createStageStateSender(send)
+  const toggleFullscreen = () => {
+    if (preview || disposed || !isShowPlayerDetail.value) return
+    window.key_event.emit(HOTKEY_COMMON.fullscreen_toggle.action)
+  }
   const fail = () => {
     failed.value = true
     ready.value = false
@@ -62,7 +69,7 @@ export default (element: Ref<HTMLIFrameElement | null>, preview: boolean) => {
     const config: FoliaConfig = {
       mode: preferences.mode,
       language: window.i18n.locale,
-      fontFamily: appSetting['common.font'],
+      fontFamily: fontFamily.value,
       fontFamilies: fontFamilies.value,
       fontScale: Math.max(0.5, Math.min(2, appSetting['playDetail.style.fontSize'] / 140)),
       reducedMotion: document.documentElement.dataset.motionEnabled === 'false',
@@ -121,6 +128,8 @@ export default (element: Ref<HTMLIFrameElement | null>, preview: boolean) => {
       syncState()
       restartClock()
     } else if (event.data.type === 'error') fail()
+    else if (event.data.type === 'toggle-fullscreen') toggleFullscreen()
+    else if (event.data.type === 'exit-fullscreen' && document.documentElement.classList.contains('fullscreen')) toggleFullscreen()
     else if (event.data.type === 'seek' && !preview && Number.isFinite(event.data.data)) {
       window.app_event.setProgress(Math.max(0, Math.min(playProgress.maxPlayTime, event.data.data - offset())))
     }
@@ -131,7 +140,7 @@ export default (element: Ref<HTMLIFrameElement | null>, preview: boolean) => {
     restartClock()
   }
   const audioEvents = ['playing', 'canplay', 'pause', 'ended', 'waiting', 'stalled', 'seeking', 'seeked', 'ratechange', 'timeupdate']
-  watch([() => lyric.lines, () => musicInfo.id, () => musicInfo.name, () => musicInfo.singer, () => musicInfo.album, () => musicInfo.lrc, () => musicInfo.lxlrc, () => musicInfo.tlrc, () => musicInfo.rlrc, () => musicInfo.pic, () => preferences.mode, () => appSetting['common.langId'], () => appSetting['common.font'], () => appSetting['playDetail.style.fontSize'], () => playProgress.maxPlayTime], syncState, { flush: 'post' })
+  watch([() => lyric.lines, () => musicInfo.id, () => musicInfo.name, () => musicInfo.singer, () => musicInfo.album, () => musicInfo.lrc, () => musicInfo.lxlrc, () => musicInfo.tlrc, () => musicInfo.rlrc, () => musicInfo.pic, () => preferences.mode, () => appSetting['common.langId'], fontFamily, () => appSetting['playDetail.style.fontSize'], () => playProgress.maxPlayTime], syncState, { flush: 'post' })
   watch([isPlay, () => lyric.offset, () => lyric.tempOffset, isShowPlayerDetail], restartClock, { flush: 'post' })
   watch(element, value => {
     ready.value = false
@@ -157,5 +166,5 @@ export default (element: Ref<HTMLIFrameElement | null>, preview: boolean) => {
     for (const event of audioEvents) audio.removeEventListener(event, audioEvent)
     analyser?.dispose()
   })
-  return { ready, failed, retry: () => { failed.value = false; void nextTick(syncState) } }
+  return { ready, failed, toggleFullscreen, retry: () => { failed.value = false; void nextTick(syncState) } }
 }

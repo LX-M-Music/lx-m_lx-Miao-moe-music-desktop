@@ -2,7 +2,7 @@
   "format": "lx-m-plugin-source",
   "formatVersion": 1,
   "id": "folia-lyrics",
-  "version": "1.2.4",
+  "version": "1.2.8",
   "apiVersion": 2,
   "entry": "src/index.ts",
   "browser": {

@@ -14,7 +14,6 @@ const previews = reactive({ spectrum: 0, wave: 0, radial: 0 })
 const needed = (radial: boolean) => {
   const matches = (style: VisualizerStyle) => (style === 'radial') === radial
   return (radial ? previews.radial > 0 : previews.spectrum + previews.wave > 0) ||
-    (appSetting['player.audioVisualization'] && matches(preferences.main)) ||
     (appSetting['desktopLyric.enable'] && appSetting['desktopLyric.audioVisualization'] && matches(preferences.desktop))
 }
 const release = () => {

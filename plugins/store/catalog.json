@@ -29,16 +29,16 @@
     },
     {
       "id": "audio-visualizer",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "apiVersion": 1,
-      "path": "audio-visualizer/1.2.1/f8ac0c0caca262e14f0c62b48efda8eb8d251d23c6f771a7366fa3dafc5ce27c.zip",
-      "bytes": 127185,
-      "sha256": "f8ac0c0caca262e14f0c62b48efda8eb8d251d23c6f771a7366fa3dafc5ce27c",
+      "path": "audio-visualizer/1.2.2/454321813849432b73bae2975df748b0bdf5c8d290a0c981316d2da565a20ea8.zip",
+      "bytes": 126723,
+      "sha256": "454321813849432b73bae2975df748b0bdf5c8d290a0c981316d2da565a20ea8",
       "packages": {
         "lxplugin": {
-          "path": "audio-visualizer/1.2.1/d129b4ccc353bc3ca8507677291ac1af114c1a07c9e47bcdd0b97eb9a853da4c.lxplugin",
-          "bytes": 128377,
-          "sha256": "d129b4ccc353bc3ca8507677291ac1af114c1a07c9e47bcdd0b97eb9a853da4c"
+          "path": "audio-visualizer/1.2.2/dc0f3610d101fe8f183380cc7185e9c80758dbf904410f22ae8a9f24cbd0852f.lxplugin",
+          "bytes": 123559,
+          "sha256": "dc0f3610d101fe8f183380cc7185e9c80758dbf904410f22ae8a9f24cbd0852f"
         }
       },
       "name": {
@@ -47,24 +47,24 @@
         "en-us": "Audio Visualizer"
       },
       "description": {
-        "zh-cn": "为播放详情页和桌面歌词添加随音乐变化的频谱，可分别开关。",
-        "zh-tw": "為播放詳細頁與桌面歌詞加入隨音樂變化的頻譜，可分別開關。",
-        "en-us": "Music spectrum for player details and desktop lyrics, with separate display switches."
+        "zh-cn": "为桌面歌词添加随音乐变化的频谱，支持经典频谱、柔波曲线和环形频谱。",
+        "zh-tw": "為桌面歌詞加入隨音樂變化的頻譜，支援經典頻譜、柔波曲線與環形頻譜。",
+        "en-us": "Audio visualization for desktop lyrics with classic spectrum, flowing waves and radial spectrum styles."
       },
       "icon": "#icon-audio-wave"
     },
     {
       "id": "folia-lyrics",
-      "version": "1.2.4",
+      "version": "1.2.8",
       "apiVersion": 2,
-      "path": "folia-lyrics/1.2.4/c91fda34848a38103331b51261baeb506c02f1f1f65667c8543cddcd51d941c3.zip",
-      "bytes": 28494783,
-      "sha256": "c91fda34848a38103331b51261baeb506c02f1f1f65667c8543cddcd51d941c3",
+      "path": "folia-lyrics/1.2.8/2fef24d71de86ffc1daca9fc5c4a67a8850cf18826edb3ef7105f5981f75e120.zip",
+      "bytes": 28497860,
+      "sha256": "2fef24d71de86ffc1daca9fc5c4a67a8850cf18826edb3ef7105f5981f75e120",
       "packages": {
         "lxplugin": {
-          "path": "folia-lyrics/1.2.4/5b9cd738ce15326bb2ad12d749e847d6bcaaa31c8bcdd44113dffd6040c46a38.lxplugin",
-          "bytes": 10473209,
-          "sha256": "5b9cd738ce15326bb2ad12d749e847d6bcaaa31c8bcdd44113dffd6040c46a38"
+          "path": "folia-lyrics/1.2.8/b9d74bfdfae48b0bd9e4052e68c5e7ef15e638ba3e716f58d31da9f6c0f43bd3.lxplugin",
+          "bytes": 10434180,
+          "sha256": "b9d74bfdfae48b0bd9e4052e68c5e7ef15e638ba3e716f58d31da9f6c0f43bd3"
         }
       },
       "name": {
@@ -73,9 +73,9 @@
         "en-us": "Folia Lyrics"
       },
       "description": {
-        "zh-cn": "13 种 Folia 歌词动效铺满播放页，鼠标靠近时显示控制栏，支持逐字动效、样式预览与独立开关。",
-        "zh-tw": "13 種 Folia 歌詞動效鋪滿播放頁，滑鼠靠近時顯示控制列，支援逐字動效、樣式預覽與獨立開關。",
-        "en-us": "Fill the player with 13 Folia lyric styles and controls that appear as the pointer approaches, with word animations, previews and a separate toggle."
+        "zh-cn": "13 种 Folia 歌词动效铺满播放页，双击歌词切换全屏，鼠标靠近时显示控制栏，支持逐字动效、样式预览与独立开关。",
+        "zh-tw": "13 種 Folia 歌詞動效鋪滿播放頁，雙擊歌詞切換全螢幕，滑鼠靠近時顯示控制列，支援逐字動效、樣式預覽與獨立開關。",
+        "en-us": "Fill the player with 13 Folia lyric styles, double-click lyrics to toggle fullscreen, and reveal controls as the pointer approaches, with word animations, previews and a separate toggle."
       },
       "icon": "#icon-lyric"
     },

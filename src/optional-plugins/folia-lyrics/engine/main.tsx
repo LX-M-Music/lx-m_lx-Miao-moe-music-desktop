@@ -4,8 +4,9 @@ import { createRoot } from 'react-dom/client'
 import { MotionConfig, motionValue } from 'framer-motion'
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
-import { FOLIA_CHANNEL, type FoliaConfig, type FoliaFrame, type FoliaSong } from '../protocol'
+import { FOLIA_CHANNEL, FOLIA_INTERACTIVE_TARGETS, type FoliaConfig, type FoliaFrame, type FoliaSong } from '../protocol'
 import { getLineRenderEndTime } from './vendor/src/utils/lyrics/renderHints'
+import { DEFAULT_MONET_TUNING } from './vendor/src/types'
 import { playerBottomInset } from './adapters/bottomBar'
 import './styles.css'
 
@@ -35,6 +36,7 @@ const audioBands = { bass: motionValue(0), lowMid: motionValue(0), mid: motionVa
 const send = (type: string, data?: unknown) => parent.postMessage({ channel: FOLIA_CHANNEL, type, data }, '*')
 const seek = (time: number) => send('seek', time)
 const theme = { name: 'LX-M Folia', backgroundColor: '#111b2c', primaryColor: '#f5f7fb', secondaryColor: '#a9bed0', accentColor: '#74dab5', fontStyle: 'sans' as const, animationIntensity: 'normal' as const }
+const monetTuning = { ...DEFAULT_MONET_TUNING, showAudioVisualization: false }
 let webGLAvailable: boolean | undefined
 function hasWebGL() {
   if (webGLAvailable === undefined) {
@@ -118,9 +120,25 @@ function App() {
         if (data.playing) frameId = requestAnimationFrame(tick)
       }
     }
+    const doubleClick = (event: MouseEvent) => {
+      if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest(FOLIA_INTERACTIVE_TARGETS)) return
+      event.preventDefault()
+      send('toggle-fullscreen')
+    }
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.repeat || !(event.target instanceof Element) || event.target.closest(FOLIA_INTERACTIVE_TARGETS)) return
+      send('exit-fullscreen')
+    }
     window.addEventListener('message', receive)
+    window.addEventListener('dblclick', doubleClick, true)
+    window.addEventListener('keydown', keyDown)
     send('ready')
-    return () => { window.removeEventListener('message', receive); cancelAnimationFrame(frameId) }
+    return () => {
+      window.removeEventListener('message', receive)
+      window.removeEventListener('dblclick', doubleClick, true)
+      window.removeEventListener('keydown', keyDown)
+      cancelAnimationFrame(frameId)
+    }
   }, [])
   if (!state) return null
   const { song, config } = state
@@ -136,6 +154,7 @@ function App() {
           audioPower={audioPower} audioBands={audioBands} showText paused={!playing} staticMode={config.reducedMotion}
           songTitle={song.title} songArtist={song.artist} songAlbum={song.album} coverUrl={song.coverUrl || undefined} seed={song.id}
           lyricsFontScale={config.fontScale} isPlayerChromeHidden showSubtitleTranslation
+          monetTuning={monetTuning}
           onLyricLineSeek={seek} />
       </Suspense>
     </RenderBoundary>

@@ -5,9 +5,9 @@
     "en-us": "Audio Visualizer"
   },
   "description": {
-    "zh-cn": "为播放详情页和桌面歌词添加随音乐变化的频谱，可分别开关。",
-    "zh-tw": "為播放詳細頁與桌面歌詞加入隨音樂變化的頻譜，可分別開關。",
-    "en-us": "Music spectrum for player details and desktop lyrics, with separate display switches."
+    "zh-cn": "为桌面歌词添加随音乐变化的频谱，支持经典频谱、柔波曲线和环形频谱。",
+    "zh-tw": "為桌面歌詞加入隨音樂變化的頻譜，支援經典頻譜、柔波曲線與環形頻譜。",
+    "en-us": "Audio visualization for desktop lyrics with classic spectrum, flowing waves and radial spectrum styles."
   },
   "icon": "#icon-audio-wave"
 }

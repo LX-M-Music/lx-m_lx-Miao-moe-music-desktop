@@ -1,20 +1,18 @@
 <template>
   <div :class="$style.picker" data-visualizer-picker>
     <div :class="$style.toolbar">
-      <div :class="$style.tabs" role="tablist" :aria-label="text.title">
-        <button v-for="target in ['main', 'desktop']" :key="target" type="button" role="tab" :aria-selected="surface === target" :tabindex="surface === target ? 0 : -1" :data-visualizer-surface="target" :disabled="pending" @click="surface = target" @keydown="handleTabKey">{{ text[target] }}</button>
-      </div>
+      <span :class="$style.target" data-visualizer-surface="desktop">{{ text.desktop }}</span>
       <base-checkbox :id="`${instanceId}_enabled`" :model-value="enabled" :label="text.enabled" :disabled="pending" @update:model-value="toggleEnabled" />
     </div>
     <div :class="$style.preview">
-      <Preview :kind="preferences[surface]" live />
-      <div :class="$style.previewLabel"><strong>{{ text.styles[preferences[surface]][0] }}</strong><span>{{ isPlay ? text.live : text.demo }}</span></div>
+      <Preview :kind="preferences.desktop" live />
+      <div :class="$style.previewLabel"><strong>{{ text.styles[preferences.desktop][0] }}</strong><span>{{ isPlay ? text.live : text.demo }}</span></div>
     </div>
     <div :class="$style.grid" role="radiogroup" :aria-label="text.title" @keydown.left.stop @keydown.right.stop @keydown.up.stop @keydown.down.stop @keydown.space.stop>
-      <label v-for="kind in STYLE_IDS" :key="kind" :class="[$style.card, { [$style.selected]: preferences[surface] === kind }]" :data-visualizer-option="kind">
-        <input :name="`${instanceId}_${surface}`" type="radio" :value="kind" :checked="preferences[surface] === kind" :disabled="pending || !preferencesReady" :aria-label="text.styles[kind][0]" @change="select(kind)" @click="preferences[surface] === kind && !enabled && select(kind)">
+      <label v-for="kind in STYLE_IDS" :key="kind" :class="[$style.card, { [$style.selected]: preferences.desktop === kind }]" :data-visualizer-option="kind">
+        <input :name="`${instanceId}_desktop`" type="radio" :value="kind" :checked="preferences.desktop === kind" :disabled="pending || !preferencesReady" :aria-label="text.styles[kind][0]" @change="select(kind)" @click="preferences.desktop === kind && !enabled && select(kind)">
         <div :class="$style.thumbnail"><Preview :kind="kind" /></div>
-        <span :class="$style.name">{{ text.styles[kind][0] }}<svg v-if="preferences[surface] === kind" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg></span>
+        <span :class="$style.name">{{ text.styles[kind][0] }}<svg v-if="preferences.desktop === kind" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg></span>
         <span :class="$style.description">{{ text.styles[kind][1] }}</span>
       </label>
     </div>
@@ -35,23 +33,14 @@ import Preview from './Preview.vue'
 
 const text = useLabels()
 const instanceId = `visualizer_${Math.random().toString(36).slice(2)}`
-const surface = ref('main')
 const pending = ref(false)
 const operationError = ref(false)
-const enabledKey = computed(() => surface.value === 'main' ? 'player.audioVisualization' : 'desktopLyric.audioVisualization')
-const enabled = computed(() => appSetting[enabledKey.value])
-const handleTabKey = (event) => {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-  event.preventDefault()
-  event.stopPropagation()
-  surface.value = event.key === 'Home' ? 'main' : event.key === 'End' ? 'desktop' : surface.value === 'main' ? 'desktop' : 'main'
-  event.currentTarget.parentElement.querySelector(`[data-visualizer-surface="${surface.value}"]`)?.focus()
-}
+const enabled = computed(() => appSetting['desktopLyric.audioVisualization'])
 const toggleEnabled = async(value) => {
   if (pending.value) return
   pending.value = true
   operationError.value = false
-  try { await setVisualization(enabledKey.value, value) } catch (error) {
+  try { await setVisualization('desktopLyric.audioVisualization', value) } catch (error) {
     operationError.value = true
     console.error('Visualizer setting failed:', error)
   } finally { pending.value = false }
@@ -60,9 +49,8 @@ const select = async(kind) => {
   if (pending.value || !preferencesReady.value) return
   pending.value = true
   operationError.value = false
-  const target = surface.value
   try {
-    if (await setVisualization(enabledKey.value, true)) saveStyle(target, kind)
+    if (await setVisualization('desktopLyric.audioVisualization', true)) saveStyle('desktop', kind)
   } catch (error) {
     operationError.value = true
     console.error('Visualizer setting failed:', error)
@@ -73,10 +61,7 @@ const select = async(kind) => {
 <style lang="less" module>
 .picker { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 12px; }
-.tabs { display: flex; padding: 3px; border-radius: var(--radius-md); background: var(--color-primary-alpha-900); }
-.tabs button { cursor: pointer; border: none; border-radius: var(--radius-sm); padding: 7px 12px; color: var(--color-font); background: transparent; }
-.tabs button[aria-selected="true"] { color: var(--color-primary); background: var(--color-surface-elevated); box-shadow: 0 1px 4px #0001; }
-.tabs button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.target { color: var(--color-font); font-weight: 600; }
 .preview { position: relative; height: 156px; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--color-primary-alpha-800); background: linear-gradient(135deg, var(--color-primary-alpha-900), transparent); }
 .previewLabel { position: absolute; top: 12px; left: 14px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
 .previewLabel strong { font-size: 13px; color: var(--color-font); }

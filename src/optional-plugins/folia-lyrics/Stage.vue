@@ -1,5 +1,5 @@
 <template>
-  <div :class="$style.stage" :data-folia-stage="preview ? 'preview' : 'player'">
+  <div :class="$style.stage" :data-folia-stage="preview ? 'preview' : 'player'" @dblclick="handleDoubleClick">
     <template v-if="!preview">
       <div :class="$style.topReveal" aria-hidden="true" />
       <div :class="$style.bottomReveal" aria-hidden="true" />
@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from '@common/utils/vueTools'
 import { isShowPlayerDetail } from '@renderer/store/player/state'
-import { FOLIA_MODES, type FoliaMode } from './protocol'
+import { FOLIA_INTERACTIVE_TARGETS, FOLIA_MODES, type FoliaMode } from './protocol'
 import { engineUrl, preferences, preferencesError, savePreferences } from './preferences'
 import { useLabels } from './labels'
 import useStage from './useStage'
@@ -41,7 +41,11 @@ const labels = useLabels()
 const element = ref<HTMLIFrameElement | null>(null)
 const dragReady = ref(false)
 onMounted(() => { dragReady.value = true })
-const { failed, retry } = useStage(element, props.preview)
+const { failed, retry, toggleFullscreen } = useStage(element, props.preview)
+const handleDoubleClick = (event: MouseEvent) => {
+  if (event.button !== 0 || !(event.target instanceof Element) || event.target.closest(FOLIA_INTERACTIVE_TARGETS)) return
+  toggleFullscreen()
+}
 const selectMode = (event: Event) => { savePreferences({ mode: (event.target as HTMLSelectElement).value as FoliaMode, enabled: true }) }
 </script>
 
@@ -54,7 +58,9 @@ const selectMode = (event: Event) => { savePreferences({ mode: (event.target as 
 .toolbar select, .toolbar button, .error button { color: var(--color-font); background: var(--color-primary-background); border: 1px solid var(--color-border); border-radius: 6px; padding: 5px 9px; font: inherit; cursor: pointer; }
 .toolbar option { color: var(--color-font); background: var(--color-primary-background); }
 .surface { position: relative; flex: auto; min-height: 0; }
-.surface iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; }
+// Match the engine document's default scheme. A mismatched iframe scheme makes
+// Chromium paint an opaque canvas behind otherwise transparent lyric content.
+.surface iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; }
 .error { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; padding: 16px; text-align: center; }
 .saveError { flex: none; padding: 8px 14px; font-size: 12px; }
 .topReveal, .bottomReveal { display: none; }
@@ -84,6 +90,7 @@ const selectMode = (event: Event) => { savePreferences({ mode: (event.target as 
   margin: 0;
   padding: 0;
   border-radius: 0;
+  background: #111b2c;
 
   .toolbar {
     position: absolute;
@@ -124,16 +131,33 @@ const selectMode = (event: Event) => { savePreferences({ mode: (event.target as 
 
 // Scope the surrounding chrome to the mounted player stage. Comments, native
 // lyrics, closing the player and uninstalling immediately restore the host theme.
-:global([data-player-detail]):has(> .stage[data-folia-stage='player']) {
-  background: #111b2c;
+.foliaPalette() {
   --color-font: #e5edf4;
   --color-font-label: #c9d7e3;
   --color-button-font: #e5edf4;
   --color-button-background-hover: rgba(255, 255, 255, .12);
+  --color-content-background: #111b2c;
+  --color-primary-background: #111b2c;
   --color-primary: #74dab5;
   --color-accent: #74dab5;
   --color-hover: rgba(255, 255, 255, .1);
   --color-primary-light-100-alpha-800: rgba(201, 215, 227, .18);
+  --ambient-reading-surface: transparent;
+}
+:global(#root [data-player-detail]):has(> .stage[data-folia-stage='player']) {
+  background: #111b2c;
+  .foliaPalette();
+
+  // The shared background publishes an inline palette on the host detail and
+  // binds local colors to its controls. Paint Folia's actual surfaces with their
+  // own palette so artwork hidden behind the iframe cannot recolor them.
+  .stage,
+  > :global([data-detail-part='chrome']),
+  > :global([data-detail-part='controls']),
+  :global([data-ambient-zone]) {
+    .foliaPalette();
+    color-scheme: dark;
+  }
 
   > :global([data-detail-part='chrome']),
   > :global([data-detail-part='controls']) {

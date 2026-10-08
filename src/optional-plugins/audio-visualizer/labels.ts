@@ -3,7 +3,6 @@ import type { VisualizerStyle } from './styles'
 
 interface Labels {
   title: string
-  main: string
   desktop: string
   enabled: string
   hint: string
@@ -15,10 +14,9 @@ interface Labels {
 }
 const zh: Labels = {
   title: '音频可视化',
-  main: '播放详情',
   desktop: '桌面歌词',
   enabled: '启用可视化',
-  hint: '选择样式即可启用，自动保存。两个位置可以分别设置。',
+  hint: '选择样式即可为桌面歌词启用音频可视化，自动保存。',
   demo: '演示预览 · 播放后随音乐律动',
   live: '正在预览当前音乐',
   close: '完成',
@@ -31,10 +29,9 @@ const zh: Labels = {
 }
 const tw: Labels = {
   title: '音訊視覺化',
-  main: '播放詳情',
   desktop: '桌面歌詞',
   enabled: '啟用視覺化',
-  hint: '選擇樣式即可啟用，自動儲存。兩個位置可以分別設定。',
+  hint: '選擇樣式即可為桌面歌詞啟用音訊視覺化，自動儲存。',
   demo: '示範預覽 · 播放後隨音樂律動',
   live: '正在預覽目前音樂',
   close: '完成',
@@ -47,10 +44,9 @@ const tw: Labels = {
 }
 const en: Labels = {
   title: 'Audio visualization',
-  main: 'Player',
   desktop: 'Desktop lyrics',
   enabled: 'Enable visualization',
-  hint: 'Choose a style to enable it. Each view saves its own selection.',
+  hint: 'Choose a style to enable visualization for desktop lyrics. Your selection is saved automatically.',
   demo: 'Demo preview · reacts to music during playback',
   live: 'Previewing your music',
   close: 'Done',
