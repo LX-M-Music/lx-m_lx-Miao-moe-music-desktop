@@ -26,7 +26,8 @@ test('settings search keeps matching controls visible and usable', { timeout: 90
     await t.test('searching 暗 reveals themes and the system light/dark theme entry', async() => {
       await search.fill('暗')
       await page.locator('#basic_theme').waitFor()
-      assert.deepEqual((await tabs.allTextContents()).map(text => text.trim()), [await label('setting__basic'), await label('setting__other')])
+      // Advanced includes the playback background's darkening help text.
+      assert.deepEqual((await tabs.allTextContents()).map(text => text.trim()), [await label('setting__basic'), await label('setting__advanced'), await label('setting__other')])
       const autoTheme = themeArea.getByLabel(await label('theme_auto_tip'), { exact: true })
       await autoTheme.waitFor()
       assert.equal(await themeArea.getByLabel(await label('theme_black'), { exact: true }).isVisible(), true)

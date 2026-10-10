@@ -48,6 +48,7 @@ export const applyAppFont = async(value: string) => {
   const families = parseFontStack(value)
   document.documentElement.style.fontFamily = ''
   const defaults = getComputedStyle(document.documentElement).fontFamily
+  document.documentElement.style.setProperty('--app-default-font-family', defaults)
   document.documentElement.style.fontFamily = families.length ? `${families.map(quoteFontFamily).join(', ')}, ${defaults}` : ''
   const ids = [...new Set(families.filter(family => family.startsWith(CUSTOM_FONT_PREFIX)))]
   // Do not retain every font the user has ever previewed in memory.

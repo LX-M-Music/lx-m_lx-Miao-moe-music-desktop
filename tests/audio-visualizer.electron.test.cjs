@@ -5,38 +5,41 @@ const { createHash } = require('node:crypto')
 const { test } = require('node:test')
 const { launch, route, settled, seedTrack, showDetail } = require('./helpers/motion-fixture.cjs')
 const { mockGitHub, openStore, label, install, startSilentAudio } = require('./helpers/plugin-fixture.cjs')
-const { packSource, unpackSource } = require('../src/common/pluginSource')
-const { version: visualizerVersion } = require('../src/optional-plugins/audio-visualizer/plugin.json')
+const { packSource } = require('../src/common/pluginSource')
+const { version } = require('../src/optional-plugins/audio-visualizer/plugin.json')
 
 const styles = ['spectrum', 'wave', 'radial']
-const showPlayer = async page => {
-  await seedTrack(page)
-  await page.evaluate(() => {
-    window.lxData.musicInfo.lrc = '[00:00.00]Visualizer check\n[00:01.00]Test signal'
-    window.app_event.lyricUpdated()
-  })
-  await showDetail(page, true)
-  await settled(page)
-}
 const openPicker = async page => {
-  await page.locator('[data-player-detail]').getByRole('button', { name: await label(page, 'audio_visualization'), exact: true }).click()
-  await page.locator('[data-visualizer-dialog]').waitFor()
-  await page.waitForFunction(() => document.querySelector('[data-visualizer-dialog]')?.contains(document.activeElement))
-  return page.locator('[data-visualizer-dialog]')
+  await showDetail(page, false)
+  await settled(page)
+  await openStore(page)
+  const picker = page.locator('[data-plugin-settings="audio-visualizer"]')
+  if (!await picker.isVisible()) await page.locator('[data-plugin-id="audio-visualizer"]').getByRole('button', { name: await label(page, 'setting__plugins_settings'), exact: true }).click()
+  await picker.waitFor()
+  return picker
 }
-const choose = async(dialog, style) => {
-  await dialog.locator(`[data-visualizer-option="${style}"]`).click()
-  await dialog.locator(`[data-visualizer-option="${style}"] input`).waitFor()
-  await dialog.page().waitForFunction(style => document.querySelector(`[data-visualizer-dialog] [data-visualizer-option="${style}"] input`)?.checked, style)
-  await dialog.page().waitForFunction(() => !document.querySelector('[data-visualizer-dialog] input[type="radio"]')?.disabled)
+const choose = async(picker, style) => {
+  await picker.locator('[data-visualizer-option="' + style + '"]').click()
+  await picker.page().waitForFunction(style => document.querySelector('[data-plugin-settings="audio-visualizer"] [data-visualizer-option="' + style + '"] input')?.checked, style)
+  await picker.page().waitForFunction(() => !document.querySelector('[data-plugin-settings="audio-visualizer"] input[type="radio"]')?.disabled)
 }
-const hasPixels = async(page, selector) => page.waitForFunction(selector => {
+const hasPixels = (page, selector) => page.waitForFunction(selector => {
   const canvas = document.querySelector(selector)
   return canvas?.width > 0 && canvas.height > 0 && canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some(value => value > 0)
 }, selector)
+const launchOptions = { rendererPath: path.resolve('dist/index.html') }
+const closeFixture = async fixture => {
+  if (!fixture || !fixture.app.process() || fixture.app.process().exitCode !== null) return
+  await showDetail(fixture.page, false).catch(() => {})
+  await settled(fixture.page).catch(() => {})
+  let timer
+  try {
+    await Promise.race([fixture.app.close(), new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error('Electron close timed out')), 15000) })])
+  } catch (error) { fixture.app.process().kill(); throw error } finally { clearTimeout(timer) }
+}
 
-test('visualizer updates independently with three styles and audioMotion, a picker, saved choices and released previews', { timeout: 120000 }, async() => {
-  let fixture = await launch()
+test('visualizer upgrades preserve desktop styles, previews and preferences while keeping player lyrics clear', { timeout: 120000 }, async() => {
+  let fixture = await launch(launchOptions)
   const output = fixture.output
   try {
     let { app, page } = fixture
@@ -46,7 +49,7 @@ test('visualizer updates independently with three styles and audioMotion, a pick
       ['src/index.js', Buffer.from("import { h } from 'vue'; export default { components: { Settings: () => h('div', 'Previous source version') } }")],
     ]))
     const sha256 = createHash('sha256').update(archive).digest('hex')
-    const oldCatalog = { schemaVersion: 2, plugins: [{ id: 'audio-visualizer', version: '1.1.1', apiVersion: 1, path: `audio-visualizer/1.1.1/${sha256}.zip`, bytes: archive.length, sha256 }] }
+    const oldCatalog = { schemaVersion: 2, plugins: [{ id: 'audio-visualizer', version: '1.1.1', apiVersion: 1, path: 'audio-visualizer/1.1.1/' + sha256 + '.zip', bytes: archive.length, sha256 }] }
     await app.evaluate((_electron, { catalog, archive }) => {
       global.__pluginCatalogOverride = catalog
       global.__pluginPackageOverrides[catalog.plugins[0].path] = archive
@@ -55,27 +58,8 @@ test('visualizer updates independently with three styles and audioMotion, a pick
     await install(page, 'audio-visualizer')
     const dataRoot = await app.evaluate(() => global.lxDataPath)
     const oldRegistry = JSON.parse(await fs.readFile(path.join(dataRoot, 'plugins/installed.json'), 'utf8'))
-    assert.equal(oldRegistry['audio-visualizer'] != null, true)
     await fs.mkdir(path.join(dataRoot, 'plugins/preferences'), { recursive: true })
     await fs.writeFile(path.join(dataRoot, 'plugins/preferences/audio-visualizer.json'), JSON.stringify({ version: 1, main: 'bars', desktop: 'ring' }))
-    // Exercise the current source rather than the previously published store archive.
-    const published = require('../plugins/store/catalog.json').plugins.find(plugin => plugin.id === 'audio-visualizer')
-    const current = await unpackSource(await fs.readFile(path.join('plugins/store', published.path)))
-    for (const name of ['MainVisualizer.vue', 'Preview.vue', 'LyricVisualizer.vue', 'renderer.ts', 'spectrum.ts']) {
-      current.files.set(`src/${name}`, await fs.readFile(path.join('src/optional-plugins/audio-visualizer', name)))
-    }
-    const currentArchive = await packSource(current.manifest, current.files)
-    const currentHash = createHash('sha256').update(currentArchive).digest('hex')
-    const currentPath = `audio-visualizer/${visualizerVersion}/${currentHash}.zip`
-    const currentCatalog = { schemaVersion: 2, plugins: [{ ...published, path: currentPath, bytes: currentArchive.length, sha256: currentHash, packages: undefined }] }
-    await app.evaluate((_electron, { catalog, archive, archivePath }) => {
-      global.__pluginCatalogOverride = catalog
-      global.__pluginPackageOverrides[archivePath] = archive
-    }, { catalog: currentCatalog, archive: currentArchive.toString('base64'), archivePath: currentPath })
-    await page.getByRole('button', { name: await label(page, 'setting__plugins_refresh'), exact: true }).click()
-    await page.locator('[data-plugin-id="audio-visualizer"]').getByRole('button', { name: await label(page, 'setting__plugins_update'), exact: true }).click()
-    await page.waitForFunction(version => document.querySelector('[data-plugin-id="audio-visualizer"]')?.textContent.includes(`v${version}`), visualizerVersion)
-    await assert.rejects(fs.stat(path.join(dataRoot, 'plugins', oldRegistry['audio-visualizer'].directory)), { code: 'ENOENT' })
     await page.evaluate(() => {
       window.__visualizerAnalysers = []
       const connect = AudioNode.prototype.connect
@@ -97,151 +81,100 @@ test('visualizer updates independently with three styles and audioMotion, a pick
         window.__visualizerAnalysers.push(analyser)
         return analyser
       }
+      window.lxData.updateSetting({ 'player.audioVisualization': true, 'desktopLyric.audioVisualization': false, 'common.isShowAnimation': false })
     })
-    await showPlayer(page)
-    let dialog = await openPicker(page)
-    assert.equal(await dialog.getByRole('radio').count(), 3)
-    assert.equal(await dialog.locator('[data-visualizer-option="spectrum"] input').isChecked(), true, 'Removed bars style falls back to spectrum')
-    await dialog.locator('[data-visualizer-surface="desktop"]').click()
-    assert.equal(await dialog.locator('[data-visualizer-option="radial"] input').isChecked(), true, 'Old ring migrates to audioMotion')
-    await dialog.locator('[data-visualizer-surface="main"]').click()
-    assert.equal(await page.evaluate(() => window.lxData.appSetting['player.audioVisualization']), false, 'Opening the picker does not toggle the visualizer')
-    for (const kind of styles) await hasPixels(page, `[data-visualizer-dialog] [data-visualizer-option="${kind}"] canvas`)
-    const previews = await dialog.locator('[data-visualizer-option] canvas').evaluateAll(canvases => canvases.map(canvas => canvas.toDataURL()))
-    assert.equal(new Set(previews).size, 3, 'Each style has a distinct preview')
-    for (const [width, height] of [[828, 540], [1366, 768], [3840, 2160]]) {
-      await page.setViewportSize({ width, height })
-      await settled(page)
-      const box = await dialog.boundingBox()
-      assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= width + 1 && box.y + box.height <= height + 1, JSON.stringify(box))
-      for (const kind of styles) {
-        await dialog.locator(`[data-visualizer-option="${kind}"]`).scrollIntoViewIfNeeded()
-        const card = await dialog.locator(`[data-visualizer-option="${kind}"]`).boundingBox()
-        assert.ok(card.x >= box.x && card.x + card.width <= box.x + box.width + 1)
-      }
-      if (width === 828) await page.screenshot({ path: path.join(output, 'visualizer-picker-small.png') })
+    await app.evaluate(() => { global.__pluginCatalogOverride = null })
+    await page.getByRole('button', { name: await label(page, 'setting__plugins_refresh'), exact: true }).click()
+    await page.locator('[data-plugin-id="audio-visualizer"]').getByRole('button', { name: await label(page, 'setting__plugins_update'), exact: true }).click()
+    await page.waitForFunction(version => document.querySelector('[data-plugin-id="audio-visualizer"]')?.textContent.includes('v' + version), version)
+    await assert.rejects(fs.stat(path.join(dataRoot, 'plugins', oldRegistry['audio-visualizer'].directory)), { code: 'ENOENT' })
+
+    let picker = await openPicker(page)
+    assert.equal(await picker.getByRole('radio').count(), 3)
+    assert.equal(await picker.locator('[data-visualizer-surface="main"]').count(), 0)
+    assert.equal(await picker.locator('[data-visualizer-option="radial"] input').isChecked(), true, 'the legacy ring style migrates to radial')
+    await page.waitForTimeout(250)
+    const previews = []
+    for (const style of styles) previews.push(createHash('sha256').update(await picker.locator('[data-visualizer-preview="' + style + '"]').last().screenshot()).digest('hex'))
+    assert.equal(new Set(previews).size, 3, 'each retained desktop style has a distinct preview')
+    await page.setViewportSize({ width: 828, height: 540 })
+    await picker.locator('[data-visualizer-option="spectrum"]').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(output, 'desktop-visualizer-settings.png') })
+    for (const style of styles) {
+      const card = await picker.locator('[data-visualizer-option="' + style + '"]').boundingBox()
+      assert(card.x >= 0 && card.x + card.width <= 828, 'style cards fit the small settings view')
     }
     await page.setViewportSize({ width: 1114, height: 718 })
-    await dialog.locator('[data-visualizer-option="spectrum"] input').focus()
-    await page.keyboard.press('ArrowRight')
-    await page.locator('[data-plugin-visualizer="main"][data-visualizer-style="wave"]').waitFor()
-    await choose(dialog, 'wave')
-    await page.locator('[data-plugin-visualizer="main"][data-visualizer-style="wave"]').waitFor()
-    await page.screenshot({ path: path.join(output, 'visualizer-picker.png') })
-    await dialog.press('Escape')
-    await dialog.waitFor({ state: 'hidden' })
-    assert.equal(await page.locator('[data-player-detail] button[aria-haspopup="dialog"]').evaluate(button => button === document.activeElement), true)
+    await seedTrack(page)
+    await page.evaluate(() => {
+      Object.assign(window.lxData.musicInfo, { lrc: '[00:00.000]Desktop visualizer check\n[00:10.000]Player lyrics stay clear', lxlrc: '', tlrc: '', rlrc: '' })
+      window.app_event.lyricUpdated()
+    })
     await startSilentAudio(page)
-    await hasPixels(page, '[data-plugin-visualizer="main"] canvas')
-    dialog = await openPicker(page)
-    for (const kind of styles) {
-      await choose(dialog, kind)
-      await page.locator(`[data-plugin-visualizer="main"][data-visualizer-style="${kind}"]`).waitFor()
-      await hasPixels(page, '[data-plugin-visualizer="main"] canvas')
-      if (kind === 'radial') {
-        assert.equal(await page.locator('[data-plugin-visualizer="main"] canvas').getAttribute('data-visualizer-engine'), 'audioMotion-4.5.4')
-        assert.equal(await page.evaluate(() => window.__visualizerAnalysers.some(node => node.fftSize === 8192 && !node.__disconnected)), true)
-        await settled(page)
-        const reads = await page.evaluate(async() => {
-          const canvas = document.querySelector('[data-plugin-visualizer="main"] canvas')
-          const lyrics = document.querySelector('[data-player-detail] [data-detail-part="lyrics"]')
-          const context = canvas.getContext('2d')
-          const width = canvas.clientWidth
-          const height = canvas.clientHeight
-          const originalBounds = lyrics.getBoundingClientRect
-          const originalDraw = context.drawImage
-          let size = 0
-          let bounds = 0
-          let draws = 0
-          Object.defineProperties(canvas, {
-            clientWidth: { configurable: true, get() { size++; return width } },
-            clientHeight: { configurable: true, get() { size++; return height } },
-          })
-          lyrics.getBoundingClientRect = function() { bounds++; return originalBounds.call(this) }
-          context.drawImage = function(...args) { draws++; return originalDraw.apply(this, args) }
-          try {
-            await new Promise(resolve => {
-              let remaining = 8
-              const next = () => { if (--remaining) requestAnimationFrame(next); else resolve() }
-              requestAnimationFrame(next)
-            })
-          } finally {
-            delete canvas.clientWidth
-            delete canvas.clientHeight
-            lyrics.getBoundingClientRect = originalBounds
-            context.drawImage = originalDraw
-          }
-          return { size, bounds, draws }
-        })
-        assert.ok(reads.draws >= 2, 'The radial renderer kept drawing')
-        assert.equal(reads.size, 0, 'Animation frames did not query canvas layout')
-        assert.equal(reads.bounds, 0, 'Animation frames did not query lyric layout')
-        await page.setViewportSize({ width: 1280, height: 760 })
-        await page.waitForFunction(() => {
-          const canvas = document.querySelector('[data-plugin-visualizer="main"] canvas')
-          const width = canvas.clientWidth
-          const height = canvas.clientHeight
-          const ratio = Math.min(devicePixelRatio || 1, 2, Math.sqrt(8_000_000 / Math.max(1, width * height)))
-          return canvas.width === Math.round(width * ratio) && canvas.height === Math.round(height * ratio)
-        })
-        await hasPixels(page, '[data-plugin-visualizer="main"] canvas')
-        await page.setViewportSize({ width: 1114, height: 718 })
-      }
-    }
-    await choose(dialog, 'wave')
-    await dialog.locator('[data-visualizer-surface="desktop"]').click()
-    await choose(dialog, 'radial')
-    assert.equal(await page.locator('[data-plugin-visualizer="main"]').getAttribute('data-visualizer-style'), 'wave')
+    await choose(picker, 'radial')
     await page.evaluate(() => window.lxData.updateSetting({ 'desktopLyric.enable': true }))
     const desktop = app.windows().find(window => window.url().includes('lyric.html')) ?? await app.waitForEvent('window', { predicate: window => window.url().includes('lyric.html') })
-    await desktop.locator('[data-plugin-visualizer="desktop"][data-visualizer-style="radial"]').waitFor({ timeout: 20000 })
-    await hasPixels(desktop, '[data-plugin-visualizer="desktop"] canvas')
-    for (const kind of styles) {
-      await choose(dialog, kind)
-      await desktop.locator(`[data-plugin-visualizer="desktop"][data-visualizer-style="${kind}"]`).waitFor()
+    for (const style of styles) {
+      await choose(picker, style)
+      await desktop.locator('[data-plugin-visualizer="desktop"][data-visualizer-style="' + style + '"]').waitFor({ timeout: 20000 })
       await hasPixels(desktop, '[data-plugin-visualizer="desktop"] canvas')
+      if (style === 'radial') {
+        assert.equal(await desktop.locator('[data-plugin-visualizer="desktop"] canvas').getAttribute('data-visualizer-engine'), 'audioMotion-4.5.4')
+        assert(await page.evaluate(() => window.__visualizerAnalysers.some(node => node.fftSize === 8192 && !node.__disconnected)))
+      }
     }
-    await choose(dialog, 'radial')
-    await page.evaluate(() => window.lxData.updateSetting({ 'player.audioVisualization': false, 'desktopLyric.audioVisualization': false, 'desktopLyric.enable': false }))
-    await dialog.press('Escape')
-    await dialog.waitFor({ state: 'hidden' })
+    await choose(picker, 'wave')
+    await route(page, '/search')
+    await settled(page)
+    await showDetail(page, true)
+    await settled(page)
+    assert.equal(await page.locator('[data-plugin-visualizer="main"], [data-visualizer-dialog]').count(), 0)
+    assert.equal(await page.locator('[data-player-detail]').getByRole('button', { name: await label(page, 'audio_visualization'), exact: true }).count(), 0)
+    await page.evaluate(() => window.lxData.updateSetting({ 'desktopLyric.audioVisualization': false, 'desktopLyric.enable': false }))
     await page.waitForFunction(() => window.__visualizerAnalysers.every(analyser => analyser.__disconnected))
-    assert.equal(await page.evaluate(() => window.__lxPluginHost.player.getAudioElement().paused), false)
-    dialog = await openPicker(page)
-    await hasPixels(page, '[data-visualizer-dialog] [data-visualizer-preview="wave"]')
-    const oldCount = await page.evaluate(() => window.__visualizerAnalysers.length)
-    assert.ok(oldCount >= 2, 'A new preview analyser is created after the previous one was released')
+    assert.equal(await page.evaluate(() => window.__lxPluginHost.player.getAudioElement().paused), false, 'releasing visualizers keeps playback running')
+    assert.equal(await page.evaluate(() => window.lxData.appSetting['player.audioVisualization']), true, 'an obsolete main preference cannot retain an analyser')
+
+    picker = await openPicker(page)
+    await hasPixels(page, '[data-plugin-settings="audio-visualizer"] [data-visualizer-preview="wave"]')
     await page.evaluate(() => require('electron').ipcRenderer.invoke('optional_plugins:uninstall', 'audio-visualizer'))
-    await dialog.waitFor({ state: 'detached' })
-    assert.equal(await page.evaluate(() => window.__visualizerAnalysers.every(analyser => analyser.__disconnected)), true)
+    await picker.waitFor({ state: 'detached' })
+    await page.waitForFunction(() => window.__visualizerAnalysers.every(analyser => analyser.__disconnected))
     const preferencesFile = path.join(dataRoot, 'plugins/preferences/audio-visualizer.json')
-    assert.deepEqual(JSON.parse(await fs.readFile(preferencesFile, 'utf8')), { version: 1, main: 'wave', desktop: 'radial' })
+    assert.deepEqual(JSON.parse(await fs.readFile(preferencesFile, 'utf8')), { version: 1, main: 'spectrum', desktop: 'wave' })
     await page.evaluate(() => window.__lxPluginHost.player.setStop())
-    await showDetail(page, false)
     await openStore(page)
     await install(page, 'audio-visualizer')
     await route(page, '/search')
     assert.deepEqual(fixture.errors, [])
-    await app.close()
-    fixture = await launch({ profilePath: output })
+    await closeFixture(fixture)
+
+    fixture = await launch({ ...launchOptions, profilePath: output })
     ;({ app, page } = fixture)
     page.setDefaultTimeout(12000)
     await mockGitHub(app, true)
-    await showPlayer(page)
-    dialog = await openPicker(page)
-    assert.equal(await dialog.locator('[data-visualizer-option="wave"] input').isChecked(), true)
-    await dialog.locator('[data-visualizer-surface="desktop"]').click()
-    assert.equal(await dialog.locator('[data-visualizer-option="radial"] input').isChecked(), true)
+    picker = await openPicker(page)
+    assert.equal(await picker.locator('[data-visualizer-option="wave"] input').isChecked(), true, 'desktop style survives an offline restart')
+    assert.equal(await picker.locator('[data-visualizer-surface="main"]').count(), 0)
     await page.evaluate(() => window.lxData.updateSetting({ 'common.langId': 'en-us' }))
-    await dialog.getByRole('radio', { name: 'Radial spectrum', exact: true }).waitFor()
-    await dialog.getByRole('button', { name: 'Done', exact: true }).click()
-    await dialog.waitFor({ state: 'hidden' })
+    await picker.getByRole('radio', { name: 'Flowing waves', exact: true }).waitFor()
     assert.deepEqual(fixture.errors, [])
-    console.log('Visualizer upgrade verified:', output)
+    console.log('Desktop visualization upgrade and lyric exclusion verified:', output)
   } catch (error) {
     console.error('Visualizer test profile:', output, 'Renderer errors:', fixture.errors)
-    console.error('Focus:', await fixture.page.evaluate(() => ({ active: document.activeElement?.outerHTML.slice(0, 500), dialog: document.querySelector('[data-visualizer-dialog]')?.getAttribute('tabindex') })).catch(() => null))
-    await fixture.page.screenshot({ path: path.join(output, 'visualizer-failure.png') }).catch(() => {})
+    await fixture.page.screenshot({ path: path.join(output, 'failure-main.png') }).catch(() => {})
+    const desktop = fixture.app.windows().find(window => window.url().includes('lyric.html'))
+    await desktop?.screenshot({ path: path.join(output, 'failure-desktop.png') }).catch(() => {})
+    console.error('Visualizer state:', await fixture.page.evaluate(() => ({
+      desktopEnabled: window.lxData.appSetting['desktopLyric.enable'],
+      desktopVisualization: window.lxData.appSetting['desktopLyric.audioVisualization'],
+      muted: window.__lxPluginHost.player.getAudioElement().muted,
+      paused: window.__lxPluginHost.player.getAudioElement().paused,
+      context: window.__lxPluginHost.player.getAudioContext().state,
+      analysers: window.__visualizerAnalysers?.map(node => ({ fftSize: node.fftSize, disconnected: node.__disconnected })),
+    })).catch(() => null))
     throw error
-  } finally { await fixture.app.close() }
+  } finally {
+    await closeFixture(fixture)
+  }
 })

@@ -29,12 +29,13 @@ interface Gesture {
   moved: boolean
 }
 
-export default ({ props, list, listRef, listItemHeight, selectedList, onStart, onSaved }: {
+export default ({ props, list, listRef, listItemHeight, selectedList, enabled, onStart, onSaved }: {
   props: { listId: string }
   list: Ref<LX.Music.MusicInfo[]>
   listRef: Ref<{ $el: HTMLElement } | null>
   listItemHeight: Ref<number>
   selectedList: Ref<LX.Music.MusicInfo[]>
+  enabled?: Ref<boolean>
   onStart: () => void
   onSaved: () => void
 }) => {
@@ -122,7 +123,7 @@ export default ({ props, list, listRef, listItemHeight, selectedList, onStart, o
   }
 
   const handleSongPointerDown = (event: PointerEvent, musicInfo: LX.Music.MusicInfo) => {
-    if (event.button !== 0 || !event.isPrimary || saving || list.value.length < 2) return
+    if (enabled?.value === false || event.button !== 0 || !event.isPrimary || saving || list.value.length < 2) return
     const target = event.target
     if (!(target instanceof Element) || target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return
     const container = listRef.value?.$el
@@ -222,7 +223,7 @@ export default ({ props, list, listRef, listItemHeight, selectedList, onStart, o
     if (gesture?.pointerId === event.pointerId && event.target === gesture.container) cancel()
   }
 
-  watch([list, () => props.listId, listRef, listItemHeight], cancel, { flush: 'sync' })
+  watch([list, () => props.listId, listRef, listItemHeight, () => enabled?.value], cancel, { flush: 'sync' })
   onDeactivated(cancel)
   onMounted(() => {
     document.addEventListener('pointerdown', onPointerDown, true)

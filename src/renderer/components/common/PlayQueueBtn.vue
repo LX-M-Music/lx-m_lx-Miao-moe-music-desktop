@@ -252,15 +252,29 @@ watch([() => playQueueList.length, rowHeight], () => {
 })
 
 const handleDocumentClick = () => {
+  window.clearTimeout(frameFocusTimer)
+  frameFocusTimer = 0
   pendingFocus = null
   dragEnd()
   isShow.value = false
   window.removeEventListener('resize', updatePosition)
+  window.removeEventListener('blur', handleWindowBlur)
   document.removeEventListener('click', handleDocumentClick)
   document.removeEventListener('keydown', handleDocumentKeydown)
 }
 const handleDocumentKeydown = (event) => {
   if (event.key == 'Escape') handleDocumentClick()
+}
+
+let frameFocusTimer = 0
+const handleWindowBlur = () => {
+  // Clicks inside lyric iframes do not bubble to the host document. Wait for
+  // Chromium to update activeElement, and close only when focus enters a frame.
+  window.clearTimeout(frameFocusTimer)
+  frameFocusTimer = window.setTimeout(() => {
+    frameFocusTimer = 0
+    if (isShow.value && document.activeElement instanceof HTMLIFrameElement) handleDocumentClick()
+  }, 0)
 }
 
 const handleOpenSinger = (item, singer) => {
@@ -275,6 +289,7 @@ const toggleShow = () => {
     isShow.value = true
     updatePosition()
     window.addEventListener('resize', updatePosition)
+    window.addEventListener('blur', handleWindowBlur)
     document.addEventListener('click', handleDocumentClick)
     document.addEventListener('keydown', handleDocumentKeydown)
     void nextTick(() => {
@@ -301,8 +316,10 @@ const handleClear = () => {
 }
 
 onBeforeUnmount(() => {
+  window.clearTimeout(frameFocusTimer)
   dragEnd()
   window.removeEventListener('resize', updatePosition)
+  window.removeEventListener('blur', handleWindowBlur)
   document.removeEventListener('click', handleDocumentClick)
   document.removeEventListener('keydown', handleDocumentKeydown)
 })

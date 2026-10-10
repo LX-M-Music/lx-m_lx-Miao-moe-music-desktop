@@ -38,7 +38,7 @@ export const setUpdateTime = (id: string, time: string) => {
 export const addListMusics = async(id: string, musicInfos: LX.Music.MusicInfo[], addMusicLocationType?: LX.AddMusicLocationType) => {
   return addListMusicsAction({
     id,
-    musicInfos: toRaw(musicInfos),
+    musicInfos: toRaw(musicInfos).map(info => toRaw(info)),
     addMusicLocationType: addMusicLocationType ?? appSetting['list.addMusicLocationType'],
   })
 }
@@ -47,7 +47,7 @@ export const moveListMusics = async(fromId: string, toId: string, musicInfos: LX
   return moveListMusicsAction({
     fromId,
     toId,
-    musicInfos: toRaw(musicInfos),
+    musicInfos: toRaw(musicInfos).map(info => toRaw(info)),
     addMusicLocationType: addMusicLocationType ?? appSetting['list.addMusicLocationType'],
   })
 }
@@ -72,7 +72,7 @@ export const createUserList = async({ name, id = `userlist_${Date.now()}`, list 
       },
     ],
   })
-  if (list) await addListMusicsAction({ id, musicInfos: toRaw(list), addMusicLocationType: appSetting['list.addMusicLocationType'] }, fromRefresh)
+  if (list) await addListMusicsAction({ id, musicInfos: toRaw(list).map(info => toRaw(info)), addMusicLocationType: appSetting['list.addMusicLocationType'] }, fromRefresh)
 }
 
 

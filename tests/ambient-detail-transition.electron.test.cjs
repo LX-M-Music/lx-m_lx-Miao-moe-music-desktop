@@ -138,7 +138,7 @@ test('dynamic background detail transitions keep window, sidebar and playback ic
       await update(page, { 'common.isShowAnimation': true })
     })
 
-    await t.test('detail-only background survives the visible exit and releases resources afterward, including fallback', async() => {
+    await t.test('detail-only background exits immediately while the page finishes closing, including fallback cleanup', async() => {
       await page.evaluate(() => window.__lxPluginHost.player.setPause())
       await update(page, { 'ui.ambientBackgroundOnlyPlayDetail': true, 'ui.ambientBackgroundQuality': 'static' })
       await page.locator(background).waitFor({ state: 'detached' })
@@ -146,9 +146,12 @@ test('dynamic background detail transitions keep window, sidebar and playback ic
       await settled(page)
       await page.locator('[data-player-detail][data-ambient-controls="dark"]').waitFor()
       const leave = await capture(page, false)
-      assert(leave.some(sample => sample.controls.some(control => control.section === 'detail' && control.opacity > 0.1)), 'measured the actual exit')
+      assert(leave.some(sample => sample.time >= 0 && sample.controls.some(control => control.section === 'detail' && control.opacity > 0.1)), 'measured the actual exit')
       for (const sample of leave) {
-        if (sample.controls.some(control => control.section === 'detail' && control.opacity > 0.1)) assert(sample.background, 'background must remain behind the visible exiting page')
+        if (sample.time < 0) continue
+        assert.equal(sample.background, false, 'detail-only background is removed on the first closing frame')
+        assert.equal(sample.rootMode, '', 'the main page palette is restored immediately')
+        assert.equal(sample.detailMode, '', 'unmounting the background cleans its detail palette')
       }
       await page.locator(background).waitFor({ state: 'detached' })
       assert.equal(await page.locator('[data-ambient-zone], [data-ambient-controls]').count(), 0)

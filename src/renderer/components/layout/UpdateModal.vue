@@ -118,9 +118,10 @@ export default {
     },
     updateDescription() {
       const edition = this.versionInfo.newVersion?.edition
-      if (edition == 'portable') return '点击“自动更新”后先测速，优先下载差分数据；不可用时下载完整便携包，完成后自动替换程序并重启。'
-      if (edition == 'single-file') return '点击“自动更新”后先测速并下载完整单文件版，完成后自动替换原文件并重启。'
-      return '点击“自动更新”后先测速并选择下载节点，下载完成后将自动安装并重启。'
+      const source = this.appSetting['common.useUpdateMirror'] ? '先测速并从镜像源' : '直接从 GitHub '
+      if (edition == 'portable') return `点击“自动更新”后${source}优先下载差分数据；不可用时下载完整便携包，完成后自动替换程序并重启。`
+      if (edition == 'single-file') return `点击“自动更新”后${source}下载完整单文件版，完成后自动替换原文件并重启。`
+      return `点击“自动更新”后${source}下载更新，下载完成后将自动安装并重启。`
     },
     isInstalling() {
       return this.versionInfo.status == 'installing'
@@ -221,7 +222,7 @@ export default {
         return
       }
       versionInfo.downloadProgress = null
-      versionInfo.status = 'testing'
+      versionInfo.status = appSetting['common.useUpdateMirror'] ? 'testing' : 'downloading'
       downloadUpdate({
         version: info.version,
         downloadUrl: info.downloadUrl,

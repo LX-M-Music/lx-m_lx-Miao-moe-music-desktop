@@ -13,11 +13,11 @@ export interface UpdateSource {
   bytesPerSecond?: number
 }
 
-export const getUpdateSources = (url: string): UpdateSource[] => {
+export const getUpdateSources = (url: string, useMirror = true): UpdateSource[] => {
   const parsed = new URL(url)
   const direct = { url, name: parsed.hostname === 'github.com' ? 'GitHub' : parsed.hostname }
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' || !/^\/[^/]+\/[^/]+\/releases\/download\//.test(parsed.pathname)) return [direct]
-  return [direct, ...UPDATE_MIRROR_PREFIXES.map(prefix => ({ url: prefix + url, name: new URL(prefix).hostname }))]
+  if (!useMirror || parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' || !/^\/[^/]+\/[^/]+\/releases\/download\//.test(parsed.pathname)) return [direct]
+  return UPDATE_MIRROR_PREFIXES.map(prefix => ({ url: prefix + url, name: new URL(prefix).hostname }))
 }
 
 interface SpeedTestOptions {
@@ -107,8 +107,8 @@ export const speedTestUpdateSources = async(sources: UpdateSource[], options: Sp
     options.signal.throwIfAborted()
     ranked.sort((a, b) => (b.bytesPerSecond ?? 0) - (a.bytesPerSecond ?? 0))
     const selected = ranked.slice(0, 6)
-    const direct = sources[0]
-    if (direct && !selected.some(source => source.url === direct.url)) selected.push(direct)
+    const fallback = sources[0]
+    if (fallback && !selected.some(source => source.url === fallback.url)) selected.push(fallback)
     return selected
   } finally {
     clearTimeout(deadline)

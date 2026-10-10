@@ -81,6 +81,9 @@ declare global {
        */
       'common.tryAutoUpdate': boolean
 
+      /** 是否从镜像源下载更新，关闭时直接从 GitHub 下载 */
+      'common.useUpdateMirror': boolean
+
       /**
        * 更新版本后是否显示变更日志
        */
@@ -313,6 +316,9 @@ declare global {
        */
       'playDetail.isShowLyricProgressSetting': boolean
 
+      /** 播放详情页-是否使用次要字体，否则使用默认字体 */
+      'playDetail.useAppFont': boolean
+
       /**
        * 播放详情页-歌词字体大小
        */
@@ -509,6 +515,11 @@ declare global {
        * 是否显示歌曲来源（仅对我的列表有效）
        */
       'list.isShowSource': boolean
+
+      /**
+       * 是否显示歌单搜索栏
+       */
+      'list.isShowSearchBar': boolean
 
       /**
        * 是否自动恢复列表滚动位置（仅对我的列表有效）

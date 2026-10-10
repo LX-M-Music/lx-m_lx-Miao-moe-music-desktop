@@ -13,14 +13,14 @@ const textContainer = ref<HTMLDivElement>()
 const currentLine = computed(() => lyric.lines[lyric.line])
 const currentLineText = computed(() => {
   const line = currentLine.value
-  return line ? [line.text, ...line.extendedLyrics].filter(Boolean).join(' · ') : undefined
+  return line ? [line.text, ...line.extendedLyrics].filter(Boolean).join('\n') : undefined
 })
 const lrcStyles = computed(() => ({
   fontFamily: setting['desktopLyric.style.font'],
   fontSize: Math.trunc(setting['desktopLyric.style.fontSize']) + 'px',
   opacity: setting['desktopLyric.style.opacity'] / 100,
   textAlign: setting['desktopLyric.style.align'],
-  '--single-line-align': setting['desktopLyric.style.align'] == 'left' ? 'flex-start' : setting['desktopLyric.style.align'] == 'right' ? 'flex-end' : 'center',
+  '--single-line-height': 1.2 + (currentLine.value?.extendedLyrics.filter(Boolean).length ?? 0) * 1.08,
 }))
 
 const showCurrentLine = () => {
@@ -47,12 +47,15 @@ watch(() => currentLine.value?.dom_line, showCurrentLine, { flush: 'post' })
   padding: 0 16px;
   overflow: hidden;
   contain: strict;
+  container-type: size;
 
   :global {
     .line-content {
       display: flex !important;
-      align-items: center;
-      gap: .5em;
+      flex-direction: column;
+      align-items: stretch;
+      gap: .12em;
+      width: 100%;
       min-width: 0;
       max-width: 100%;
       line-height: 1.2;
@@ -60,7 +63,8 @@ watch(() => currentLine.value?.dom_line, showCurrentLine, { flush: 'post' })
     }
     .line, .extended {
       display: block !important;
-      flex: 0 1 auto;
+      flex: none;
+      width: 100%;
       min-width: 0;
       max-width: 100%;
     }
@@ -95,10 +99,11 @@ watch(() => currentLine.value?.dom_line, showCurrentLine, { flush: 'post' })
   }
 }
 .text {
-  display: flex;
-  justify-content: var(--single-line-align);
   width: 100%;
   min-width: 0;
+  // Fit every row in short lyric windows without changing the saved font size.
+  // Leave room for text shadows and fractional window bounds.
+  font-size: min(1em, calc((100cqh - 4px) / var(--single-line-height)));
 }
 .fontWeightFont :global(.font-mode > .line),
 .fontWeightLine :global(.line-mode > .line) { font-weight: bold; }

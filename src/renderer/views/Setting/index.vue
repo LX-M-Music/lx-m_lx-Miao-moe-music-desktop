@@ -178,7 +178,7 @@ export default {
         {
           id: 'SettingBasic',
           title: t('setting__basic'),
-          prefixes: ['setting__basic', 'theme'],
+          prefixes: ['setting__basic', 'setting__font', 'theme'],
           keys: ['setting__play_timeout'],
           entries: [
             ...customThemeEntries.value,

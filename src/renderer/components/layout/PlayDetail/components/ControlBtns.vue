@@ -4,7 +4,6 @@ div(:class="$style.footerLeftControlBtns")
     svg(xmlns="http://www.w3.org/2000/svg" height="100%" viewBox="0 0 24 24" :style="{ opacity: appSetting['desktopLyric.enable'] ? 1 : 'var(--player-control-opacity, .7)' }")
       use(xlink:href="#icon-mini-player")
   common-sound-effect-btn
-  common-visualization-toggle(:class="$style.footerLeftControlBtn")
   common-plugin-contributions(name="playDetailControls" :class="$style.footerLeftControlBtn")
   button(:class="[$style.footerLeftControlBtn, { [$style.active]: isShowLrcSelectContent }]" :aria-label="$t('lyric__select')" @click="toggleVisibleLrc")
     svg(version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" width="95%" viewBox="0 0 24 24" space="preserve")
@@ -43,7 +42,6 @@ import { appSetting } from '@renderer/store/setting'
 export default {
   setup() {
     // const setting = useRefGetter('setting')
-    // const setAudioVisualization = useCommit('setAudioVisualization')
     // const saveMediaDeviceId = useCommit('setMediaDeviceId')
 
     const toggleVisibleLrc = () => {

@@ -28,12 +28,28 @@ test('catalog combines both websites, removes duplicates and leaves other downlo
   const utils = api()
   const url = 'https://github.com/Miao-moe/lx-m_lx-Miao-moe-music-desktop/releases/download/v9.0.0/Setup.exe'
   const routes = utils.getUpdateSources(url)
-  assert.equal(routes.length, 155)
-  assert.equal(routes[0].url, url)
+  assert.equal(routes.length, 154)
+  assert.equal(routes[0].url, catalog.UPDATE_MIRROR_PREFIXES[0] + url)
+  assert(routes.every(route => new URL(route.url).hostname !== 'github.com'))
   assert(routes.some(route => route.url === 'https://github.mxw.qzz.io/' + url))
   assert(routes.some(route => route.url === 'https://gh-proxy.net/' + url))
   assert.equal(utils.getUpdateSources('https://example.test/Setup.exe').length, 1)
   assert.equal(utils.getUpdateSources('https://github.com/owner/repo/issues').length, 1)
+})
+
+test('disabling mirrors returns only the original GitHub release URL', () => {
+  const utils = api()
+  const url = 'https://github.com/owner/repo/releases/download/v9.0.0/Setup.exe'
+  assert.deepEqual(utils.getUpdateSources(url, false), [{ url, name: 'GitHub' }])
+  assert.equal(utils.getUpdateSources(url, true).length, 154)
+  assert.equal(utils.getUpdateSources(url, undefined).length, 154)
+})
+
+test('non-release URLs are never prefixed, in either download mode', () => {
+  const utils = api()
+  for (const url of ['https://example.test/Setup.exe', 'https://github.com/owner/repo/issues', 'http://github.com/owner/repo/releases/download/v9.0.0/Setup.exe']) {
+    for (const useMirror of [true, false]) assert.equal(utils.getUpdateSources(url, useMirror)[0].url, url)
+  }
 })
 
 test('selection measures installer bytes rather than headers and bounds concurrent probes', async() => {
@@ -107,7 +123,7 @@ const stall = (_, request) => new Promise((resolve, reject) => {
   if (request.signal.aborted) abort()
 })
 
-test('unreachable catalogs have a finite deadline and retain the original GitHub route', async() => {
+test('unreachable catalogs have a finite deadline and retain only a provided fallback route', async() => {
   let requests = 0
   const sources = Array.from({ length: 20 }, (_, i) => source(`node-${i}.test`))
   const utils = api((...args) => { requests++; return stall(...args) })

@@ -16,19 +16,23 @@ const sample = Buffer.from('MZ test update payload; never executed by the unit t
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex')
 const fileName = 'LX-M Music-v9.0.0-x64-Setup.exe'
 
-function loadSource(filename, overrides = {}, appProcess = process, schedule = setTimeout) {
+function loadSource(filename, overrides = {}, appProcess = process, schedule = setTimeout, appGlobal = global) {
   const code = ts.transpileModule(fs.readFileSync(path.join(project, filename), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
   }).outputText
   const module = { exports: {} }
-  vm.runInThisContext('(function(require,module,exports,process,setTimeout){' + code + '\n})', { filename })(name => {
+  vm.runInThisContext('(function(require,module,exports,process,setTimeout,global){' + code + '\n})', { filename })(name => {
     if (Object.hasOwn(overrides, name)) return overrides[name]
     throw Error('Unexpected dependency: ' + name)
-  }, module, module.exports, appProcess, schedule)
+  }, module, module.exports, appProcess, schedule, appGlobal)
   return module.exports
 }
 
 const assetUtils = loadSource('src/common/utils/update.ts')
+const updateSourceUtils = loadSource('src/main/modules/winMain/updateSources.ts', {
+  '@common/updateMirrors': { UPDATE_MIRROR_PREFIXES: ['https://fast.test/', 'https://backup.test/'] },
+  '@common/utils/undiciCompat': {},
+})
 const greenName = 'LX-M.Music-v9.0.0-win_x64-green.7z'
 const singleName = 'LX-M.Music-v9.0.0-x64-portable.exe'
 const peSample = () => {
@@ -52,7 +56,7 @@ async function mockArchive(_archive, directory, executable) {
   }
 }
 
-function fixture(t, { request, launch, installed = true, openError = '', deadlineMs, sources, speedTest, edition = 'installed', prepareArchive, prepareDifferential, relaunch } = {}) {
+function fixture(t, { request, launch, installed = true, openError = '', deadlineMs, sources, getSources, speedTest, settings = { 'common.useUpdateMirror': true }, edition = 'installed', prepareArchive, prepareDifferential, relaunch } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-update-test-'))
   const installDirectory = path.join(root, "应用 & player's music")
   fs.mkdirSync(installDirectory)
@@ -121,10 +125,10 @@ function fixture(t, { request, launch, installed = true, openError = '', deadlin
     },
     './updateRelaunch': { async launchWindowsRelaunch(...args) { relaunches.push(args); await relaunch?.(...args) } },
     './updateSources': {
-      getUpdateSources: url => sources ?? [{ url, name: 'example.test' }],
+      getUpdateSources: getSources ?? (url => sources ?? [{ url, name: 'example.test' }]),
       speedTestUpdateSources: speedTest ?? (async sources => sources),
     },
-  }, { platform: 'win32', arch: 'x64', resourcesPath: path.join(installDirectory, 'resources'), env: {} }, (callback, ms) => setTimeout(callback, ms === 30 * 60_000 && deadlineMs ? deadlineMs : ms)).default()
+  }, { platform: 'win32', arch: 'x64', resourcesPath: path.join(installDirectory, 'resources'), env: {} }, (callback, ms) => setTimeout(callback, ms === 30 * 60_000 && deadlineMs ? deadlineMs : ms), { lx: { appSetting: settings } }).default()
   const emit = (name, params) => handlers.get(name)({ params })
   const wait = async(name) => (await once(bus, name, { signal: AbortSignal.timeout(5000) }))[0]
   const findFile = (name = fileName) => fs.readdirSync(root).filter(name => name.startsWith('lx-m-update-'))
@@ -136,6 +140,7 @@ function fixture(t, { request, launch, installed = true, openError = '', deadlin
     launches,
     relaunches,
     opened,
+    settings,
     installDirectory,
     emit,
     wait,
@@ -290,6 +295,94 @@ const mirrorSources = [
   { name: 'fast.test', url: 'https://fast.test/Setup.exe' },
   { name: 'backup.test', url: 'https://backup.test/Setup.exe' },
 ]
+
+for (const useMirror of [true, false, undefined]) {
+  test(`the main downloader respects the ${String(useMirror)} mirror preference`, async t => {
+    const url = 'https://github.com/owner/repo/releases/download/v9.0.0/Setup.exe'
+    const urls = []
+    let probes = 0
+    const f = fixture(t, {
+      settings: useMirror === undefined ? {} : { 'common.useUpdateMirror': useMirror },
+      getSources: updateSourceUtils.getUpdateSources,
+      speedTest: async(sources, options) => {
+        probes++
+        assert(sources.every(source => new URL(source.url).hostname !== 'github.com'))
+        options.onProgress(0, sources.length)
+        return sources
+      },
+      request: async url => { urls.push(url); return response() },
+    })
+    await f.download({ downloadUrl: url })
+    assert.deepEqual(urls, [useMirror === false ? url : 'https://fast.test/' + url])
+    assert.equal(probes, useMirror === false ? 0 : 1)
+    const reports = f.events.filter(event => event.name === 'update_progress').map(event => event.params)
+    assert.equal(reports[0].phase, useMirror === false ? 'downloading' : 'testing')
+    assert.equal(reports.find(report => report.phase === 'downloading').source, useMirror === false ? 'GitHub' : 'fast.test')
+    assert.equal(reports.at(-1).phase, 'verifying')
+  })
+}
+
+for (const useMirror of [true, false]) {
+  test(`portable manifest, payload and full-archive fallback keep the ${useMirror ? 'mirror' : 'GitHub'} source choice`, async t => {
+    const base = 'https://github.com/owner/repo/releases/download/v9.0.0/'
+    const prefix = useMirror ? 'https://fast.test/' : ''
+    const urls = []
+    const metadata = Buffer.from('{}')
+    const f = fixture(t, {
+      edition: 'portable',
+      settings: { 'common.useUpdateMirror': useMirror },
+      getSources: updateSourceUtils.getUpdateSources,
+      prepareArchive: mockArchive,
+      async prepareDifferential({ sources }) {
+        assert(sources.every(source => (new URL(source.url).hostname === 'github.com') === !useMirror))
+        assert.equal(sources[0].url, prefix + base + 'update.bin')
+        // A setting change during an update must not switch its remaining requests.
+        f.settings['common.useUpdateMirror'] = !useMirror
+        throw Error('Range unsupported')
+      },
+      request: async url => { urls.push(url); return url.endsWith('.json') ? response(metadata) : response() },
+    })
+    await f.download({
+      fileName: greenName,
+      edition: 'portable',
+      downloadUrl: base + 'green.7z',
+      differential: {
+        manifest: { fileName: greenName.replace('-green.7z', '-green-update.json'), downloadUrl: base + 'update.json', size: metadata.length, digest: sha256(metadata) },
+        payload: { fileName: greenName.replace('-green.7z', '-green-update.bin'), downloadUrl: base + 'update.bin', size: 64, digest: 'a'.repeat(64) },
+      },
+    })
+    assert.deepEqual(urls, [prefix + base + 'update.json', prefix + base + 'green.7z'])
+    assert(f.events.some(event => event.params?.mode === 'full'))
+    assert.equal(f.quits, 0)
+  })
+
+  test(`failed ${useMirror ? 'mirror' : 'GitHub'} downloads do not silently switch download modes`, async t => {
+    const urls = []
+    const f = fixture(t, {
+      settings: { 'common.useUpdateMirror': useMirror },
+      getSources: updateSourceUtils.getUpdateSources,
+      request: async url => { urls.push(url); return { ...response(), statusCode: 503 } },
+    })
+    await f.download({ downloadUrl: 'https://github.com/owner/repo/releases/download/v9.0.0/Setup.exe' }, 'update_error')
+    assert.equal(urls.length, useMirror ? 2 : 1)
+    assert(urls.every(url => (new URL(url).hostname === 'github.com') === !useMirror))
+    assert.equal(f.findFile(), undefined)
+    assert.equal(f.launches.length, 0)
+  })
+}
+
+test('the next download picks up a changed preference without restarting the app', async t => {
+  const urls = []
+  const url = 'https://github.com/owner/repo/releases/download/v9.0.0/Setup.exe'
+  const f = fixture(t, {
+    getSources: updateSourceUtils.getUpdateSources,
+    request: async url => { urls.push(url); return response() },
+  })
+  await f.download({ downloadUrl: url })
+  f.settings['common.useUpdateMirror'] = false
+  await f.download({ downloadUrl: url })
+  assert.deepEqual(urls, ['https://fast.test/' + url, url])
+})
 
 test('update tests sources before the full download and reports the selected source', async t => {
   let ready = false

@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from '@common/utils/vueTools'
+import { computed, markRawList, onBeforeUnmount, onMounted, reactive, ref, watch } from '@common/utils/vueTools'
 import { clipboardWriteText } from '@common/utils/electron'
 import { formatError } from '@common/utils/errorMessage'
 import { libraryCall, listeningHistoryVersion } from '@renderer/utils/library'
@@ -120,7 +120,10 @@ const load = async() => {
   error.value = ''
   try {
     const next = await libraryCall('getListeningHistory', { page: page.value })
-    if (current === generation) result.value = next
+    if (current === generation) {
+      markRawList(next.rows.map(entry => entry.song))
+      result.value = next
+    }
   } catch (cause) {
     if (current === generation) error.value = formatError(cause, t('history__load_failed'), 'HISTORY_LOAD_FAILED')
   } finally {

@@ -1,5 +1,5 @@
 <template>
-  <dd data-setting-search="setting__basic_font setting__font_primary setting__font_fallback setting__font_import">
+  <dd data-setting-search="setting__basic_font setting__font_primary setting__font_fallback setting__font_import setting__font_play_detail setting__font_play_detail_hint">
     <h3 id="basic_font">{{ $t('setting__basic_font') }}<svg-icon class="help-icon" name="help-circle-outline" :aria-label="$t('setting__font_hint')" /></h3>
     <div :class="$style.choices">
       <div data-font-primary>
@@ -10,6 +10,10 @@
         <p id="font_fallback_label">{{ $t('setting__font_fallback') }}</p>
         <base-selection :list="fontList" :model-value="fonts[1]" item-key="id" item-name="label" aria-labelledby="font_fallback_label" @update:model-value="selectFont(fonts[0], $event)" />
       </div>
+    </div>
+    <div class="setting-actions" :class="$style.detailFont" data-font-play-detail>
+      <base-checkbox id="setting_font_play_detail" :model-value="appSetting['playDetail.useAppFont']" :label="$t('setting__font_play_detail')" @update:model-value="setDetailFont($event)" />
+      <svg-icon class="help-icon" name="help-circle-outline" :aria-label="$t('setting__font_play_detail_hint')" />
     </div>
     <p :class="$style.preview" data-font-preview>{{ $t('setting__font_preview') }}</p>
     <div class="setting-actions">
@@ -54,6 +58,9 @@ const fontList = computed(() => {
 const selectFont = async(primary: string, fallback: string) => {
   try { await updateSetting({ 'common.font': makeFontStack(primary, fallback) }) } catch (err) { error.value = formatError(err, '', 'FONT_SAVE_FAILED') }
 }
+const setDetailFont = async(enabled: boolean) => {
+  try { await updateSetting({ 'playDetail.useAppFont': enabled }) } catch (err) { error.value = formatError(err, '', 'FONT_SAVE_FAILED') }
+}
 const handleImport = async() => {
   if (importing.value) return
   importing.value = true
@@ -93,6 +100,7 @@ onMounted(async() => {
   > div { min-width: 0; max-width: 100%; }
   p { margin-bottom: 8px; }
 }
+.detailFont { margin-top: 14px; }
 .preview { margin: 14px 0; padding: 12px; border: 1px solid var(--color-primary-alpha-200); border-radius: 6px; line-height: 1.7; overflow-wrap: anywhere; }
 .error { margin-top: 12px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 </style>

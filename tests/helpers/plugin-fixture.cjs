@@ -61,7 +61,9 @@ const install = async(page, id) => {
     return card && [...card.querySelectorAll('button')].some(button => !button.disabled)
   }, id)
   await button.click()
-  await card.getByRole('button', { name: await label(page, 'setting__plugins_settings'), exact: true }).waitFor({ timeout: 180000 })
+  await card.getByRole('button', { name: await label(page, 'setting__plugins_settings'), exact: true })
+    .or(card.getByRole('button', { name: await label(page, 'setting__plugins_close_settings'), exact: true }))
+    .waitFor({ timeout: 180000 })
 }
 const uninstall = async(page, id) => {
   const card = page.locator(`[data-plugin-id="${id}"]`)

@@ -39,8 +39,8 @@ test('update UI shows cancellable speed testing, indeterminate progress and the 
   assert(await later.isEnabled())
   assert.equal(await progress.getAttribute('aria-valuenow'), null)
   assert.equal(await page.evaluate(() => window.__updateRequests[0].installAfterDownload), true)
-  await publish({ phase: 'testing', progress: 0, transferred: 0, total: 0, bytesPerSecond: 0, testedSources: 12, totalSources: 155 })
-  await page.getByText('已测试 12 / 155 个节点', { exact: true }).waitFor()
+  await publish({ phase: 'testing', progress: 0, transferred: 0, total: 0, bytesPerSecond: 0, testedSources: 12, totalSources: 154 })
+  await page.getByText('已测试 12 / 154 个节点', { exact: true }).waitFor()
   const style = await page.locator('[data-update-progress]').evaluate(el => ({
     padding: parseFloat(getComputedStyle(el).paddingTop),
     trackWidth: el.children[1].clientWidth,
@@ -54,7 +54,7 @@ test('update UI shows cancellable speed testing, indeterminate progress and the 
   await later.click()
   await auto.waitFor({ state: 'hidden' })
   assert.equal(await page.evaluate(() => window.lxData.versionInfo.status), 'idle')
-  await publish({ phase: 'testing', progress: 0, transferred: 0, total: 0, bytesPerSecond: 0, testedSources: 13, totalSources: 155 })
+  await publish({ phase: 'testing', progress: 0, transferred: 0, total: 0, bytesPerSecond: 0, testedSources: 13, totalSources: 154 })
   assert.equal(await page.evaluate(() => window.lxData.versionInfo.status), 'idle', 'cancelled testing must ignore late progress')
 
   await page.evaluate(() => { window.lxData.versionInfo.showModal = true })
@@ -95,8 +95,8 @@ test('update UI shows cancellable speed testing, indeterminate progress and the 
   await page.locator('[data-setting-tab="SettingUpdate"]').click()
   await page.waitForSelector('#update')
   await page.evaluate(() => { window.lxData.versionInfo.status = 'testing' })
-  await publish({ phase: 'testing', progress: 0, transferred: 0, total: 0, bytesPerSecond: 0, testedSources: 20, totalSources: 155 })
-  await page.getByText(/已测试 20 \/ 155 个节点/).waitFor()
+  await publish({ phase: 'testing', progress: 0, transferred: 0, total: 0, bytesPerSecond: 0, testedSources: 20, totalSources: 154 })
+  await page.getByText(/已测试 20 \/ 154 个节点/).waitFor()
   const setting = page.locator('#update + dd')
   assert.match(await setting.innerText(), /正在测速/)
   assert.doesNotMatch(await setting.innerText(), /正在下载/)

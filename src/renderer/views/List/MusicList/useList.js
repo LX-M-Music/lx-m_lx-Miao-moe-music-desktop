@@ -1,6 +1,7 @@
 import { computed, watch, ref, onBeforeUnmount } from '@common/utils/vueTools'
 import { windowFontSize } from '@renderer/store'
 import { appSetting } from '@renderer/store/setting'
+import { isMac } from '@common/utils'
 
 const useKeyEvent = ({ handleSelectAllData, listRef }) => {
   const keyEvent = {
@@ -62,8 +63,10 @@ export default ({ listRef, list }) => {
   }
   const keyEvent = useKeyEvent({ listRef, handleSelectAllData })
 
-  const handleSelectData = clickIndex => {
-    if (keyEvent.isShiftDown) {
+  const handleSelectData = (clickIndex, event) => {
+    const isShiftDown = event ? event.shiftKey : keyEvent.isShiftDown
+    const isModDown = event ? (isMac ? event.metaKey : event.ctrlKey) : keyEvent.isModDown
+    if (isShiftDown) {
       if (selectedList.value.length) {
         removeAllSelect()
         if (lastSelectIndex != clickIndex) {
@@ -82,7 +85,7 @@ export default ({ listRef, list }) => {
         selectedList.value.push(list.value[clickIndex])
         lastSelectIndex = clickIndex
       }
-    } else if (keyEvent.isModDown) {
+    } else if (isModDown) {
       lastSelectIndex = clickIndex
       let item = list.value[clickIndex]
       let index = selectedList.value.indexOf(item)

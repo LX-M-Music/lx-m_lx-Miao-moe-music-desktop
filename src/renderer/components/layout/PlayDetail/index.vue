@@ -2,7 +2,10 @@
   <div
     v-if="detailMounted" v-show="detailDisplayed" ref="detailRoot" data-player-detail
     :class="[$style.container, { fullscreen: isFullscreen, [$style.ambientDetail]: appSetting['ui.ambientBackground'] && !pluginPlayDetail }]" :aria-hidden="!isShowPlayerDetail"
-    :style="{ '--playDetail-font-weight': appSetting['playDetail.style.fontWeight'] }"
+    :style="{
+      '--playDetail-font-weight': appSetting['playDetail.style.fontWeight'],
+      fontFamily: detailFontFamily,
+    }"
     :inert="!isShowPlayerDetail ? '' : null" @contextmenu="handleContextMenu"
   >
     <div :class="$style.bg" />
@@ -40,7 +43,6 @@
       <music-comment v-if="visibled" :class="$style.comment" :show="isShowPlayComment" :music-info="playMusicInfo.musicInfo" @close="hideComment" />
     </div>
     <play-bar v-if="visibled" data-detail-part="controls" />
-    <common-audio-visualizer v-if="appSetting['player.audioVisualization'] && visibled && !pluginPlayDetail" />
     <!-- Native drag regions follow document order, so this must follow plugin no-drag surfaces. -->
     <div
       v-if="isShowPlayerDetail && visibled && pluginPlayDetail && !isShowPlayComment && !isShowLrcSelectContent && !isFullscreen && !isMaximized"
@@ -52,6 +54,7 @@
 
 <script>
 import { computed, watch } from '@common/utils/vueTools'
+import { getLyricDetailFontFamily } from '@common/fonts'
 import { pluginRuntime } from '@renderer/store/optionalPlugins'
 import usePlayerDetailMotion from '@renderer/utils/compositions/usePlayerDetailMotion'
 import useEntityDetailNavigation from '@renderer/utils/compositions/useEntityDetailNavigation'
@@ -89,6 +92,11 @@ export default {
   },
   setup() {
     const pluginPlayDetail = computed(() => Object.values(pluginRuntime.playDetails).find(detail => detail?.enabled.value)?.component)
+    const detailFontFamily = computed(() => {
+      const font = getLyricDetailFontFamily(appSetting['common.font'], appSetting['playDetail.useAppFont'])
+      const defaults = 'var(--app-default-font-family, system-ui, sans-serif)'
+      return font ? `${font}, ${defaults}` : defaults
+    })
     const { canOpenEntity, getSingerNames, openEntityDetail } = useEntityDetailNavigation()
     const entityMusicInfo = computed(() => {
       const info = playMusicInfo.musicInfo
@@ -139,6 +147,7 @@ export default {
 
     return {
       appSetting,
+      detailFontFamily,
       playMusicInfo,
       isShowPlayerDetail,
       isShowLrcSelectContent,

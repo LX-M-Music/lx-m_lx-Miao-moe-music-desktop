@@ -4,6 +4,8 @@ dd
   .gap-top
     base-checkbox(id="setting_list_actionButtonsVisible_enable" :model-value="appSetting['list.actionButtonsVisible']" :label="$t('setting__list_action_btn')" @update:model-value="updateSetting({'list.actionButtonsVisible': $event})")
   .gap-top
+    base-checkbox(id="setting_list_searchBar_enable" :model-value="appSetting['list.isShowSearchBar']" :label="$t('setting__list_search_bar')" @update:model-value="updateSetting({'list.isShowSearchBar': $event})")
+  .gap-top
     base-checkbox(id="setting_list_showSource_enable" :model-value="appSetting['list.isShowSource']" :label="$t('setting__list_source')" @update:model-value="updateSetting({'list.isShowSource': $event})")
   .gap-top
     base-checkbox(id="setting_list_scroll_enable" :model-value="appSetting['list.isSaveScrollLocation']" :label="$t('setting__list_scroll')" @update:model-value="updateSetting({'list.isSaveScrollLocation': $event})")

@@ -3,8 +3,8 @@
     <main :class="$style.main">
       <h2>{{ $t('list_add__multiple_' + (isMove ? 'title_move' : 'title_add'), { num: musicList.length }) }}</h2>
       <div class="scroll" :class="$style.btnContent">
-        <base-btn v-for="(item, index) in lists" :key="item.id" :class="$style.btn" :aria-label="$t('list_add__multiple_btn_title', { name: item.name })" @click="handleClick(index)">{{ item.name }}</base-btn>
-        <base-btn :class="[$style.btn, $style.newList, isEditing ? $style.editing : null]" :aria-label="$t('lists__new_list_btn')" @click="handleEditing($event)">
+        <base-btn v-for="(item, index) in lists" :key="item.id" :class="$style.btn" :aria-label="$t('list_add__multiple_btn_title', { name: item.name })" :disabled="isSaving || !musicList.length" @click="handleClick(index)">{{ item.name }}</base-btn>
+        <base-btn :class="[$style.btn, $style.newList, isEditing ? $style.editing : null]" :aria-label="$t('lists__new_list_btn')" :disabled="isSaving" @click="handleEditing($event)">
           <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" viewBox="0 0 42 42" space="preserve">
             <use xlink:href="#icon-addTo" />
           </svg>
@@ -23,6 +23,7 @@ import { addListMusics, moveListMusics, createUserList } from '@renderer/store/l
 import useKeyDown from '@renderer/utils/compositions/useKeyDown'
 import { useI18n } from '@root/lang'
 import { dialog } from '@renderer/plugins/Dialog'
+import { formatError } from '@common/utils/errorMessage'
 
 export default {
   props: {
@@ -83,6 +84,7 @@ export default {
   data() {
     return {
       isEditing: false,
+      isSaving: false,
       newListName: '',
       rowNum: 3,
     }
@@ -109,17 +111,26 @@ export default {
           ? 4
           : width < 3840 ? 5 : 6
     },
-    handleClick(index) {
+    async handleClick(index) {
+      const target = this.lists[index]
+      if (this.isSaving || !target || !this.musicList.length) return
       const list = 'progress' in this.musicList[0] ? this.musicList.map(t => t.metadata.musicInfo) : this.musicList
+      const keepOpen = this.keyModDown && !this.isMove
+      this.isSaving = true
+      try {
+        if (this.isMove) await moveListMusics(this.fromListId, target.id, list)
+        else await addListMusics(target.id, list)
 
-      if (this.isMove) void moveListMusics(this.fromListId, this.lists[index].id, list)
-      else void addListMusics(this.lists[index].id, list)
-
-      if (this.keyModDown && !this.isMove) return
-      this.$nextTick(() => {
-        this.handleClose()
-        this.$emit('confirm')
-      })
+        if (keepOpen) return
+        this.$nextTick(() => {
+          this.handleClose()
+          this.$emit('confirm')
+        })
+      } catch (cause) {
+        void dialog.error(formatError(cause, '', this.isMove ? 'LIST_MUSIC_MOVE_FAILED' : 'LIST_MUSIC_ADD_FAILED'))
+      } finally {
+        this.isSaving = false
+      }
     },
     handleClose() {
       this.$emit('update:show', false)
@@ -131,13 +142,21 @@ export default {
       this.$nextTick(() => event.currentTarget.querySelector('.' + this.$style.newListInput).focus())
     },
     async handleSaveList(event) {
+      if (this.isSaving) return
       let name = event.target.value
       this.newListName = event.target.value = ''
       this.isEditing = false
       if (!name || (
         userLists.some(l => l.name == name) && !(await dialog.confirm(window.i18n.t('list_duplicate_tip'))))
       ) return
-      void createUserList({ name })
+      this.isSaving = true
+      try {
+        await createUserList({ name })
+      } catch (cause) {
+        void dialog.error(formatError(cause, '', 'LIST_CREATE_FAILED'))
+      } finally {
+        this.isSaving = false
+      }
     },
   },
 }

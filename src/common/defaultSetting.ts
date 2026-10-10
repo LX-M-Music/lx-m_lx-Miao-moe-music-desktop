@@ -24,6 +24,7 @@ const defaultSetting: LX.AppSetting = {
   'common.playBarProgressStyle': 'mini',
   'common.transparentWindow': !isMac,
   'common.tryAutoUpdate': true,
+  'common.useUpdateMirror': true,
   'common.showChangeLog': true,
   'common.showErrorDialog': false,
 
@@ -73,6 +74,7 @@ const defaultSetting: LX.AppSetting = {
 
   'playDetail.isZoomActiveLrc': true,
   'playDetail.isShowLyricProgressSetting': true,
+  'playDetail.useAppFont': true,
   'playDetail.style.fontSize': 140,
   'playDetail.style.fontWeight': 400,
   'playDetail.style.align': 'center',
@@ -117,6 +119,7 @@ const defaultSetting: LX.AppSetting = {
 
   'list.isClickPlayList': false,
   'list.isShowSource': true,
+  'list.isShowSearchBar': true,
   'list.isSaveScrollLocation': true,
   'list.addMusicLocationType': 'top',
   'list.actionButtonsVisible': false,

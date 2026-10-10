@@ -1,24 +1,25 @@
 <template>
-  <common-list-loading :load-key="list" :loading="isLoading" :class="$style.list" :style="columnLayout.style">
+  <common-list-loading :load-key="list" :loading="isLoading" :class="$style.list" :style="columnLayout.style" :data-list-filtered="isSearching || undefined">
+    <SearchBar v-if="appSetting['list.isShowSearchBar']" ref="searchRef" v-model="searchQuery" v-model:field="searchField" />
     <common-music-list-header :layout="columnLayout" />
-    <div v-show="list.length" ref="dom_listContent" :class="$style.content">
+    <div v-show="visibleList.length" ref="dom_listContent" :class="$style.content">
       <base-virtualized-list
-        v-if="actionButtonsVisible" ref="listRef" v-slot="{ item, index }" :list="list" key-name="id"
+        v-if="actionButtonsVisible" ref="listRef" v-slot="{ item, index }" :list="visibleList" key-name="id"
         :item-height="listItemHeight" :overscan="10" container-class="scroll music-column-scroll" content-class="list"
         @scroll="saveListPosition" @contextmenu.capture="handleListRightClick"
       >
         <div
-          class="list-item" :class="[{ [$style.active]: playerInfo.isPlayList && playerInfo.playIndex === index }, { selected: selectedIndex == index || rightClickSelectedIndex == index }, { active: selectedList.includes(item) }, { disabled: !assertApiSupport(item.source) }]"
+          class="list-item" :class="[{ [$style.active]: playerInfo.isPlayList && playerInfo.playIndex === getSourceIndex(item) }, { selected: selectedIndex == getSourceIndex(item) || rightClickSelectedIndex == getSourceIndex(item) }, { active: selectedList.includes(item) }, { disabled: !assertApiSupport(item.source) }]"
           :data-song-id="item.id" :data-song-dragging="songDrag?.ids.has(item.id) || undefined"
           @pointerdown="handleSongPointerDown($event, item)" @dragstart.prevent
-          @click="handleListItemClick($event, index)" @contextmenu="handleListItemRightClick($event, index, item)"
+          @click="handleListItemClick($event, index)" @contextmenu="handleListItemRightClick($event, getSourceIndex(item), item)"
         >
           <div class="list-item-cell no-select" :class="$style.num" :aria-label="$t('list__drag_tip')" style="flex: 0 0 var(--music-column-index);" data-music-cell="index">
             <transition name="play-active">
-              <div v-if="playerInfo.isPlayList && playerInfo.playIndex === index" :class="$style.playIcon">
+              <div v-if="playerInfo.isPlayList && playerInfo.playIndex === getSourceIndex(item)" :class="$style.playIcon">
                 <span class="playing-equalizer" :class="{ paused: !playerInfo.isPlay }" aria-hidden="true"><span /><span /><span /></span>
               </div>
-              <div v-else class="num">{{ index + 1 }}</div>
+              <div v-else class="num">{{ getSourceIndex(item) + 1 }}</div>
             </transition>
           </div>
           <div class="list-item-cell no-select" :class="$style.cover" style="flex: 0 0 var(--music-column-cover); padding: 0 6px;" data-music-cell="cover">
@@ -51,28 +52,28 @@
           </div>
           <div class="list-item-cell" style="flex: 0 0 var(--music-column-time);" data-music-cell="time"><span class="no-select">{{ item.interval || '--/--' }}</span></div>
           <div class="list-item-cell" style="flex: 0 0 var(--music-column-action); padding-left: 0; padding-right: 0;" data-music-cell="action">
-            <material-list-buttons :index="index" :download-btn="assertApiSupport(item.source) && item.source != 'local'" @btn-click="handleListBtnClick" />
+            <material-list-buttons :index="getSourceIndex(item)" :download-btn="assertApiSupport(item.source) && item.source != 'local'" @btn-click="handleListBtnClick" />
           </div>
         </div>
       </base-virtualized-list>
       <base-virtualized-list
-        v-else ref="listRef" v-slot="{ item, index }" :list="list" key-name="id"
+        v-else ref="listRef" v-slot="{ item, index }" :list="visibleList" key-name="id"
         :item-height="listItemHeight" :overscan="10" container-class="scroll music-column-scroll" content-class="list"
         @scroll="saveListPosition" @contextmenu.capture="handleListRightClick"
       >
         <div
           class="list-item"
-          :class="[{ [$style.active]: playerInfo.isPlayList && playerInfo.playIndex === index }, { selected: selectedIndex == index || rightClickSelectedIndex == index }, { active: selectedList.includes(item) }, { disabled: !assertApiSupport(item.source) }]"
+          :class="[{ [$style.active]: playerInfo.isPlayList && playerInfo.playIndex === getSourceIndex(item) }, { selected: selectedIndex == getSourceIndex(item) || rightClickSelectedIndex == getSourceIndex(item) }, { active: selectedList.includes(item) }, { disabled: !assertApiSupport(item.source) }]"
           :data-song-id="item.id" :data-song-dragging="songDrag?.ids.has(item.id) || undefined"
           @pointerdown="handleSongPointerDown($event, item)" @dragstart.prevent
-          @click="handleListItemClick($event, index)" @contextmenu="handleListItemRightClick($event, index, item)"
+          @click="handleListItemClick($event, index)" @contextmenu="handleListItemRightClick($event, getSourceIndex(item), item)"
         >
           <div class="list-item-cell no-select" :class="$style.num" :aria-label="$t('list__drag_tip')" style="flex: 0 0 var(--music-column-index);" data-music-cell="index">
             <transition name="play-active">
-              <div v-if="playerInfo.isPlayList && playerInfo.playIndex === index" :class="$style.playIcon">
+              <div v-if="playerInfo.isPlayList && playerInfo.playIndex === getSourceIndex(item)" :class="$style.playIcon">
                 <span class="playing-equalizer" :class="{ paused: !playerInfo.isPlay }" aria-hidden="true"><span /><span /><span /></span>
               </div>
-              <div v-else class="num">{{ index + 1 }}</div>
+              <div v-else class="num">{{ getSourceIndex(item) + 1 }}</div>
             </transition>
           </div>
           <div class="list-item-cell no-select" :class="$style.cover" style="flex: 0 0 var(--music-column-cover); padding: 0 6px;" data-music-cell="cover">
@@ -114,8 +115,8 @@
         </div>
       </div>
     </div>
-    <div v-show="!list.length" :class="[$style.noItem, 'ui-state', { 'ui-state-error': loadError }]" role="status">
-      <p>{{ loadError ? (appSetting['common.showErrorDialog'] ? loadError : $t('list__load_failed')) : $t('no_item') }}</p>
+    <div v-show="!visibleList.length" :class="[$style.noItem, 'ui-state', { 'ui-state-error': loadError }]" role="status">
+      <p>{{ loadError ? (appSetting['common.showErrorDialog'] ? loadError : $t('list__load_failed')) : $t(isSearching ? 'list__search_no_result' : 'no_item') }}</p>
       <base-btn v-if="loadError" class="ui-state-retry" min @click="retryList">{{ $t('reload') }}</base-btn>
     </div>
     <common-list-add-modal
@@ -128,18 +129,17 @@
     />
     <common-download-modal v-model:show="isShowDownload" :music-info="selectedDownloadMusicInfo" teleport="#view" :list-id="listId" />
     <common-download-multiple-modal v-model:show="isShowDownloadMultiple" :list="selectedList" teleport="#view" :list-id="listId" @confirm="removeAllSelect" />
-    <search-list :list="list" :visible="isShowSearchBar" @action="handleMusicSearchAction" />
     <music-toggle-modal v-model:show="isShowMusicToggleModal" :music-info="selectedToggleMusicInfo" :preferred-source="selectedToggleSource" @toggle="toggleSource" />
     <base-menu v-model="isShowItemMenu" :menus="menus" :xy="menuLocation" item-name="name" @menu-click="handleMenuClick" />
   </common-list-loading>
 </template>
 
 <script>
-import { computed, reactive } from '@common/utils/vueTools'
+import { computed, reactive, watch, nextTick } from '@common/utils/vueTools'
 import { clipboardWriteText } from '@common/utils/electron'
 import { assertApiSupport } from '@renderer/store/utils'
 import { getCoverKey } from '@renderer/utils/musicCover'
-import SearchList from './components/SearchList.vue'
+import SearchBar from './components/SearchBar.vue'
 import MusicToggleModal from './components/MusicToggleModal.vue'
 import useListInfo from './useListInfo'
 import useList from './useList'
@@ -158,7 +158,7 @@ import useEntityDetailNavigation from '@renderer/utils/compositions/useEntityDet
 export default {
   name: 'MusicList',
   components: {
-    SearchList,
+    SearchBar,
     MusicToggleModal,
   },
   props: {
@@ -175,9 +175,13 @@ export default {
 
     let scrollIndex = null
     let isAnimation = false
-    const handleRestoreScroll = (_scrollIndex, _isAnimation) => {
+    const handleRestoreScroll = async(_scrollIndex, _isAnimation) => {
       scrollIndex = _scrollIndex
       isAnimation = _isAnimation
+      if (scrollIndex != null && isSearching.value) {
+        clearSearch()
+        await nextTick()
+      }
       if (isAnimation) void restoreScroll(scrollIndex, isAnimation)
       // console.log('handleRestoreScroll', scrollIndex, isAnimation)
     }
@@ -207,11 +211,21 @@ export default {
     } = useListInfo({ props, onLoadedList })
 
     const {
+      searchRef,
+      searchQuery,
+      searchField,
+      isSearching,
+      visibleList,
+      getSourceIndex,
+      clearSearch,
+    } = useSearch({ props, list, listRef, setSelectedIndex })
+
+    const {
       selectedList,
       listItemHeight,
       handleSelectData,
       removeAllSelect,
-    } = useList({ listRef, list })
+    } = useList({ listRef, list: visibleList })
 
     const {
       handlePlayMusic,
@@ -275,17 +289,7 @@ export default {
       handleRemoveMusic,
     })
 
-    const {
-      isShowSearchBar,
-      searchList,
-      handleMusicSearchAction,
-    } = useSearch({
-      setSelectedIndex,
-      handlePlayMusic,
-      listRef,
-    })
-
-    const { saveListPosition, restoreScroll } = useListScroll({ props, listRef, list, handleRestoreScroll })
+    const { saveListPosition, restoreScroll } = useListScroll({ props, listRef, list, handleRestoreScroll, isSearching })
 
     const { songDrag, handleSongPointerDown } = useSongDrag({
       props,
@@ -293,6 +297,7 @@ export default {
       listRef,
       listItemHeight,
       selectedList,
+      enabled: computed(() => !isSearching.value),
       onStart: () => { handleMenuClick(null) },
       onSaved: () => {
         removeAllSelect()
@@ -302,8 +307,9 @@ export default {
 
     const handleListItemClick = (event, index) => {
       if (rightClickSelectedIndex.value > -1) return
-      handleSelectData(index)
-      doubleClickPlay(index)
+      handleSelectData(index, event)
+      const sourceIndex = getSourceIndex(visibleList.value[index])
+      if (sourceIndex >= 0) doubleClickPlay(sourceIndex)
     }
     let rightClickTarget = null
     const handleListItemRightClick = (event, index, musicInfo) => {
@@ -320,6 +326,7 @@ export default {
       rightClickSelectedIndex.value = -1
       menuClick(index < 0 ? null : action, index)
     }
+    watch([searchQuery, searchField], () => { handleMenuClick(null) })
     const handleListRightClick = (event) => {
       if (!event.target.classList.contains('select')) return
       if (!window.getSelection()?.toString().trim()) return
@@ -391,9 +398,12 @@ export default {
 
       scrollToTop,
 
-      isShowSearchBar,
-      searchList,
-      handleMusicSearchAction,
+      searchRef,
+      searchQuery,
+      searchField,
+      isSearching,
+      visibleList,
+      getSourceIndex,
 
       list,
       playerInfo,
@@ -459,6 +469,7 @@ export default {
   justify-content: center;
   position: relative;
 }
+.list[data-list-filtered] .num { cursor: default; }
 .cover {
   height: 100%;
   display: flex;

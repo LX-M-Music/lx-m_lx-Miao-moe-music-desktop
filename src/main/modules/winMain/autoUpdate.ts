@@ -137,6 +137,8 @@ const downloadUpdate = async({ downloadUrl: url, fileName, digest, size, version
   let dispatcher: ReturnType<typeof buildDownloadDispatcher> | null = null
   let deadline: ReturnType<typeof setTimeout> | undefined
   try {
+    // Keep one source choice throughout probing, differential updates and full-package fallback.
+    const useMirror = global.lx.appSetting['common.useUpdateMirror']
     const runtime = getUpdateRuntime()
     const fullAsset = { downloadUrl: url, fileName: tempName, digest, size }
     validateAsset(fullAsset, runtime)
@@ -157,7 +159,7 @@ const downloadUpdate = async({ downloadUrl: url, fileName, digest, size, version
     }
     dispatcher = buildDownloadDispatcher()
     const probeAsset = delta?.payload ?? fullAsset
-    const candidates = getUpdateSources(probeAsset.downloadUrl)
+    const candidates = getUpdateSources(probeAsset.downloadUrl, useMirror)
     const sources = candidates.length > 1 ? await speedTestUpdateSources(candidates, {
       dispatcher,
       signal: controller.signal,
@@ -179,7 +181,7 @@ const downloadUpdate = async({ downloadUrl: url, fileName, digest, size, version
     let lastError: unknown = new Error('没有可用的更新下载地址')
     const reroute = (asset: LX.UpdateAsset): UpdateSource[] => sources.map(source => ({
       ...source,
-      url: source.url.endsWith(probeAsset.downloadUrl) ? source.url.slice(0, -probeAsset.downloadUrl.length) + asset.downloadUrl : getUpdateSources(asset.downloadUrl)[0].url,
+      url: source.url.endsWith(probeAsset.downloadUrl) ? source.url.slice(0, -probeAsset.downloadUrl.length) + asset.downloadUrl : getUpdateSources(asset.downloadUrl, useMirror)[0].url,
     }))
     if (delta) {
       try {

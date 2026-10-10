@@ -3,6 +3,9 @@ dt#update
   | {{ $t('setting__update') }}
   svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__update_start_tip')")
 dd
+  .gap-top(data-update-mirror)
+    base-checkbox(id="setting__update_useMirror" :model-value="appSetting['common.useUpdateMirror']" :label="$t('setting__update_use_mirror')" @update:model-value="updateSetting({'common.useUpdateMirror': $event})")
+    .p.small {{ $t('setting__update_use_mirror_tip') }}
   .gap-top
     base-checkbox(id="setting__update_showChangeLog" :model-value="appSetting['common.showChangeLog']" :label="$t('setting__update_show_change_log')" @update:model-value="updateSetting({'common.showChangeLog': $event})")
   .gap-top
