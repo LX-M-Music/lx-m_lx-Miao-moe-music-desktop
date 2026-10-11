@@ -1,5 +1,5 @@
 <template>
-  <div :class="[$style.lyric, { [$style.fontWeightFont]: setting['desktopLyric.style.isFontWeightFont'], [$style.fontWeightLine]: setting['desktopLyric.style.isFontWeightLine'], [$style.fontWeightExtended]: setting['desktopLyric.style.isFontWeightExtended'] }]" :style="lrcStyles" :title="currentLineText" data-mini-single-line>
+  <div :class="[$style.lyric, { [$style.fontWeightFont]: setting['desktopLyric.style.isFontWeightFont'], [$style.fontWeightLine]: setting['desktopLyric.style.isFontWeightLine'], [$style.fontWeightExtended]: setting['desktopLyric.style.isFontWeightExtended'] }]" :style="lrcStyles" data-mini-single-line>
     <div ref="textContainer" :class="$style.text" />
   </div>
 </template>
@@ -11,10 +11,6 @@ import { setting } from '@lyric/store/state'
 
 const textContainer = ref<HTMLDivElement>()
 const currentLine = computed(() => lyric.lines[lyric.line])
-const currentLineText = computed(() => {
-  const line = currentLine.value
-  return line ? [line.text, ...line.extendedLyrics].filter(Boolean).join('\n') : undefined
-})
 const lrcStyles = computed(() => ({
   fontFamily: setting['desktopLyric.style.font'],
   fontSize: Math.trunc(setting['desktopLyric.style.fontSize']) + 'px',
