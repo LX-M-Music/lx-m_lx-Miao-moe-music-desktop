@@ -50,7 +50,7 @@ async function fixture(t) {
   return { root, old, next, artifacts, manifest, payload, payloadBytes, manifestAsset }
 }
 
-test('portable packaging publishes a matching manifest/payload and the updater fetches only changed chunks', async(t) => {
+test('portable packaging keeps a matching manifest/payload local and the updater fetches only changed chunks', async(t) => {
   const f = await fixture(t)
   const ranges = []
   const progress = []
@@ -73,9 +73,10 @@ test('portable packaging publishes a matching manifest/payload and the updater f
   assert.equal(await fs.readFile(path.join(f.old, 'portable/userData/music.db'), 'utf8'), 'user database')
   assert.equal(await fs.readFile(path.join(f.old, 'notes.txt'), 'utf8'), 'extra user file')
   await api.validateStagedPortable(stage, runtime, '9.0.0')
-  const extra = await portableArtifactHook([{ appOutDir: f.next, arch: 1, packager: { appInfo: { version: '9.0.0' } } }], false)({ outDir: path.join(f.root, 'hook-artifacts') })
-  assert.equal(extra.length, 2)
-  assert(extra.some(file => file.endsWith('-win_x64-green-update.json')))
+  const outDir = path.join(f.root, 'hook-artifacts')
+  const extra = await portableArtifactHook([{ appOutDir: f.next, arch: 1, packager: { appInfo: { version: '9.0.0' } } }], false)({ outDir })
+  assert.deepEqual(extra, [])
+  assert.deepEqual((await fs.readdir(outDir)).sort(), ['LX-M.Music-v9.0.0-win_x64-green-update.bin', 'LX-M.Music-v9.0.0-win_x64-green-update.json'])
 })
 
 test('wrong runtime metadata, unsafe names, overlapping ranges, duplicate Windows paths and inconsistent hashes are rejected', async(t) => {

@@ -8,7 +8,7 @@ const { Arch } = require('electron-builder')
 const { sha256, safeRemove } = require('./helpers/windows-update-fixture.cjs')
 const portable = require('../build-config/portable-update.cjs')
 
-test('actual packaging configuration writes the correct edition/architecture marker and generates green sidecars after final artifacts', { skip: process.platform !== 'win32', timeout: 30000 }, async(t) => {
+test('actual packaging configuration writes the correct edition/architecture marker and keeps green sidecars local after final artifacts', { skip: process.platform !== 'win32', timeout: 30000 }, async(t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-update-packaging-'))
   t.after(() => safeRemove(root, 'lx-update-packaging-'))
   for (const [type, arch, win7, edition] of [
@@ -70,10 +70,12 @@ test('actual packaging configuration writes the correct edition/architecture mar
         assert.equal(file.sha256, sha256(bytes), file.path)
       }
     }
-    if (edition !== 'portable') assert.deepEqual(artifacts, [])
-    else {
-      assert.equal(artifacts.length, contexts.length * 2)
-      for (const manifestPath of artifacts.filter(name => name.endsWith('.json'))) {
+    assert.deepEqual(artifacts, [])
+    if (edition === 'portable') {
+      const sidecars = fs.readdirSync(outDir).filter(name => /green-update\.(json|bin)$/.test(name))
+      assert.equal(sidecars.length, contexts.length * 2)
+      for (const name of sidecars.filter(name => name.endsWith('.json'))) {
+        const manifestPath = path.join(outDir, name)
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
         const context = contexts.find(item => Arch[item.arch] === manifest.arch)
         const entry = manifest.files.find(file => file.path === 'LX-M Music.exe')

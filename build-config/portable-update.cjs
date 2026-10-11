@@ -104,11 +104,13 @@ async function createPortableDelta(appOutDir, outDir, { version, arch, win7 = fa
 
 function portableArtifactHook(contexts, win7) {
   return async({ outDir }) => {
-    const files = []
-    for (const context of contexts) files.push(...await createPortableDelta(context.appOutDir, outDir, {
-      version: context.packager.appInfo.version, arch: Arch[context.arch], win7,
-    }))
-    return files
+    for (const context of contexts) {
+      await createPortableDelta(context.appOutDir, outDir, {
+        version: context.packager.appInfo.version, arch: Arch[context.arch], win7,
+      })
+    }
+    // Keep update manifests and payloads as local build files.
+    return []
   }
 }
 
