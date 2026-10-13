@@ -1,6 +1,6 @@
 import { isPrivatePlaylistId, sharedPlaylistData } from '@common/privatePlaylists'
 import { WebDAVError } from './errors'
-import { validateData } from './data'
+import { normalizePlaylists, validateData } from './data'
 
 interface MobilePlaylistFile {
   version?: string
@@ -18,7 +18,7 @@ export const parseMobilePlaylists = (content: string) => {
   const file = raw as unknown as MobilePlaylistFile
   const playlists = sharedPlaylistData({ defaultList: file.data.defaultList, loveList: file.data.loveList, userList: file.data.userList })
   validateData({ playlists }, ['playlists'])
-  return { file, playlists, containsPrivate: file.data.userList.some(list => isPrivatePlaylistId(list?.id)) }
+  return { file, playlists: normalizePlaylists(playlists), containsPrivate: file.data.userList.some(list => isPrivatePlaylistId(list?.id)) }
 }
 
 export const buildMobilePlaylists = (previous: MobilePlaylistFile | undefined, playlists: LX.Sync.List.ListData): MobilePlaylistFile => {

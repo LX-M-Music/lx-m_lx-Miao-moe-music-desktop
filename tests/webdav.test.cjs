@@ -433,3 +433,37 @@ test('custom mobile playlist directory matches a mobile fork with a changed WebD
   assert(f.dav.files.has('/dav/Music/%E6%89%8B%E6%9C%BA/playlists.json'))
   assert(!f.dav.files.has(f.dav.playlistFile))
 })
+
+test('Walnut omitted playlist metadata and SQLite null defaults do not trigger uploads after restart', async t => {
+  const f = await fixture(t)
+  const remote = { ...playlists('listening'), loveList: [song('favorite')], userList: [{ id: 'created', name: 'Created playlist', list: [song('custom')] }] }
+  f.dav.seedMobile({ version: '2', lastModified: Date.now(), data: { ...remote, tempList: [] } })
+  assert.deepEqual((await f.run('download')).downloaded, ['playlists'])
+  const before = f.dav.files.get(f.dav.playlistFile)
+  // The real SQLite reader fills absent optional columns when the app starts again.
+  Object.assign(f.local.playlists.userList[0], { source: null, sourceListId: null, locationUpdateTime: null })
+  const next = await f.run('sync')
+  assert.equal(next.success, true)
+  assert.deepEqual(next.uploaded, [])
+  assert.deepEqual(next.downloaded, [])
+  assert.equal(f.dav.files.get(f.dav.playlistFile), before)
+})
+
+test('WebDAV shares the three public list types while all five Cookie imports stay local', async t => {
+  const f = await fixture(t)
+  f.local.playlists.loveList.push(song('favorite'))
+  f.local.playlists.userList.push({ id: 'self-created', name: 'Created', list: [song('custom')] })
+  const privateLists = ['wy', 'tx', 'kg', 'kw', 'mg'].map(source => ({ id: 'userlist_' + source + '_sync_account', name: source + ' account import', list: [song(source + '-private')] }))
+  f.local.playlists.userList.push(...privateLists)
+  assert.equal((await f.run('upload')).success, true)
+  const cloud = JSON.parse(f.dav.files.get(f.dav.playlistFile))
+  assert.equal(cloud.data.defaultList.length, 1)
+  assert.equal(cloud.data.loveList.length, 1)
+  assert.deepEqual(cloud.data.userList.map(list => list.id), ['self-created'])
+  assert(!f.dav.files.get(f.dav.playlistFile).includes('-private'))
+  cloud.data.userList[0].name = 'Renamed on mobile'
+  f.dav.seedMobile(cloud)
+  assert.deepEqual((await f.run('download')).downloaded, ['playlists'])
+  assert.equal(f.local.playlists.userList[0].name, 'Renamed on mobile')
+  assert.deepEqual(f.local.playlists.userList.slice(1), privateLists)
+})

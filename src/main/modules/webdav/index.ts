@@ -6,7 +6,7 @@ import { serializePublicConfig } from '@main/utils/credentials'
 import { STORE_NAMES } from '@common/constants'
 import { playlistDiff } from '@common/syncDiff'
 import { createClient, type RemoteFile } from './client'
-import { hash, normalizeData, parseSnapshot, selectedSections, validateData } from './data'
+import { hash, normalizeData, normalizePlaylists, parseSnapshot, selectedSections, validateData } from './data'
 import { planSync, type Baseline } from './plan'
 import { WebDAVError } from './errors'
 import { errorForTransport, getErrorInfo } from '@common/utils/errorMessage'
@@ -94,8 +94,11 @@ export const runWebDAV = async(operation: LX.WebDAV.Operation): Promise<LX.WebDA
       for (const section of unchecked) validated.add(section)
       if (readPrimary) cached = { identity: cacheIdentity, file: remoteFile, snapshot: remote, normalized, validated, hashes: remoteFile.unchanged && cached ? cached.hashes : {} }
       if (syncPlaylists && !mobileParsed && remote.data.playlists && (!Array.isArray(remote.data.playlists.userList) || remote.data.playlists.userList.some(list => !list || typeof list !== 'object'))) throw new WebDAVError('invalid_data', ['playlists'])
-      const legacyPlaylists = syncPlaylists && !mobileParsed && remote.data.playlists ? sharedPlaylistData(remote.data.playlists) : undefined
-      if (legacyPlaylists) validateData({ playlists: legacyPlaylists }, ['playlists'])
+      let legacyPlaylists = syncPlaylists && !mobileParsed && remote.data.playlists ? sharedPlaylistData(remote.data.playlists) : undefined
+      if (legacyPlaylists) {
+        validateData({ playlists: legacyPlaylists }, ['playlists'])
+        legacyPlaylists = normalizePlaylists(legacyPlaylists)
+      }
       const remoteData: LX.WebDAV.Data = { ...Object.fromEntries(primarySections.map(section => [section, normalized[section]])), ...(syncPlaylists ? { playlists: mobileParsed?.playlists ?? legacyPlaylists } : {}) }
       const missingPrimary = primarySections.length > 0 && remoteFile.content == null
       const missingPlaylists = syncPlaylists && !remoteData.playlists && primarySections.length === 0

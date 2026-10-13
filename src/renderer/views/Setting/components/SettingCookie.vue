@@ -35,12 +35,14 @@ dd(v-for="item in sources" :key="item.id" :data-setting-search="`setting__cookie
         :placeholder="item.placeholder"
         rows="3"
         spellcheck="false"
+        :disabled="loginBusy(item.id)"
         @input="handleCookieChange(item.id, $event.target.value)"
       )
     .p.setting-actions
-      base-btn.btn(min :disabled="loginBusy(item.id)" @click="handleLogin(item)") {{ loginBusy(item.id) ? $t('setting__cookie_login_running') : $t('setting__cookie_login') }}
+      base-btn.btn(min :disabled="loginBusy(item.id)" @click="handleLogin(item, 'embedded')") {{ loginMode(item.id) === 'embedded' ? $t('setting__cookie_login_running') : $t('home2__login_embedded') }}
+      base-btn.btn(min :disabled="loginMode(item.id) === 'browser'" @click="handleLogin(item, 'browser')") {{ loginMode(item.id) === 'browser' ? $t('setting__cookie_login_running') : $t('home2__login_browser') }}
       base-btn.btn(min :disabled="testStates[item.id]?.busy || loginBusy(item.id) || syncing" @click="handleTestPlaylists(item.id)") {{ testStates[item.id]?.busy ? $t('setting__cookie_test_running') : $t('setting__cookie_test') }}
-      base-btn.btn(min @click="handleClear(item.id)") {{ $t('setting__cookie_clear') }}
+      base-btn.btn(min :disabled="loginBusy(item.id)" @click="handleClear(item.id)") {{ $t('setting__cookie_clear') }}
       span(v-if="appSetting[item.settingKey]" :style="{ color: isValid(item.id) ? 'var(--color-primary)' : 'var(--color-font-label)', fontSize: '12px' }")
         | {{ isValid(item.id) ? $t('setting__cookie_status_valid') : $t('setting__cookie_status_invalid') }}
       span(v-if="loginTip(item.id)" :style="{ color: loginError(item.id) ? 'var(--color-font-label)' : 'var(--color-primary)', fontSize: '12px' }") {{ loginTip(item.id) }}
@@ -58,7 +60,8 @@ import {
   isCookieValid,
 } from '@renderer/utils/cookieManager'
 import { checkCookiePlaylists, syncAllPlaylists, syncCookiePlaylists } from '@renderer/utils/cookieSync'
-import { loginCookieEmbedded } from '@renderer/utils/ipc'
+import { clearPlatformLoginState, loginPlatform, platformLoginStates } from '@renderer/store/platformLogin'
+import { refreshLoginStatus } from '@renderer/store/loginStatus'
 
 export default {
   name: 'SettingCookie',
@@ -86,9 +89,13 @@ export default {
       try {
         const result = await checkCookiePlaylists(id)
         if (testStates[id] !== state || appSetting[`cookie.${id}`] !== cookie) return
+        const message = t(`setting__cookie_test_${result.status}`, { count: String(result.listCount) })
+        const failure = result.status === 'failed' && result.message
+          ? result.message
+          : { code: `COOKIE_${result.status.toUpperCase()}`, message }
         testStates[id] = {
           busy: false,
-          tip: result.status === 'success' ? t(`setting__cookie_test_${result.status}`, { count: String(result.listCount) }) : formatError(result.message ?? { code: `COOKIE_${result.status.toUpperCase()}`, message: t(`setting__cookie_test_${result.status}`) }, '', 'COOKIE_LOAD_FAILED'),
+          tip: result.status === 'success' ? message : formatError(failure, '', 'COOKIE_LOAD_FAILED'),
           error: result.status !== 'success',
         }
       } catch (error) {
@@ -112,6 +119,7 @@ export default {
       const item = sources.find(s => s.id === id)
       if (!item) return
       appSetting[item.settingKey] = value
+      clearPlatformLoginState(id)
       resetTest(id)
       saveCookie(item.settingKey, value)
     }
@@ -125,31 +133,34 @@ export default {
         cookieSaveTimers.delete(item.settingKey)
       }
       appSetting[item.settingKey] = ''
+      clearPlatformLoginState(id)
       resetTest(id)
       await updateSetting({ [item.settingKey]: '' })
+      refreshLoginStatus()
     }
 
-    const loginStates = reactive({})
-    const loginBusy = (id) => loginStates[id]?.busy === true
-    const loginTip = (id) => loginStates[id]?.tip ?? ''
-    const loginError = (id) => loginStates[id]?.error === true
+    const loginMode = (id) => platformLoginStates[id]?.mode
+    const loginBusy = (id) => !!loginMode(id)
+    const loginTip = (id) => platformLoginStates[id]?.error || (platformLoginStates[id]?.success ? t('setting__cookie_login_done') : '')
+    const loginError = (id) => !!platformLoginStates[id]?.error
 
-    const handleLogin = async(item) => {
-      if (loginBusy(item.id)) return
-      loginStates[item.id] = { busy: true, tip: '', error: false }
+    const handleLogin = async(item, mode) => {
+      const timer = cookieSaveTimers.get(item.settingKey)
       try {
-        // 一键登录使用软件内嵌登录窗口，完成后窗口自动关闭并回收 Cookie
-        const { cookie, playlists } = await loginCookieEmbedded(item.id)
-        appSetting[item.settingKey] = cookie
+        if (timer) {
+          clearTimeout(timer)
+          cookieSaveTimers.delete(item.settingKey)
+          await updateSetting({ [item.settingKey]: appSetting[item.settingKey].trim() })
+        }
+        const loginResult = await loginPlatform(item.id, mode)
+        if (!loginResult) return
         resetTest(item.id)
-        await updateSetting({ [item.settingKey]: cookie })
-        loginStates[item.id] = { busy: false, tip: t('setting__cookie_login_done'), error: false }
 
         syncing.value = true
         syncTip.value = ''
         syncError.value = false
         try {
-          const result = await syncCookiePlaylists(item.id, playlists)
+          const result = await syncCookiePlaylists(item.id, loginResult.playlists)
           if (result.synced) {
             syncTip.value = t('setting__cookie_sync_now_done', { list: String(result.listCount), count: String(result.count) })
             syncError.value = !!result.error
@@ -166,9 +177,7 @@ export default {
         } finally {
           syncing.value = false
         }
-      } catch (error) {
-        loginStates[item.id] = { busy: false, tip: formatError(error, t('setting__cookie_login_failed'), 'COOKIE_LOGIN_FAILED'), error: true }
-      }
+      } catch { /* The shared login state carries the error for this platform. */ }
     }
 
     const syncing = ref(false)
@@ -222,6 +231,7 @@ export default {
       handleCookieChange,
       handleClear,
       loginBusy,
+      loginMode,
       loginTip,
       loginError,
       handleLogin,

@@ -11,11 +11,11 @@
             <span :class="$style.stateText">{{ $t('home2__state_' + loginStatus[item.source]) }}</span>
           </div>
           <div :class="$style.actions">
-            <base-btn :class="$style.btn" min :disabled="busy[item.source] || loginStatus[item.source] == 'valid'" @click="handleLogin(item.source, true)">
-              {{ busyMode[item.source] == 'embedded' ? $t('home2__login_running') : $t('home2__login_embedded') }}
+            <base-btn :class="$style.btn" min :disabled="!!platformLoginStates[item.source]?.mode" @click="handleLogin(item.source, 'embedded')">
+              {{ platformLoginStates[item.source]?.mode == 'embedded' ? $t('home2__login_running') : $t('home2__login_embedded') }}
             </base-btn>
-            <base-btn :class="$style.btn" min :disabled="busyMode[item.source] == 'browser'" @click="handleLogin(item.source, false)">{{ $t('home2__login_browser') }}</base-btn>
-            <base-btn :class="$style.btn" min outline :disabled="busy[item.source] || loginStatus[item.source] == 'none'" @click="handleClear(item.source)">{{ $t('home2__login_clear') }}</base-btn>
+            <base-btn :class="$style.btn" min :disabled="platformLoginStates[item.source]?.mode == 'browser'" @click="handleLogin(item.source, 'browser')">{{ platformLoginStates[item.source]?.mode == 'browser' ? $t('home2__login_running') : $t('home2__login_browser') }}</base-btn>
+            <base-btn :class="$style.btn" min outline :disabled="!!platformLoginStates[item.source]?.mode || loginStatus[item.source] == 'none'" @click="handleClear(item.source)">{{ $t('home2__login_clear') }}</base-btn>
           </div>
         </li>
       </ul>
@@ -25,11 +25,9 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from '@common/utils/vueTools'
 import { COOKIE_SOURCES, SOURCE_NAME, type CookieSource } from '@renderer/utils/cookieManager'
-import { loginCookie, loginCookieEmbedded, cancelLoginCookieEmbedded } from '@renderer/utils/ipc'
-import { updateSetting, appSetting } from '@renderer/store/setting'
-import { clearCookie, loginStatus, refreshLoginStatus } from '@renderer/store/loginStatus'
+import { clearCookie, loginStatus } from '@renderer/store/loginStatus'
+import { clearPlatformLoginState, loginPlatform, platformLoginStates, type PlatformLoginMode } from '@renderer/store/platformLogin'
 import { syncCookiePlaylists } from '@renderer/utils/cookieSync'
 import showToast from '@renderer/plugins/Toast'
 
@@ -42,10 +40,6 @@ const emit = defineEmits<{
   (event: 'changed', source: CookieSource): void
 }>()
 
-const busy = reactive<Partial<Record<CookieSource, boolean>>>({})
-const busyMode = reactive<Partial<Record<CookieSource, 'embedded' | 'browser'>>>({})
-const activeTasks = new Map<CookieSource, Promise<unknown>>()
-
 const items = COOKIE_SOURCES.map(source => ({
   source,
   name: SOURCE_NAME[source],
@@ -55,58 +49,26 @@ const handleClose = () => {
   emit('close')
 }
 
-const saveCookie = async(source: CookieSource, cookie: string) => {
-  const key = ('cookie.' + source) as 'cookie.wy'
-  appSetting[key] = cookie
-  await updateSetting({ [key]: cookie })
-}
-
-const runLogin = async(source: CookieSource, mode: 'embedded' | 'browser') => {
-  busy[source] = true
-  busyMode[source] = mode
-  const task = (async() => {
-    const { cookie, playlists } = mode == 'embedded'
-      ? await loginCookieEmbedded(source)
-      : await loginCookie(source)
-    await saveCookie(source, cookie)
-    refreshLoginStatus()
+const handleLogin = async(source: CookieSource, mode: PlatformLoginMode) => {
+  try {
+    const result = await loginPlatform(source, mode)
+    if (!result) return
     emit('changed', source)
     handleClose()
     // 登录成功后立即同步该平台收藏歌单（沿用 Cookie 同步链路），结果仅提示
-    void syncCookiePlaylists(source, playlists).then(result => {
+    void syncCookiePlaylists(source, result.playlists).then(result => {
       if (result.synced) showToast(window.i18n.t('home2__import_synced', { n: String(result.count) }))
     }).catch(err => {
       console.log('sync playlists after login failed:', err)
     })
-  })()
-  activeTasks.set(source, task)
-  try {
-    await task
   } catch (error: any) {
     showToast(error?.message || window.i18n.t('home2__login_failed'))
-  } finally {
-    busy[source] = false
-    busyMode[source] = undefined
-    activeTasks.delete(source)
   }
-}
-
-const handleLogin = async(source: CookieSource, embedded: boolean) => {
-  // 内嵌登录进行中点击「浏览器登录」：取消内嵌窗口并切换到系统浏览器
-  if (busy[source]) {
-    if (embedded) return
-    if (busyMode[source] == 'embedded') {
-      void cancelLoginCookieEmbedded(source)
-      await activeTasks.get(source)?.catch(() => {})
-      return runLogin(source, 'browser')
-    }
-    return
-  }
-  return runLogin(source, embedded ? 'embedded' : 'browser')
 }
 
 const handleClear = async(source: CookieSource) => {
   await clearCookie(source)
+  clearPlatformLoginState(source)
   emit('changed', source)
 }
 </script>

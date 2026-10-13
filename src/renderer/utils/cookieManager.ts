@@ -18,6 +18,7 @@
  */
 
 import { appSetting } from '@renderer/store/setting'
+import { COOKIE_LOGIN_DEFINITIONS, hasLoginState } from '@common/cookieLogin'
 
 /** 音乐平台标识 */
 export type MusicSource = 'wy' | 'tx' | 'kg' | 'kw' | 'mg'
@@ -81,7 +82,7 @@ export const getCookieValue = (cookie: string, name: string): string | null => {
   if (!cookie) return null
   // 兼容 `key=value; key2=value2` 与换行/制表分隔
   const match = new RegExp(`(?:^|[;\\s])${name}\\s*=\\s*([^;]+)`).exec(cookie)
-  return match ? match[1].trim() : null
+  return match ? match[1].trim() || null : null
 }
 
 /**
@@ -97,13 +98,9 @@ export const getCookieValue = (cookie: string, name: string): string | null => {
 export const isCookieValid = (source: MusicSource, cookie?: string): boolean => {
   const c = cookie ?? getCookie(source)
   if (!c.trim()) return false
-  switch (source) {
-    case 'wy': return !!getCookieValue(c, 'MUSIC_U')
-    case 'tx': return !!(getCookieValue(c, 'uin') ?? getCookieValue(c, 'wxuin')) && !!getCookieValue(c, 'qqmusic_key')
-    case 'kg': return !!getCookieValue(c, 'KuGoo')
-    case 'kw': return !!getCookieValue(c, 'userid')
-    case 'mg': return !!getCookieValue(c, 'mg_auth_sid') || !!getCookieValue(c, 'migu_music_sid') || !!getCookieValue(c, 'USER_ID')
-  }
+  const definition = COOKIE_LOGIN_DEFINITIONS[source]
+  const names = new Set([...definition.cookieGroups.flat(), ...(definition.storageKeys ?? [])])
+  return hasLoginState([...names].map(name => ({ name, value: getCookieValue(c, name) ?? '' })), new Map(), definition)
 }
 
 /**

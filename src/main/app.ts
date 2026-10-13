@@ -13,6 +13,7 @@ import createWorkers from './worker'
 import { migrateDBData } from './utils/migrate'
 import { setProxyByHost } from '@common/utils/request'
 import { flushStores } from '@main/utils/store'
+import { canNavigateCookieLoginWindow } from '@main/utils/cookieLoginWindow'
 
 export const initGlobalData = () => {
   const envParams = parseEnvParams()
@@ -319,6 +320,7 @@ export const listenerAppEvent = (startApp: () => void) => {
         console.log('navigation to url:', navigationUrl.length > 130 ? navigationUrl.substring(0, 130) + '...' : navigationUrl)
         return
       }
+      if (canNavigateCookieLoginWindow(contents, navigationUrl)) return
       if (!navigationUrlWhiteList.some(url => url.test(navigationUrl))) {
         event.preventDefault()
         return

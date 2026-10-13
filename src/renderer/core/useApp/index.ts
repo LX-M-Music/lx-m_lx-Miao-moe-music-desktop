@@ -1,4 +1,5 @@
 import { checkUpdate, getEnvParams, getViewPrevState, sendInited } from '@renderer/utils/ipc'
+import { LIST_IDS } from '@common/constants'
 
 import { proxy, isFullscreen, themeId } from '@renderer/store'
 import { appSetting } from '@renderer/store/setting'
@@ -69,6 +70,7 @@ export default () => {
     }
 
     void getViewPrevState().then(state => {
+      if (state.url === '/list' && 'id' in state.query && state.query.id === LIST_IDS.HISTORY) state.query = { ...state.query, id: LIST_IDS.DEFAULT }
       void router.push({ path: state.url, query: state.query })
     })
 

@@ -1,201 +1,162 @@
-import { BrowserWindow, ipcMain, session, shell } from 'electron'
+import { BrowserWindow, ipcMain, session } from 'electron'
 import path from 'node:path'
 import { mainHandle } from '@common/mainIpc'
 import { WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
-import {
-  COOKIE_LOGIN_DEFINITIONS,
-  getRelevantCookies,
-  hasLoginState,
-  serializeCookies,
-  type CookieLoginDefinition,
-  type CookieLoginResult,
-  type MusicSource,
-} from './cookieLogin'
+import { registerCookieLoginWindow } from '@main/utils/cookieLoginWindow'
+import { COOKIE_LOGIN_DEFINITIONS, getRelevantCookies, hasLoginState, isLoginPage, isMusicSource, loginStorageScript, serializeCookies, type CookieLoginDefinition, type MusicSource } from '@common/cookieLogin'
+import { loginCookieInBrowser, miguPlaylistsScript, parseMiguPlaylists, type CookieLoginResult } from './cookieLogin'
 
-const SOURCE_TITLES: Record<MusicSource, string> = {
-  wy: '登录网易云音乐',
-  tx: '登录 QQ 音乐',
-  kg: '登录酷狗音乐',
-  kw: '登录酷我音乐',
-  mg: '登录咪咕音乐',
-}
-
+const SOURCE_TITLES: Record<MusicSource, string> = { wy: '登录网易云音乐', tx: '登录 QQ 音乐', kg: '登录酷狗音乐', kw: '登录酷我音乐', mg: '登录咪咕音乐' }
 const CHROME_ACTION_CHANNEL = 'cookie-login-chrome-action'
-
-/**
- * 软件内嵌登录窗口
- *
- * 打开一个独立的 BrowserWindow 加载对应平台官网登录页（官方页面自带扫码/手机号/密码登录），
- * 轮询会话 Cookie / localStorage，登录成功后自动把 Cookie 返回给渲染进程并关闭窗口。
- * 会话使用独立内存 partition 并在每次打开前清空，不污染应用默认会话。
- */
-
-const POLL_INTERVAL = 1000
 const LOGIN_TIMEOUT = 5 * 60 * 1000
-
-const isMusicSource = (source: unknown): source is MusicSource => {
-  return typeof source == 'string' && source in COOKIE_LOGIN_DEFINITIONS
+interface EmbeddedTask {
+  promise: Promise<CookieLoginResult>
+  cancel: () => void
+  switchToBrowser: () => void
 }
+const loginTasks = new Map<MusicSource, EmbeddedTask>()
+const owners = new WeakMap<Electron.WebContents, EmbeddedTask>()
 
-const getRelevantStorage = async(win: BrowserWindow, definition: CookieLoginDefinition) => {
+const getRelevantStorage = async(windows: Set<BrowserWindow>, definition: CookieLoginDefinition) => {
   const values = new Map<string, string>()
   if (!definition.storageKeys?.length) return values
-  const keys = new Set(definition.storageKeys)
-  const empty: Record<string, string> = {}
-  const raw: Record<string, string> = await win.webContents.executeJavaScript('JSON.stringify({ ...localStorage })')
-    .then((text: unknown) => typeof text == 'string' ? JSON.parse(text) as Record<string, string> : empty)
-    .catch(() => empty)
-  for (const [name, value] of Object.entries(raw)) {
-    if (keys.has(name) && value) values.set(name, value)
+  const visit = async(frame: Electron.WebFrameMain) => {
+    if (isLoginPage(frame.url, definition)) {
+      const raw = await frame.executeJavaScript(loginStorageScript(definition)).catch(() => '{}')
+      try {
+        const entries = typeof raw === 'string' ? JSON.parse(raw) as Record<string, string> : {}
+        for (const [name, value] of Object.entries(entries)) if (value) values.set(name, value)
+      } catch {}
+    }
+    for (const child of frame.frames) await visit(child)
   }
+  for (const win of windows) if (!win.isDestroyed()) await visit(win.webContents.mainFrame).catch(() => {})
   return values
 }
 
-const createLoginWindow = async(source: MusicSource, definition: CookieLoginDefinition, ses: Electron.Session) => {
-  const win = new BrowserWindow({
-    title: SOURCE_TITLES[source],
-    width: 560,
-    height: 720,
-    minWidth: 420,
-    minHeight: 560,
-    // 无边框 + 透明窗口：由注入的 preload 绘制与主程序一致的圆角标题栏
-    frame: false,
-    transparent: true,
-    show: false,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      spellcheck: false,
-      session: ses,
-      preload: path.join(__dirname, 'cookie-login-preload.js'),
-    },
-  })
-
-  // 登录过程中的授权弹窗（如 QQ 互联）在相同会话内打开，保证 Cookie 可被捕获，并同样注入圆角标题栏
-  win.webContents.setWindowOpenHandler(() => ({
-    action: 'allow',
-    overrideBrowserWindowOptions: {
-      autoHideMenuBar: true,
-      frame: false,
-      transparent: true,
-      width: 820,
-      height: 620,
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        session: ses,
-        preload: path.join(__dirname, 'cookie-login-preload.js'),
-      },
-    },
-  }))
-
-  return win
-}
-
-// 注入标题栏按钮的动作（裸 IPC，校验 sender 属于本模块的登录窗口/其弹窗）
-const handleChromeAction = (sourceOf: (contents: Electron.WebContents) => MusicSource | undefined) => {
-  ipcMain.on(CHROME_ACTION_CHANNEL, (event, action: unknown) => {
-    const source = sourceOf(event.sender)
-    if (!source) return
-    if (action == 'browser') {
-      void shell.openExternal(COOKIE_LOGIN_DEFINITIONS[source].url).catch(() => {})
-      return
-    }
-    if (action == 'close') BrowserWindow.fromWebContents(event.sender)?.close()
-  })
-}
-
-const loginWindows = new Map<MusicSource, BrowserWindow>()
-
 const loginEmbedded = async(source: MusicSource): Promise<CookieLoginResult> => {
+  const current = loginTasks.get(source)
+  if (current) return current.promise
   const definition = COOKIE_LOGIN_DEFINITIONS[source]
   const ses = session.fromPartition(`cookie-login-embedded:${source}`)
-  await ses.clearStorageData().catch(() => {})
-  await ses.clearCache().catch(() => {})
-
-  return new Promise<CookieLoginResult>((resolve, reject) => {
-    let settled = false
-    let pollTimer: ReturnType<typeof setInterval> | undefined
-    let timeoutTimer: ReturnType<typeof setTimeout> | undefined
-    let win: BrowserWindow | null = null
-
-    const cleanup = () => {
-      if (pollTimer) clearInterval(pollTimer)
-      if (timeoutTimer) clearTimeout(timeoutTimer)
-      pollTimer = timeoutTimer = undefined
-      if (win && !win.isDestroyed()) win.destroy()
-      win = null
-      loginWindows.delete(source)
-    }
-    const settle = (fn: typeof resolve | typeof reject, value: CookieLoginResult | Error) => {
+  const windows = new Set<BrowserWindow>()
+  let settled = false
+  let switching = false
+  let disposing = false
+  let polling = false
+  let pollTimer: ReturnType<typeof setInterval> | undefined
+  let timeoutTimer: ReturnType<typeof setTimeout> | undefined
+  let resolve: (value: CookieLoginResult) => void
+  let reject: (error: Error) => void
+  const promise = new Promise<CookieLoginResult>((_resolve, _reject) => { resolve = _resolve; reject = _reject })
+  const disposeWindows = () => {
+    disposing = true
+    if (pollTimer) clearInterval(pollTimer)
+    if (timeoutTimer) clearTimeout(timeoutTimer)
+    for (const win of [...windows]) if (!win.isDestroyed()) win.destroy()
+    windows.clear()
+  }
+  const finish = (result?: CookieLoginResult, error?: Error) => {
+    if (settled) return
+    settled = true
+    disposeWindows()
+    if (loginTasks.get(source) === task) loginTasks.delete(source)
+    if (result) resolve(result)
+    else reject(error ?? new Error('[COOKIE_LOGIN_CANCELLED] 登录窗口已关闭'))
+  }
+  const task: EmbeddedTask = {
+    promise,
+    cancel: () => { finish() },
+    switchToBrowser: () => {
+      if (settled || switching) return
+      switching = true
+      disposeWindows()
+      void loginCookieInBrowser(source).then(result => { finish(result) }, error => { finish(undefined, error) })
+    },
+  }
+  loginTasks.set(source, task)
+  const preferences = {
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+    spellcheck: false,
+    session: ses,
+    preload: path.join(__dirname, 'cookie-login-preload.js'),
+  }
+  const trackWindow = (win: BrowserWindow, root = false) => {
+    const contents = win.webContents
+    registerCookieLoginWindow(contents)
+    windows.add(win)
+    owners.set(contents, task)
+    win.setMenuBarVisibility(false)
+    contents.setWindowOpenHandler(({ url }) => ({
+      action: /^(?:https?:|about:blank)/i.test(url) ? 'allow' : 'deny',
+      overrideBrowserWindowOptions: { autoHideMenuBar: true, frame: false, transparent: true, width: 900, height: 720, webPreferences: preferences },
+    }))
+    contents.on('did-create-window', child => { trackWindow(child) })
+    win.on('closed', () => {
+      owners.delete(contents)
+      windows.delete(win)
+      if (root && !disposing) finish()
+    })
+  }
+  void (async() => {
+    try {
+      await ses.clearStorageData()
+      await ses.clearCache()
       if (settled) return
-      settled = true
-      cleanup()
-      fn(value as never)
-    }
-
-    void (async() => {
-      try {
-        win = await createLoginWindow(source, definition, ses)
-      } catch (error) {
-        settle(reject, error as Error)
-        return
-      }
-      loginWindows.set(source, win)
-
-      win.setMenuBarVisibility(false)
-      win.once('ready-to-show', () => win?.show())
-      win.on('closed', () => {
-        if (!settled) {
-          settled = true
-          if (pollTimer) clearInterval(pollTimer)
-          if (timeoutTimer) clearTimeout(timeoutTimer)
-          reject(new Error('登录窗口已关闭'))
-        }
-        win = null
+      const win = new BrowserWindow({ title: SOURCE_TITLES[source], width: 1000, height: 760, minWidth: 760, minHeight: 560, frame: false, transparent: true, show: false, webPreferences: preferences })
+      trackWindow(win, true)
+      win.once('ready-to-show', () => { if (!win.isDestroyed()) win.show() })
+      win.webContents.on('did-fail-load', (_event, code, description, _url, mainFrame) => {
+        if (mainFrame && code !== -3 && !switching) finish(undefined, new Error('[COOKIE_LOGIN_PAGE_FAILED] 登录页面加载失败：' + description))
       })
-
       const poll = async() => {
-        if (!win || win.isDestroyed()) return
+        if (settled || switching || polling) return
+        polling = true
         try {
-          const cookies = await ses.cookies.get({})
-          const relevant = getRelevantCookies(cookies as Array<{ name: string, value: string, domain: string }>, definition)
-          if (!hasLoginState(relevant, new Map(), definition)) return
-          const storage = await getRelevantStorage(win, definition)
-          const cookie = serializeCookies(relevant, storage)
-          if (!cookie) return
-          settle(resolve, { cookie })
-        } catch { /* 页面跳转期间读取可能失败，等待下一轮 */ }
+          const cookies = getRelevantCookies(await ses.cookies.get({}), definition)
+          const storage = await getRelevantStorage(windows, definition)
+          if (!hasLoginState(cookies, storage, definition) || settled || switching) return
+          let playlists
+          if (source === 'mg') {
+            const page = [...windows].find(item => !item.isDestroyed() && isLoginPage(item.webContents.getURL(), definition))
+            const body = await page?.webContents.executeJavaScript(miguPlaylistsScript).catch(() => undefined)
+            if (body) { try { playlists = parseMiguPlaylists(JSON.parse(body)) } catch {} }
+          }
+          if (settled || switching) return
+          const finalCookies = getRelevantCookies(await ses.cookies.get({}), definition)
+          const finalStorage = await getRelevantStorage(windows, definition)
+          if (hasLoginState(finalCookies, finalStorage, definition)) finish({ cookie: serializeCookies(finalCookies, finalStorage), ...(playlists ? { playlists } : {}) })
+        } catch { /* A navigating frame can disappear; retry on the next poll. */ } finally {
+          // No other poll can enter while this attempt owns the flag.
+          // eslint-disable-next-line require-atomic-updates
+          polling = false
+        }
       }
-
-      pollTimer = setInterval(() => { void poll() }, POLL_INTERVAL)
-      timeoutTimer = setTimeout(() => { settle(reject, new Error('登录超时')) }, LOGIN_TIMEOUT)
-      void win.loadURL(definition.url).catch(() => {})
-    })()
-  })
+      pollTimer = setInterval(() => { void poll() }, 1000)
+      timeoutTimer = setTimeout(() => { finish(undefined, new Error('[COOKIE_LOGIN_TIMEOUT] 登录超时，请重新打开登录窗口')) }, LOGIN_TIMEOUT)
+      void win.loadURL(definition.url).catch(error => { if (!settled && !switching && !String(error).includes('ERR_ABORTED')) finish(undefined, new Error('[COOKIE_LOGIN_PAGE_FAILED] 登录页面加载失败，请检查网络后重试')) })
+    } catch (error) { finish(undefined, error as Error) }
+  })()
+  return promise
 }
 
 export default () => {
-  handleChromeAction((contents) => {
-    for (const [source, win] of loginWindows) {
-      if (win.isDestroyed()) continue
-      if (win.webContents === contents) return source
-      if (contents.hostWebContents === win.webContents) return source
-    }
-    return undefined
+  ipcMain.on(CHROME_ACTION_CHANNEL, (event, action: unknown) => {
+    if (event.senderFrame !== event.sender.mainFrame) return
+    const task = owners.get(event.sender)
+    if (!task) return
+    if (action === 'browser') task.switchToBrowser()
+    else if (action === 'close') BrowserWindow.fromWebContents(event.sender)?.close()
   })
   mainHandle<MusicSource, CookieLoginResult>(WIN_MAIN_RENDERER_EVENT_NAME.cookie_login_embedded, async({ params: source }) => {
-    if (!isMusicSource(source)) throw new Error('Unsupported music source')
+    if (!isMusicSource(source)) throw new Error('[COOKIE_LOGIN_SOURCE] Unsupported music source')
     return loginEmbedded(source)
   })
-  // 取消进行中的内嵌登录（窗口销毁后渲染端收到「登录窗口已关闭」拒绝）
   mainHandle<MusicSource, boolean>(WIN_MAIN_RENDERER_EVENT_NAME.cookie_login_embedded_cancel, async({ params: source }) => {
-    if (!isMusicSource(source)) throw new Error('Unsupported music source')
-    const win = loginWindows.get(source)
-    if (win && !win.isDestroyed()) win.destroy()
-    loginWindows.delete(source)
+    if (!isMusicSource(source)) throw new Error('[COOKIE_LOGIN_SOURCE] Unsupported music source')
+    loginTasks.get(source)?.cancel()
     return true
   })
 }

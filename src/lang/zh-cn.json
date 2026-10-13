@@ -807,7 +807,7 @@
   "setting__basic_window_size_title": "设置软件窗口尺寸",
   "setting__click_copy": "点击复制",
   "setting__cookie": "平台管理",
-  "setting__cookie_desc": "管理各平台的登录状态与收藏歌单同步。登录状态基于各平台 Cookie，可在首页「管理登录」或本页一键登录。",
+  "setting__cookie_desc": "管理各平台的登录状态与收藏歌单同步。可选择「软件内登录」或「浏览器登录」，完成后自动保存登录状态；也可手动填写 Cookie。",
   "setting__cookie_clear": "清空",
   "setting__cookie_clear_confirm": "确定清空 {name} 的 Cookie？清空后需重新填写才能同步歌单。",
   "setting__cookie_login": "一键登录",

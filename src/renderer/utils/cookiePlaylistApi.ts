@@ -8,6 +8,7 @@ import {
 import { deduplicationList, toNewMusicInfo } from '@renderer/utils'
 import musicSdk from '@renderer/utils/musicSdk'
 import { eapi } from '@renderer/utils/musicSdk/wy/utils/crypto'
+import { filterMusicInfoListV5 } from '@renderer/utils/musicSdk/mg/musicInfo'
 import { toMD5 } from '@renderer/utils/musicSdk/utils'
 import { httpFetch } from '@renderer/utils/request'
 
@@ -54,8 +55,10 @@ export interface RemotePlaylist {
 }
 
 export class CookieLoginError extends Error {
+  code = 'COOKIE_LOGIN_EXPIRED'
+
   constructor(source: CookieSource) {
-    super(`${source} cookie: login expired`)
+    super(`${source}: login expired`)
   }
 }
 
@@ -116,7 +119,9 @@ const getTxPlaylists = async(cookie: string): Promise<RemotePlaylist[]> => {
   if (body?.code !== 0 || !Array.isArray(playlists)) throw new Error('tx: failed to load playlists')
   return playlists
     .map((item: any) => ({ id: String(item.tid ?? item.dissid ?? ''), name: String(item.diss_name ?? item.title ?? '').trim() }))
-    .filter((item: RemotePlaylist) => item.id && item.name)
+    // QQ also returns digital-album and paid-song directories with tid=0.
+    // Those are not playlists and cannot be read through the playlist API.
+    .filter((item: RemotePlaylist) => /^[1-9]\d*$/.test(item.id) && item.name)
 }
 
 const getTxSongs = async(cookie: string, id: string): Promise<LX.Music.MusicInfo[]> => {
@@ -142,8 +147,10 @@ const getKwPlaylists = async(cookie: string): Promise<RemotePlaylist[]> => {
 const KG_APPID = 1005
 const KG_CLIENTVER = 20489
 const KG_SIGN_SALT = 'OIlwieks28dk2k092lksi2UIkp'
+const KG_WEB_APPIDS = new Set([1010, 1014])
+const KG_WEB_SIGN_SALT = 'NVPh5oo715z5DIWAeQlhMDsWXXQV4hwt'
 
-interface KugouAuth { userid: string, token: string, mid: string, dfid: string }
+interface KugouAuth { userid: string, token: string, mid: string, dfid: string, appid: number }
 
 export const getKugouAuth = (cookie: string): KugouAuth => {
   const encoded = getCookieValue(cookie, 'KuGoo')
@@ -154,31 +161,37 @@ export const getKugouAuth = (cookie: string): KugouAuth => {
   const userid = account.get('KugooID') ?? account.get('KugouID') ?? ''
   const token = account.get('t') ?? ''
   if (!userid || !token) throw new Error('kg cookie: incomplete credentials')
+  const appid = Number(account.get('a_id') ?? getCookieValue(cookie, 'a_id') ?? KG_APPID)
   return {
     userid,
     token,
-    mid: getCookieValue(cookie, 'kg_mid') ?? '-',
-    dfid: getCookieValue(cookie, 'kg_dfid') ?? '-',
+    mid: getCookieValue(cookie, 'kg_mid') ?? getCookieValue(cookie, 'mid') ?? '-',
+    dfid: getCookieValue(cookie, 'kg_dfid') ?? getCookieValue(cookie, 'dfid') ?? '-',
+    appid: KG_WEB_APPIDS.has(appid) ? appid : KG_APPID,
   }
 }
 
 export const requestKugou = async(path: string, router: string, data: Record<string, any>, auth: KugouAuth, extra: Record<string, string | number> = {}) => {
-  const clienttime = Math.floor(Date.now() / 1000)
+  // Web tokens are bound to their app ID and H5 signing protocol; Android requests reject them.
+  const isWeb = KG_WEB_APPIDS.has(auth.appid)
+  const clienttime = isWeb ? Date.now() : Math.floor(Date.now() / 1000)
   const params: Record<string, string | number> = {
     dfid: auth.dfid,
     mid: auth.mid,
-    uuid: '-',
-    appid: KG_APPID,
-    clientver: KG_CLIENTVER,
+    uuid: isWeb ? auth.mid : '-',
+    appid: auth.appid,
+    clientver: isWeb ? 20000 : KG_CLIENTVER,
     clienttime,
-    plat: 1,
+    plat: isWeb ? 4 : 1,
     userid: auth.userid,
     token: auth.token,
+    ...(isWeb ? { srcappid: 2919 } : {}),
     ...extra,
   }
   const bodyText = JSON.stringify(data)
   const signText = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join('')
-  const signature = toMD5(`${KG_SIGN_SALT}${signText}${bodyText}${KG_SIGN_SALT}`)
+  const salt = isWeb ? KG_WEB_SIGN_SALT : KG_SIGN_SALT
+  const signature = toMD5(`${salt}${signText}${bodyText}${salt}`)
   const query = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))
   query.set('signature', signature)
 
@@ -187,7 +200,10 @@ export const requestKugou = async(path: string, router: string, data: Record<str
     body: bodyText,
     headers: {
       'content-type': 'application/json',
-      'user-agent': 'Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi',
+      'user-agent': isWeb
+        ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        : 'Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi',
+      ...(isWeb ? { Origin: 'https://www.kugou.com', Referer: 'https://www.kugou.com/' } : {}),
       'x-router': router,
       dfid: auth.dfid,
       mid: auth.mid,
@@ -223,7 +239,7 @@ const getKgPlaylists = async(cookie: string): Promise<RemotePlaylist[]> => {
     total = Number(data?.list_count ?? list.length)
     loaded += list.length
     for (const item of list) {
-      if (Number(item.type) !== 0 || Number(item.is_def) !== 0) continue
+      if (Number(item.type) !== 0 || Number(item.is_def ?? 0) !== 0) continue
       const id = String(item.listid ?? '')
       if (!id || ids.has(id)) continue
       ids.add(id)
@@ -272,11 +288,13 @@ const parseMiguPlaylists = (body: any): RemotePlaylist[] => {
     .filter((item: RemotePlaylist) => item.id && item.name)
 }
 
-const getMgPlaylists = async(cookie: string, captured?: RemotePlaylist[]): Promise<RemotePlaylist[]> => {
-  if (captured) return captured
-  const { body } = await fetchResponse('https://c.musicapp.migu.cn/pc/user/home-page/v2.0', {
+const requestMigu = async(cookie: string, path: string) => {
+  // Login can persist pacmtoken from localStorage under mg_auth_pacmtoken.
+  const token = getCookieValue(cookie, 'mg_auth_pacmtoken')
+  const requestCookie = token && !getCookieValue(cookie, 'pacmtoken') ? `${cookie.replace(/;\s*$/, '')}; pacmtoken=${token}` : cookie
+  const { body } = await fetchResponse(`https://app.c.nf.migu.cn${path}`, {
     headers: {
-      Cookie: cookie,
+      Cookie: requestCookie,
       Origin: 'https://music.migu.cn',
       Referer: 'https://music.migu.cn/v5/',
       platform: 'H5',
@@ -286,10 +304,35 @@ const getMgPlaylists = async(cookie: string, captured?: RemotePlaylist[]): Promi
       IMSI: 'h5page',
     },
   })
+  if (String(body?.code) === '290001') throw new CookieLoginError('mg')
+  if (String(body?.code) !== '000000') throw new Error(`mg api error: ${body?.code ?? 'unknown'}`)
+  return body
+}
+
+const getMgPlaylists = async(cookie: string, captured?: RemotePlaylist[]): Promise<RemotePlaylist[]> => {
+  if (captured) return captured
+  const body = await requestMigu(cookie, '/pc/user/home-page/v2.0')
   return parseMiguPlaylists(body)
 }
 
-const getPagedSdkSongs = async(source: 'kw' | 'mg', id: string): Promise<LX.Music.MusicInfo[]> => {
+const getMgSongs = async(cookie: string, id: string): Promise<LX.Music.MusicInfo[]> => {
+  const songs: any[] = []
+  let total: number | undefined
+  for (let page = 1; page <= 1000; page++) {
+    const body = await requestMigu(cookie, `/MIGUM3.0/resource/playlist/song/v2.0?pageNo=${page}&pageSize=50&playlistId=${encodeURIComponent(id)}`)
+    const list = body?.data?.songList
+    const rawCount = body?.data?.totalCount
+    const count = Number(rawCount)
+    if (!Array.isArray(list) || !['number', 'string'].includes(typeof rawCount) || String(rawCount).trim() === '' || !Number.isSafeInteger(count) || count < 0 || (total !== undefined && total !== count)) throw new Error('mg: incomplete playlist songs')
+    total = count
+    songs.push(...list)
+    if (songs.length === total) return deduplicationList(filterMusicInfoListV5(songs).map(toNewMusicInfo))
+    if (!list.length || songs.length > total) break
+  }
+  throw new Error('mg: incomplete playlist songs')
+}
+
+const getPagedSdkSongs = async(source: 'kw', id: string): Promise<LX.Music.MusicInfo[]> => {
   const items: any[] = []
   let page = 1
   let total = Number.POSITIVE_INFINITY
@@ -335,6 +378,6 @@ export const getRemoteSongs = async(source: CookieSource, cookie: string, playli
     case 'tx': return getTxSongs(cookie, playlist.id)
     case 'kg': return getKgSongs(cookie, playlist.id)
     case 'kw': return getPagedSdkSongs('kw', playlist.id)
-    case 'mg': return getPagedSdkSongs('mg', playlist.id)
+    case 'mg': return getMgSongs(cookie, playlist.id)
   }
 }

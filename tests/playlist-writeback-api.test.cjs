@@ -23,6 +23,7 @@ function fixture(respond, cookieOverrides = {}) {
     '@renderer/utils': { deduplicationList: items => items, toNewMusicInfo: item => item },
     '@renderer/utils/musicSdk': {},
     '@renderer/utils/musicSdk/wy/utils/crypto': { eapi: (url, params) => ({ url, params }) },
+    '@renderer/utils/musicSdk/mg/musicInfo': { filterMusicInfoListV5: items => items },
     '@renderer/utils/musicSdk/utils': { toMD5: md5 },
     '../ipc': { updateSetting: async settings => { Object.assign(appSetting, settings) } },
     '@renderer/utils/request': {

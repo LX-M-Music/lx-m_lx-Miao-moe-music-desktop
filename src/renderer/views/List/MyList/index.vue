@@ -34,18 +34,6 @@
         </span>
       </li>
       <li
-        class="default-list" :class="[$style.listsItem, {[$style.active]: LIST_IDS.HISTORY == listId}]"
-        :aria-label="$t('history__title')" :aria-selected="LIST_IDS.HISTORY == listId"
-        @click="handleListToggle(LIST_IDS.HISTORY)"
-      >
-        <span :class="$style.listsLabel">
-          <transition name="list-active">
-            <svg-icon v-if="LIST_IDS.HISTORY == listId" name="angle-right-solid" :class="$style.activeIcon" />
-          </transition>
-          {{ $t('history__title') }}
-        </span>
-      </li>
-      <li
         class="default-list" :class="[$style.listsItem, {[$style.active]: loveList.id == listId}, {[$style.clicked]: rightClickItemIndex == -1}, {[$style.fetching]: fetchingListStatus[loveList.id]}]"
         :aria-label="$t(loveList.name)" :aria-selected="loveList.id == listId"
         @contextmenu="handleListsItemRigthClick($event, -1)" @click="handleListToggle(loveList.id)"
@@ -275,7 +263,6 @@ export default {
       isShowRecycleBin: ref(false),
       isShowTagsModal,
       tagsListInfo,
-      LIST_IDS,
       rightClickItemIndex,
       defaultList,
       loveList,

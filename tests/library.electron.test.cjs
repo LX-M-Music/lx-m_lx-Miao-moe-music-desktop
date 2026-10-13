@@ -7,7 +7,7 @@ const rendererPath = process.env.LX_TEST_USE_DEV_SERVER ? undefined : path.resol
 const rpc = (page, method, ...args) => page.evaluate(({ method, args }) => require('electron').ipcRenderer.invoke('winMain_library_action', { method, args }), { method, args })
 const songs = page => page.evaluate(() => require('electron').ipcRenderer.invoke('player_list_music_get', 'default'))
 
-test('playlist tags use the context menu and the trial list precedes listening history', { timeout: 120000 }, async() => {
+test('playlist tags use the context menu and the sidebar omits listening history', { timeout: 120000 }, async() => {
   let f = await launch({ rendererPath })
   const profilePath = f.output
   const first = { id: 'wy_first', name: '历史歌曲一', singer: '测试歌手', source: 'wy', interval: '03:00', meta: { songId: 'first' } }
@@ -23,9 +23,9 @@ test('playlist tags use the context menu and the trial list precedes listening h
     await route(f.page, '/list?id=one')
     await settled(f.page)
     assert.equal(await f.page.getByRole('button', { name: '曲库管理' }).count(), 0)
-    assert.equal(await f.page.locator('#my-list .default-list[aria-label="听歌历史"]').count(), 1)
+    assert.equal(await f.page.locator('#my-list .default-list[aria-label="听歌历史"]').count(), 0)
     assert.equal(await f.page.locator('#my-list .default-list[aria-label="试听列表"]').count(), 1)
-    assert.deepEqual(await f.page.locator('#my-list .default-list').allTextContents().then(items => items.slice(0, 2).map(item => item.trim())), ['试听列表', '听歌历史'])
+    assert.deepEqual(await f.page.locator('#my-list .default-list').allTextContents().then(items => items.map(item => item.trim())), ['试听列表', '我的收藏'])
     await f.page.locator('#my-list .default-list[aria-label="试听列表"]').click()
     await f.page.locator('#my-list .default-list[aria-label="试听列表"][aria-selected="true"]').waitFor()
     await f.page.locator('#my-list .list-item[data-song-id="wy_first"]').waitFor()
@@ -63,7 +63,7 @@ test('playlist tags use the context menu and the trial list precedes listening h
       await global.lx.worker.dbService.recordListening(tracks[0], new Date('2026-09-01T12:01:00').getTime())
       await global.lx.worker.dbService.recordListening(tracks[1], new Date('2026-09-02T12:00:00').getTime())
     }, [first, second])
-    await f.page.locator('#my-list .default-list[aria-label="听歌历史"]').click()
+    await route(f.page, '/list?id=history')
     await f.page.locator('[data-listening-history]').waitFor()
     await f.page.locator('#my-list .user-list[data-id="one"]').click({ button: 'right' })
     await f.page.getByRole('tab', { name: '编辑标签' }).click()
@@ -93,13 +93,15 @@ test('playlist tags use the context menu and the trial list precedes listening h
     await f.page.evaluate(() => window.i18n.setLanguage('en-us'))
     await f.page.getByRole('heading', { name: 'Listening history' }).waitFor()
     assert.equal(await history.locator('[data-music-column="action"]').innerText(), 'Listened at')
-    assert.equal(await f.page.locator('#my-list .default-list[aria-label="Listening history"]').count(), 1)
+    assert.equal(await f.page.locator('#my-list .default-list[aria-label="Listening history"]').count(), 0)
     await f.page.evaluate(() => window.i18n.setLanguage('zh-cn'))
     assert.equal((await songs(f.page)).length, 1, 'former trial-list data should not be erased')
     assert.deepEqual(f.errors, [])
 
     await f.app.close()
     f = await launch({ profilePath, rendererPath })
+    await f.page.locator('#my-list .default-list[aria-label="试听列表"][aria-selected="true"]').waitFor()
+    assert.equal(await f.page.locator('[data-listening-history]').count(), 0)
     assert.deepEqual((await rpc(f.page, 'getLibraryPreferences')).lists.one.tags, ['学习', '收藏'])
     assert.equal((await rpc(f.page, 'getListeningHistory')).stats.plays, 2)
     await route(f.page, '/list?id=history')

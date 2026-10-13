@@ -63,6 +63,18 @@ const validPlaylists = (value: unknown): value is LX.Sync.List.ListData => {
   })
 }
 
+// Mobile clients omit optional playlist metadata; SQLite restores missing columns as null.
+// Compare the same representation so a restart does not look like a playlist edit.
+export const normalizePlaylists = (playlists: LX.Sync.List.ListData): LX.Sync.List.ListData => ({
+  ...playlists,
+  userList: playlists.userList.map(list => ({
+    ...list,
+    locationUpdateTime: list.locationUpdateTime ?? null,
+    source: list.source ?? undefined,
+    sourceListId: list.sourceListId ?? undefined,
+  })),
+})
+
 export const isCompleted = (task: LX.Download.ListItem) => task.isComplate || task.status == 'completed'
 
 // Only task identity and music metadata travel between machines. URLs and partial files expire or belong to a different machine.
@@ -144,6 +156,7 @@ export const normalizeData = (data: LX.WebDAV.Data, sections: LX.WebDAV.Section[
   for (const section of sections) {
     if (data[section] === undefined) continue
     switch (section) {
+      case 'playlists': result.playlists = normalizePlaylists(data.playlists!); break
       case 'settings': result.settings = portableSettings(data.settings!); break
       case 'downloadHistory': result.downloadHistory = portableDownloads(data.downloadHistory!); break
       case 'downloadTasks': result.downloadTasks = portableDownloads(data.downloadTasks!); break

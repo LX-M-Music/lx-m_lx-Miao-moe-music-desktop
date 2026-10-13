@@ -1317,7 +1317,7 @@
   "home2__login_failed": "登入失敗或已取消",
   "home2__login_tip": "「軟體內登入」會在應用內開啟平台官方登入頁（支援掃碼/手機號等），完成登入後視窗自動關閉並保存登入狀態；「瀏覽器登入」將開啟系統瀏覽器，登入後 Cookie 自動回收。",
   "setting__cookie": "平台管理",
-  "setting__cookie_desc": "管理各平台的登入狀態與收藏歌單同步。登入狀態基於各平台 Cookie，可在首頁「管理登入」或本頁一鍵登入。",
+  "setting__cookie_desc": "管理各平台的登入狀態與收藏歌單同步。可選擇「軟體內登入」或「瀏覽器登入」，完成後自動保存登入狀態；也可手動填寫 Cookie。",
   "home2__hot_songs": "熱門歌曲",
   "home2__song_gone": "歌曲已不在榜單中，請重試",
   "setting__advanced_window_controls": "視窗控制按鈕風格",

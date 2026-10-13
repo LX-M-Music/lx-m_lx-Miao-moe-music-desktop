@@ -20,8 +20,15 @@ const applyChrome = () => {
   if (!body || doc.getElementById('lx-login-titlebar')) return
 
   // 窗口背景裁切为圆角（窗口本身 transparent，页面背景保持白底圆角）
-  html.style.cssText += ';background: transparent !important;'
-  body.style.cssText += ';border-radius: 12px !important; overflow: hidden !important; padding-top: ' + BAR_HEIGHT + ' !important; box-sizing: border-box !important;'
+  html.style.cssText += ';background: transparent !important; height: 100% !important; overflow: hidden !important;'
+  body.style.cssText += ';border-radius: 12px !important; height: 100% !important; overflow: hidden !important; margin: 0 !important; padding-top: 0 !important; box-sizing: border-box !important;'
+  // Give fixed site headers their own viewport below the title bar. Keep the
+  // native drag controls inside body so Chromium computes their hit regions.
+  const content = doc.createElement('div')
+  content.id = 'lx-login-content'
+  content.style.cssText = 'position: absolute; top: ' + BAR_HEIGHT + '; bottom: 0; left: 0; right: 0; overflow: auto; transform: translateZ(0);'
+  while (body.firstChild) content.appendChild(body.firstChild)
+  body.appendChild(content)
 
   const bar = doc.createElement('div')
   bar.id = 'lx-login-titlebar'
@@ -81,7 +88,7 @@ const applyChrome = () => {
     return btn
   }
 
-  const browserBtn = makeButton('浏览器打开', false)
+  const browserBtn = makeButton('浏览器登录', false)
   browserBtn.addEventListener('click', () => { ipcRenderer.send(ACTION_CHANNEL, 'browser') })
 
   const closeBtn = makeButton('×', true)

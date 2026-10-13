@@ -25,6 +25,10 @@
 
 歌单使用两款手机版兼容的 `playlists.json`，默认路径为 `LX_Music/playlists.json`，格式版本为 `2`。LXM 的其他项目仍使用原目录下的 `lx-music-sync.json`，格式版本为 1。上传歌单时保留手机版文件中的临时列表、播放历史、下载任务及其他附加字段；LXM 只读取和改写公开歌单，Cookie 导入歌单不会写入共享文件。单个文件最多 32 MiB。连接支持 HTTP / HTTPS 和 Basic 认证，HTTPS 使用正常证书验证。请求在主进程执行，不受浏览器 CORS 限制；使用直接连接，不套用音乐请求的代理。
 
+与 `lx-lxwalnut-music-mobile-26.09.28` 互通自建歌单、试听列表和我的收藏时，在 LXM 中只勾选“歌单”，把“手机版歌单目录”设置为手机版 WebDAV 路径（默认 `LX_Music`）。各平台通过 Cookie 自动导入的歌单保留在本机，不参加共享同步。手机版已有的临时列表、播放历史和下载任务仍随原文件保留，LXM 不用它们覆盖本地对应数据。
+
+手机版可能省略歌单的来源、来源歌单 ID 和更新时间，LXM 数据库重启后会把这些字段读成空值。同步比较已统一这两种表示，避免重启后把字段默认值误判成歌单修改并重复上传。
+
 替换本机数据前，在应用数据目录保留 `webdav-local-backup.json`，包含本次被替换的项目，下载记录包含原本机路径。它只保留最近一次覆盖前的副本。`webdav.json` 保存当前目标的同步基线与上次结果。备份和基线都留在本机。
 
 目录操作使用 [WebDAV 的 PROPFIND、MKCOL、GET、PUT 和 DELETE](https://www.rfc-editor.org/rfc/rfc4918.html)。上传时采用 [HTTP 条件请求](https://www.rfc-editor.org/rfc/rfc9110.html#name-conditional-requests)：新文件使用 `If-None-Match`，已有文件优先使用强 ETag 和 `If-Match`，没有强 ETag 时使用服务端提供的 `Last-Modified`。时间戳验证精度取决于服务器；两类验证信息均缺失时停止覆盖。跨站重定向会被拒绝，用户名和密码不会转发给其他站点。

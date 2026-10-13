@@ -807,7 +807,7 @@
   "setting__basic_window_size_title": "Set the window size",
   "setting__click_copy": "Click to copy",
   "setting__cookie": "Platforms",
-  "setting__cookie_desc": "Manage platform sign-in state and favorite playlist sync. Sign-in is based on platform cookies; sign in from the home page or here.",
+  "setting__cookie_desc": "Manage platform sign-in and playlist sync. Choose in-app or browser sign-in to save your login automatically, or enter cookies manually.",
   "setting__cookie_clear": "Clear",
   "setting__cookie_clear_confirm": "Clear the {name} Cookie? You will need to re-enter it later to sync playlists.",
   "setting__cookie_login": "Log In",

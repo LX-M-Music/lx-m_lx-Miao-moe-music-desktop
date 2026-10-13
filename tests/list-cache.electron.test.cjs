@@ -133,18 +133,19 @@ test('local playlists and artwork survive switching, edits and a full offline re
       assert.equal(await fixture.page.evaluate(() => document.documentElement.dataset.motionEnabled), 'true')
     })
 
-    await t.test('the existing resource-cache button clears artwork without deleting playlists', async() => {
+    await t.test('the artwork-cache button clears artwork without deleting playlists', async() => {
       offline = false
       await route(fixture.page, '/setting')
       await settled(fixture.page)
       const label = await fixture.page.evaluate(() => window.i18n.t('setting__other'))
       await fixture.page.getByRole('tab', { name: label, exact: true }).click()
       await settled(fixture.page)
-      const clear = await fixture.page.evaluate(() => window.i18n.t('setting__other_resource_cache_clear_btn'))
-      await fixture.page.getByRole('button', { name: clear, exact: true }).click()
-      const confirm = await fixture.page.evaluate(() => window.i18n.t('setting__other_resource_cache_confirm'))
-      await fixture.page.getByRole('button', { name: confirm, exact: true }).click()
-      await fixture.page.waitForFunction(() => window.__motionComponents().find(c => c.type.name === 'SettingOther').setupState.isDisabledResourceCacheClear === false)
+      const row = fixture.page.locator('[data-cache-manager] > div').filter({ hasText: /^封面磁盘缓存/ })
+      await row.getByRole('button', { name: '清理', exact: true }).click()
+      await fixture.page.waitForFunction(() => {
+        const row = [...document.querySelectorAll('[data-cache-manager] > div')].find(row => row.textContent.startsWith('封面磁盘缓存'))
+        return row && !row.querySelector('button').disabled && row.textContent.includes('0 B')
+      })
       await route(fixture.page, '/list?id=cache-a')
       await coversLoaded(fixture.page)
       assert.equal((await listState(fixture.page)).count, 1000)

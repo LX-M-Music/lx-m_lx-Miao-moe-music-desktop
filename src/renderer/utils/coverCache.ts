@@ -5,10 +5,12 @@ import { createRequestLimiter } from './musicSdk/requestCache'
 import { readArtworkResponse, validateArtwork } from '@common/utils/imageLimits'
 
 interface CachedImage { src: string, bytes: number, users: number, retired: boolean }
+interface ImageRequest { users: number, generation: number, memoryVersion: number, image?: CachedImage }
 const images = new Map<string, CachedImage>()
 const retiredImages = new Set<CachedImage>()
 let memoryGeneration = 0
 const pending = new Map()
+const imageRequests = new Map<string, ImageRequest>()
 const scheduleDownload = createRequestLimiter(6)
 let maxMemoryBytes = 32 * 1024 * 1024
 let maxMemoryEntries = 256
@@ -17,7 +19,7 @@ const trimMemory = () => {
   let bytes = [...images.values()].reduce((total, image) => total + image.bytes, 0)
   for (const [key, image] of images) {
     if (images.size <= maxMemoryEntries && bytes <= maxMemoryBytes) break
-    if (image.users || pending.has(key)) continue
+    if (image.users) continue
     images.delete(key)
     bytes -= image.bytes
     URL.revokeObjectURL(image.src)
@@ -33,6 +35,7 @@ export const clearCoverMemory = () => {
   }
   images.clear()
   pending.clear()
+  imageRequests.clear()
 }
 
 export const setCoverMemoryLimits = (bytes: number, entries: number) => {
@@ -50,9 +53,21 @@ const download = async(url: string): Promise<Blob> => {
   }))
 }
 
-const load = async(url: string, fallbackUrl?: string): Promise<CachedImage> => {
-  const memoryVersion = memoryGeneration
-  const generation = artworkCacheGeneration()
+const holdRequestImage = (request: ImageRequest, image: CachedImage) => {
+  if (request.image !== undefined || request.users === 0) return
+  request.image = image
+  image.users++
+  if (image.retired) retiredImages.add(image)
+}
+
+const releaseImage = (image: CachedImage) => {
+  image.users--
+  if (image.retired && !image.users) { URL.revokeObjectURL(image.src); retiredImages.delete(image) }
+  trimMemory()
+}
+
+const load = async(url: string, fallbackUrl: string | undefined, request: ImageRequest): Promise<CachedImage> => {
+  const { memoryVersion, generation } = request
   const key = `image:${url}`
   let cached = await readArtworkCache<Blob>(key)
   throwIfRequestCancelled()
@@ -72,7 +87,11 @@ const load = async(url: string, fallbackUrl?: string): Promise<CachedImage> => {
       // A working original also satisfies this thumbnail key, avoiding another
       // failed thumbnail request every time the playlist is opened.
       if (!cached) await writeArtworkCache(key, blob, generation)
+      throwIfRequestCancelled()
       const image = { src, bytes: blob.size + dimensions.decodedBytes, users: 0, retired: generation !== artworkCacheGeneration() || memoryVersion !== memoryGeneration }
+      // A shared download resolves before its consumers resume. Keep the URL
+      // alive through that gap, including a cache clear or another row's eviction.
+      holdRequestImage(request, image)
       if (!image.retired) images.set(url, image)
       return image
     } catch (error) {
@@ -89,10 +108,11 @@ const load = async(url: string, fallbackUrl?: string): Promise<CachedImage> => {
   throw new Error('No artwork URL')
 }
 
-const getImage = async(url: string, fallbackUrl?: string) => {
+const getImage = async(url: string, fallbackUrl: string | undefined, request: ImageRequest) => {
   const image = images.get(url)
-  if (image) return image
-  return shareRequest(pending, url, async() => load(url, fallbackUrl))
+  if (image) { holdRequestImage(request, image); return image }
+  // Requests started before a clear must remain separate from new consumers.
+  return shareRequest(pending, request, async() => load(url, fallbackUrl, request))
 }
 
 // Each mounted image leases its URL. Eviction never revokes an image still on screen.
@@ -110,9 +130,7 @@ const leaseImage = (url: string, image: CachedImage) => {
     release: () => {
       if (released) return
       released = true
-      image.users--
-      if (image.retired && !image.users) { URL.revokeObjectURL(image.src); retiredImages.delete(image) }
-      trimMemory()
+      releaseImage(image)
     },
   }
 }
@@ -120,9 +138,25 @@ const leaseImage = (url: string, image: CachedImage) => {
 export const acquireCover = async(url: string, fallbackUrl?: string, signal: AbortSignal | undefined = getRequestSignal()) => {
   throwIfRequestCancelled(signal)
   if (!/^https?:\/\//i.test(url)) return { src: url, release: () => {} }
-  const image = await withRequestScope(signal, async() => getImage(url, fallbackUrl))
-  throwIfRequestCancelled(signal)
-  return leaseImage(url, image)
+  // Reserve a memory hit synchronously, before any unmount can revoke its URL.
+  const cached = images.get(url)
+  if (cached) return leaseImage(url, cached)
+  let request = imageRequests.get(url)
+  if (!request) {
+    request = { users: 0, generation: artworkCacheGeneration(), memoryVersion: memoryGeneration }
+    imageRequests.set(url, request)
+  }
+  request.users++
+  try {
+    const image = await withRequestScope(signal, async() => getImage(url, fallbackUrl, request))
+    throwIfRequestCancelled(signal)
+    return leaseImage(url, image)
+  } finally {
+    if (--request.users === 0) {
+      if (imageRequests.get(url) === request) imageRequests.delete(url)
+      if (request.image) releaseImage(request.image)
+    }
+  }
 }
 
 // Song rows and every player surface use the same detail-sized artwork. Display
