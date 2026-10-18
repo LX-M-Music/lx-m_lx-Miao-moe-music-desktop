@@ -130,6 +130,7 @@
     <common-download-modal v-model:show="isShowDownload" :music-info="selectedDownloadMusicInfo" teleport="#view" :list-id="listId" />
     <common-download-multiple-modal v-model:show="isShowDownloadMultiple" :list="selectedList" teleport="#view" :list-id="listId" @confirm="removeAllSelect" />
     <music-toggle-modal v-model:show="isShowMusicToggleModal" :music-info="selectedToggleMusicInfo" :preferred-source="selectedToggleSource" @toggle="toggleSource" />
+    <AudioTagEditorModal :after-save="handleTagsSaved" />
     <base-menu v-model="isShowItemMenu" :menus="menus" :xy="menuLocation" item-name="name" @menu-click="handleMenuClick" />
   </common-list-loading>
 </template>
@@ -149,6 +150,8 @@ import useMusicDownload from './useMusicDownload'
 import useMusicAdd from './useMusicAdd'
 import useSongDrag from './useSongDrag'
 import useMusicActions from './useMusicActions'
+import useMusicTagEditor from './useMusicTagEditor'
+import AudioTagEditorModal from '@renderer/components/common/AudioTagEditorModal.vue'
 import useSearch from './useSearch'
 import useListScroll from './useListScroll'
 import useMusicToggle from './useMusicToggle'
@@ -160,6 +163,7 @@ export default {
   components: {
     SearchBar,
     MusicToggleModal,
+    AudioTagEditorModal,
   },
   props: {
     listId: {
@@ -266,6 +270,8 @@ export default {
       handleRemoveMusic,
     } = useMusicActions({ props, list, removeAllSelect, selectedList })
 
+    const { handleEditMusicTags, handleTagsSaved } = useMusicTagEditor({ list })
+
     const {
       menus,
       menuLocation,
@@ -287,6 +293,7 @@ export default {
       handleCopyName,
       handleDislikeMusic,
       handleRemoveMusic,
+      handleEditMusicTags,
     })
 
     const { saveListPosition, restoreScroll } = useListScroll({ props, listRef, list, handleRestoreScroll, isSearching })
@@ -379,6 +386,7 @@ export default {
       isShowItemMenu,
       menuLocation,
       handleMenuClick,
+      handleTagsSaved,
 
       handleListRightClick,
       assertApiSupport,

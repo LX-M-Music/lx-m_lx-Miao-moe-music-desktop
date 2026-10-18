@@ -2,7 +2,7 @@
   <material-modal :show="editor.visible" :close-btn="!editor.busy" width="min(780px, calc(100vw - 32px))" max-width="calc(100vw - 32px)" max-height="calc(100vh - 32px)" @close="close" @after-enter="focusEditor">
     <div ref="content" :class="$style.content" role="dialog" aria-modal="true" :aria-label="$t('download__edit_tags')" @keydown.esc.stop.prevent="close">
       <h2 :class="$style.title">{{ $t('download__edit_tags') }}</h2>
-      <TagEditor />
+      <TagEditor :after-save="afterSave" />
     </div>
   </material-modal>
 </template>
@@ -11,6 +11,8 @@
 import { onBeforeUnmount, ref } from '@common/utils/vueTools'
 import TagEditor from '../../../optional-plugins/audio-tag-editor/Settings.vue'
 import { editor } from '../../../optional-plugins/audio-tag-editor/session'
+
+defineProps({ afterSave: { type: Function, default: undefined } })
 
 const content = ref(null)
 // Keep the draft when closing; opening another file already checks unsaved changes.

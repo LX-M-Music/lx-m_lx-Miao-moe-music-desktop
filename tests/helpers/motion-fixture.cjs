@@ -6,12 +6,13 @@ const { _electron } = require('playwright-core')
 
 const project = process.env.LX_TEST_PROJECT ? path.resolve(process.env.LX_TEST_PROJECT) : path.resolve(__dirname, '../..')
 
-async function launch({ record = false, profilePath, initializeMotion = true, reducedMotion = 'no-preference', rendererPath = process.env.LX_TEST_RENDERER_PATH, disableHardwareAcceleration = true, args = [] } = {}) {
+async function launch({ record = false, hidden = false, profilePath, initializeMotion = true, reducedMotion = 'no-preference', rendererPath = process.env.LX_TEST_RENDERER_PATH, disableHardwareAcceleration = true, args = [] } = {}) {
   if (process.env.LX_TEST_PROJECT) rendererPath = path.join(project, 'dist/index.html')
   const output = profilePath ?? await fs.mkdtemp(path.join(os.tmpdir(), 'lx-motion-check-'))
   await fs.mkdir(path.join(output, 'portable'), { recursive: true })
   const wrapper = path.join(output, 'wrapper.cjs')
   await fs.writeFile(wrapper, `const electron = require('electron');
+${hidden ? 'electron.BrowserWindow.prototype.show = function() {}; electron.BrowserWindow.prototype.showInactive = function() {};' : ''}
 electron.app.setAppPath(${JSON.stringify(project)});
 electron.app.getVersion = () => ${JSON.stringify(require(path.join(project, 'package.json')).version)};
 electron.app.setAsDefaultProtocolClient = () => false;

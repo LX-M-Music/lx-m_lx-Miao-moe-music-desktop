@@ -2,6 +2,8 @@ import { computed, ref, shallowReactive, reactive, nextTick } from '@common/util
 import musicSdk from '@renderer/utils/musicSdk'
 import { useI18n } from '@renderer/plugins/i18n'
 import { hasDislike } from '@renderer/core/dislikeList'
+import { canEditLocalMusic } from '@root/optional-plugins/audio-tag-editor/actions'
+import { editor } from '@root/optional-plugins/audio-tag-editor/session'
 
 export default ({
   assertApiSupport,
@@ -18,6 +20,7 @@ export default ({
   handleCopyName,
   handleDislikeMusic,
   handleRemoveMusic,
+  handleEditMusicTags,
   hiddenActions = /** @type {string[]} */ ([]),
 }) => {
   const itemMenuControl = reactive({
@@ -32,6 +35,8 @@ export default ({
     dislike: true,
     remove: true,
     sourceDetail: true,
+    local: false,
+    editTags: false,
   })
   const t = useI18n()
   const menuLocation = shallowReactive({ x: 0, y: 0 })
@@ -75,6 +80,12 @@ export default ({
         disabled: !itemMenuControl.copyName,
       },
       {
+        name: t('download__edit_tags'),
+        action: 'editTags',
+        hide: !handleEditMusicTags || !itemMenuControl.local,
+        disabled: !itemMenuControl.editTags || editor.busy || !editor.active,
+      },
+      {
         name: t('list__source_detail'),
         action: 'sourceDetail',
         disabled: !itemMenuControl.sourceDetail,
@@ -99,6 +110,8 @@ export default ({
 
   const showMenu = (event, musicInfo) => {
     itemMenuControl.sourceDetail = !!musicSdk[musicInfo.source]?.getMusicDetailPageUrl
+    itemMenuControl.local = musicInfo.source === 'local'
+    itemMenuControl.editTags = canEditLocalMusic(musicInfo)
     // itemMenuControl.play =
     //   itemMenuControl.playLater =
     itemMenuControl.download = assertApiSupport(musicInfo.source) && musicInfo.source != 'local'
@@ -157,6 +170,9 @@ export default ({
         break
       case 'sourceDetail':
         handleOpenMusicDetail(index)
+        break
+      case 'editTags':
+        if (itemMenuControl.editTags && !editor.busy && editor.active) handleEditMusicTags?.(index)
     }
   }
 

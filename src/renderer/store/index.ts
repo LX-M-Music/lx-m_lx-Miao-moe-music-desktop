@@ -95,8 +95,8 @@ export const sourceNames = computed(() => {
     wy: 'wy',
     all: window.i18n.t(prefix + 'all' as any),
   }
-  for (const { id } of music.sources) {
-    sourceNames[id as LX.OnlineSource] = window.i18n.t(prefix + id as any)
+  for (const { id, name } of music.sources) {
+    sourceNames[id as LX.OnlineSource] = id.startsWith('musicfree_') ? name : window.i18n.t(prefix + id as any)
   }
 
   return sourceNames

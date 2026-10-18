@@ -115,7 +115,7 @@ export const getAndSetList = async(source: LX.OnlineSource, tabId: string, sortI
   let request: Promise<ListInfo> | undefined
   if (sortId == 'recommend') {
     // 主页推荐歌单：未配置该平台 Cookie 时提示配置
-    if (!hasCookie(source)) {
+    if (source.startsWith('musicfree_') || !hasCookie(source as Exclude<LX.OnlineSource, `musicfree_${string}`>)) {
       listInfo.list = []
       listInfo.total = 0
       listInfo.noItemLabel = window.i18n.t('list__need_cookie')

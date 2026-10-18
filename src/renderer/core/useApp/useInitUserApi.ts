@@ -8,6 +8,7 @@ import { qualityList, userApi } from '@renderer/store'
 import { appSetting } from '@renderer/store/setting'
 import { dialog } from '@renderer/plugins/Dialog'
 import { setUserApi } from '@renderer/core/apiSource'
+import { isMusicFreeSource } from '@common/musicFree'
 
 const sendUserApiRequest: typeof sendUserApiRequestRemote = async(data) => {
   let stop: () => void
@@ -33,7 +34,7 @@ export default () => {
     if (status) {
       if (apiInfo.sources) {
         let apis: any = {}
-        let qualitys: LX.QualityList = {}
+        let qualitys: LX.QualityList = Object.fromEntries(Object.entries(qualityList.value).filter(([id]) => isMusicFreeSource(id)))
         for (const [source, { actions, type, qualitys: sourceQualitys }] of Object.entries(apiInfo.sources)) {
           if (type != 'music') continue
           apis[source as LX.Source] = {}

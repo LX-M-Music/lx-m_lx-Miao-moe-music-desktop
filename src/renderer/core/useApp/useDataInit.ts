@@ -14,6 +14,7 @@ import { initDislikeInfo, registerRemoteDislikeAction } from '@renderer/core/dis
 import { syncCookieListsOnStartup } from '@renderer/utils/cookieSync'
 import { getListPrevSelectId } from '@renderer/utils/data'
 import { initPlaylistWriteback, startPlaylistWriteback, disposePlaylistWriteback, notifyPlaylistChanged } from '@renderer/utils/playlistWriteback'
+import { initMusicFreeSources } from '@renderer/store/musicFree'
 
 const initPrevPlayInfo = async() => {
   const info = await getPlayInfo()
@@ -66,6 +67,7 @@ export default () => {
     await Promise.all([
       initUserApi().catch(err => { log.error(err); showLoadError(err, 'LOCAL_DATA_LOAD_FAILED') }), // 自定义API
       initLocalLists(),
+      initMusicFreeSources().catch(err => { log.error(err); showLoadError(err, 'MUSICFREE_LOAD_FAILED') }),
     ]).catch(err => {
       log.error(err); showLoadError(err, 'LOCAL_DATA_LOAD_FAILED')
     })

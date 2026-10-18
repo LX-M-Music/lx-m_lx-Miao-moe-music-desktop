@@ -26,6 +26,7 @@ declare namespace LX {
     }
 
     interface MusicInfoMeta_online extends MusicInfoMetaBase {
+      musicfree?: Record<string, any>
       qualitys: MusicQualityType[]
       _qualitys: _MusicQualityType
       albumId?: string | number // 歌曲专辑ID
@@ -88,7 +89,11 @@ declare namespace LX {
       meta: MusicInfoMeta_mg
     }
 
-    type MusicInfoOnline = MusicInfo_online_common | MusicInfo_kg | MusicInfo_tx | MusicInfo_mg
+    interface MusicInfo_musicfree extends MusicInfoBase<`musicfree_${string}`> {
+      meta: MusicInfoMeta_online
+    }
+
+    type MusicInfoOnline = MusicInfo_online_common | MusicInfo_kg | MusicInfo_tx | MusicInfo_mg | MusicInfo_musicfree
     type MusicInfo = MusicInfoOnline | MusicInfoLocal
 
     interface LyricInfo {

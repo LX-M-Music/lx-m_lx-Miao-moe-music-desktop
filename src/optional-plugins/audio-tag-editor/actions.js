@@ -2,7 +2,7 @@ import { formatError } from '@common/utils/errorMessage'
 import { computed } from 'vue'
 import { dialog } from '@renderer/plugins/Dialog'
 import { getDownloads, getDownloadSavePaths } from '@renderer/utils/downloadFiles'
-import { readTags } from './metadata'
+import { readTags, supported } from './metadata'
 import { resolveDownloadFile, sameFilePath } from './downloadFile'
 import { editor } from './session'
 import { text, fieldNames } from './text'
@@ -74,4 +74,17 @@ export const openDownload = async(id, notifyError = false) => withEditorAction(a
   if (!editor.active) return false
   applySnapshot(snapshot, id)
   return true
+}, notifyError)
+
+export const canEditLocalMusic = musicInfo => musicInfo?.source === 'local' && supported(musicInfo.meta?.filePath)
+
+export const openLocalMusic = async(musicInfo, notifyError = false) => withEditorAction(async() => {
+  if (!canEditLocalMusic(musicInfo)) fail('UNSUPPORTED_FILE')
+  const filePath = musicInfo.meta.filePath
+  if (dirty.value && sameFilePath(filePath, editor.snapshot.filePath)) {
+    editor.downloadId = ''
+    return true
+  }
+  if (!await confirmDiscard() || !editor.active) return false
+  return loadFile(filePath)
 }, notifyError)

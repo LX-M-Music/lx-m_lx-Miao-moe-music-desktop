@@ -14,6 +14,7 @@ import { markRaw, toRaw } from '@common/utils/vueTools'
 import { getMusicUrl, getPicUrl, getLyricInfo } from '@renderer/core/music/online'
 import { appSetting } from '../setting'
 import { qualityList } from '..'
+import { isMusicFreeSource, isMusicFreeMediaUrl } from '@common/musicFree'
 import { proxyCallback } from '@renderer/worker/utils'
 import { arrPush, arrUnshift, joinPath } from '@renderer/utils'
 import { DOWNLOAD_STATUS } from '@common/constants'
@@ -337,7 +338,7 @@ const handleStartTask = async(info: LX.Download.ListItem, run: DownloadRun) => {
         }).catch(error => { if (isCurrentRun(info, run)) handleError(info, error) })
         break
     }
-  }), getProxy(), Math.max(0, appSetting['download.rateLimit'] || 0) * 1024,
+  }), isMusicFreeMediaUrl(info.metadata.url) ? undefined : getProxy(), Math.max(0, appSetting['download.rateLimit'] || 0) * 1024,
   downloadLimitBytes(appSetting['download.maxTaskSizeMiB']),
   batchInitialBytes)
 }
@@ -346,6 +347,7 @@ const startTask = async(info: LX.Download.ListItem) => {
   runs.set(info.id, run)
   info.isComplate = false
   if (info.failure?.kind === 'url') info.metadata.url = null
+  if (isMusicFreeSource(info.metadata.musicInfo.source) || isMusicFreeMediaUrl(info.metadata.url)) info.metadata.url = null
   info.failure = undefined
   setStatus(info, DOWNLOAD_STATUS.RUN)
   runingTask.set(info.id, info)

@@ -1,17 +1,18 @@
 <template>
   <material-modal :show="show" teleport="#view" @close="handleClose" @after-enter="$refs.input.focus()">
-    <main :class="$style.main">
+    <main :class="$style.main" data-user-api-online-import>
       <h2>{{ $t('user_api_import_online__title') }}</h2>
       <base-input
         ref="input"
         v-model="url"
         :class="$style.input"
         type="url"
+        :disabled="disabled"
         :placeholder="$t('user_api_import_online__input_tip')"
         @submit="handleSubmit" @blur="verify"
       />
       <div :class="$style.footer">
-        <base-btn :class="$style.btn" @click="handleClose">{{ $t('btn_close') }}</base-btn>
+        <base-btn :class="$style.btn" :disabled="disabled" @click="handleClose">{{ $t('btn_close') }}</base-btn>
         <base-btn :class="$style.btn" :disabled="disabled" @click="handleSubmit">{{ btnText }}</base-btn>
       </div>
     </main>
@@ -29,8 +30,12 @@ export default {
       type: Boolean,
       default: false,
     },
+    importSource: {
+      type: Function,
+      required: true,
+    },
   },
-  emits: ['update:show', 'import'],
+  emits: ['update:show'],
   data() {
     return {
       url: '',
@@ -49,20 +54,25 @@ export default {
   },
   methods: {
     handleClose() {
-      this.$emit('update:show', false)
+      if (!this.disabled) this.$emit('update:show', false)
     },
     verify() {
-      if (!/^https?:\/\//.test(this.url)) this.url = ''
+      this.url = this.url.trim()
+      if (!/^https?:\/\//i.test(this.url)) this.url = ''
       return this.url
     },
     async handleSubmit() {
-      let url = this.verify()
+      if (this.disabled) return
+      const url = this.verify()
       if (!url) return
       this.disabled = true
       this.btnText = this.$t('user_api_import_online__input_loading')
-      let script
       try {
-        script = await httpFetch(url, { follow_max: 3 }).promise.then(resp => resp.body)
+        const response = await httpFetch(url, { follow_max: 3 }).promise
+        if (response.statusCode !== 200) throw new Error(`HTTP ${response.statusCode}`)
+        const script = typeof response.body === 'string' ? response.body : JSON.stringify(response.body)
+        await this.importSource({ script, url })
+        this.$emit('update:show', false)
       } catch (err) {
         void dialog.error(this.$t('user_api_import__failed', { message: formatError(err, '', 'SOURCE_IMPORT_FAILED') }))
         return
@@ -70,15 +80,6 @@ export default {
         this.disabled = false
         this.btnText = this.$t('user_api_import_online__input_confirm')
       }
-      if (script.length > 9_000_000) {
-        void dialog.error(this.$t('user_api_import__failed', {
-          message: 'Too large script',
-          confirm: this.$t('ok'),
-        }))
-        return
-      }
-      this.$emit('import', script)
-      this.handleClose()
     },
   },
 }

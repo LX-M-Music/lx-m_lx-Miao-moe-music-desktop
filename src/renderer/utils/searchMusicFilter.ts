@@ -27,7 +27,7 @@ export const getSearchVersion = (name?: string | null): SearchVersion => {
   return 'standard'
 }
 
-export const filterSearchSongs = <T extends Song>(songs: T[], version: SearchVersion = 'all', merge = false, canPlay: (song: T) => boolean = () => true) => {
+export const filterSearchSongs = <T extends Song>(songs: T[], version: SearchVersion = 'all', merge = false, canPlay: (song: T) => boolean = () => true, sourceLabel: (source: string) => string = source => source) => {
   const selected = songs.filter(song => version === 'all' || getSearchVersion(song.name) === version)
   const groups = new Map<string, T[][]>()
   const list: T[] = []
@@ -48,11 +48,12 @@ export const filterSearchSongs = <T extends Song>(songs: T[], version: SearchVer
         Reflect.deleteProperty(sourceLabels, previous.id)
         group.unshift(song)
       } else group.push(song)
-      sourceLabels[group[0].id] = group.map(item => item.source).join(' / ')
+      sourceLabels[group[0].id] = group.map(item => sourceLabel(item.source)).join(' / ')
     } else {
       list.push(song)
       candidates.push([song])
       groups.set(key, candidates)
+      if (sourceLabel(song.source) !== song.source) sourceLabels[song.id] = sourceLabel(song.source)
     }
   }
   return { list, sourceLabels, mergedCount: selected.length - list.length }

@@ -9,6 +9,8 @@ import { supportQuality } from './api-source'
 import { versionChars } from './versionChars'
 import { loadLocalSourcePlugins, loadRemoteSourcePlugins } from './plugins/loader'
 import { getRequestSignal, withRequestScope, withRequestDeadline } from '../requestContext'
+import { isMusicFreeSource } from '@common/musicFree'
+import { onSourcesChanged, sourceRevision, sourcesChanged } from './plugins/sourceEvents'
 
 
 /**
@@ -65,7 +67,21 @@ registerExtSources(loadLocalSourcePlugins())
 
 const musicSdk = {
   get sources() {
+    // eslint-disable-next-line no-unused-expressions -- Track dynamic sources in Vue computed consumers.
+    sourceRevision.value
     return buildSourceList()
+  },
+  onSourcesChanged,
+  replaceMusicFreeSources(plugins) {
+    for (let index = extSources.length - 1; index >= 0; index--) {
+      const { id } = extSources[index]
+      if (!isMusicFreeSource(id)) continue
+      delete sourcesMap[id]
+      delete musicSdk[id]
+      extSources.splice(index, 1)
+    }
+    for (const { id, source } of registerExtSources(plugins)) musicSdk[id] = source
+    sourcesChanged()
   },
   ...sourcesMap,
   async init() {
@@ -74,6 +90,7 @@ const musicSdk = {
       const registered = registerExtSources(await loadRemoteSourcePlugins())
       // 远程音源在本对象创建后注入，需手动同步到导出对象以支持 `musicSdk[source]`
       for (const { id, source } of registered) musicSdk[id] = source
+      if (registered.length) sourcesChanged()
     } catch (err) {
       console.warn('[musicSdk] load remote source plugins failed:', err)
     }
@@ -227,4 +244,4 @@ const musicSdk = {
   },
 }
 
-export default musicSdk
+export default /** @type {typeof musicSdk & Record<import('@common/musicFree').MusicFreeSource, any>} */ (musicSdk)

@@ -84,7 +84,7 @@ import { sizeFormate } from '@renderer/utils'
 import { retryFailedDownloads } from '@renderer/store/download/action'
 import { downloadFailureKinds } from '@common/utils/download/errors'
 import { formatDownloadFileName } from '@common/utils/download/fileName'
-import TagEditorModal from './TagEditorModal.vue'
+import TagEditorModal from '@renderer/components/common/AudioTagEditorModal.vue'
 
 export default {
   name: 'Download',

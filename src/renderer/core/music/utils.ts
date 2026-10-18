@@ -14,6 +14,7 @@ import { requestMsg } from '@renderer/utils/message'
 import { apis } from '@renderer/utils/musicSdk/api-source'
 import { awaitRequest, shareRequest, throwIfRequestCancelled } from '@renderer/utils/requestContext'
 import { createRequestCache } from '@renderer/utils/musicSdk/requestCache'
+import { isMusicFreeSource, MUSIC_FREE_QUALITIES } from '@common/musicFree'
 
 
 const otherSourceCache = createRequestCache(60000, 20)
@@ -182,6 +183,10 @@ type TryQualityType = typeof TRY_QUALITYS_LIST[number]
  * 例如设置为 flac24bit 时返回 [flac24bit, flac, 320k, 128k]（按音源/歌曲支持度过滤）
  */
 export const getTryQualityList = (highQuality: LX.Quality, musicInfo: LX.Music.MusicInfoOnline, explicitQuality = false): LX.Quality[] => {
+  if (isMusicFreeSource(musicInfo.source)) {
+    const index = MUSIC_FREE_QUALITIES.indexOf(highQuality as typeof MUSIC_FREE_QUALITIES[number])
+    return MUSIC_FREE_QUALITIES.slice(index < 0 ? 0 : index)
+  }
   const list = qualityList.value[musicInfo.source]
   const tryList: LX.Quality[] = TRY_QUALITYS_LIST.includes(highQuality as TryQualityType)
     ? TRY_QUALITYS_LIST
@@ -231,6 +236,10 @@ const requestOnlineMusicUrl = async(musicInfo: LX.Music.MusicInfoOnline, quality
   return shareRequest(pendingMusicUrls, key, async() => awaitRequest(musicSdk[musicInfo.source].getMusicUrl(toOldMusicInfo(musicInfo), quality)))
 }
 
+// Relay URLs and MusicFree signed URLs are session-bound. Resolve them again
+// instead of persisting a dead loopback URL across application restarts.
+const getCachedOnlineUrl = async(musicInfo: LX.Music.MusicInfoOnline, quality: LX.Quality) => isMusicFreeSource(musicInfo.source) ? null : getStoreMusicUrl(musicInfo, quality)
+
 export const getMaxQuality = (musicInfo: LX.Music.MusicInfoOnline, sourceQualityList: readonly string[]): LX.Quality => {
   if (musicInfo.meta._qualitys.flac24bit) {
     for (const q of EXTRA_QUALITY_TIERS) {
@@ -259,8 +268,6 @@ export const getOnlineOtherSourceMusicUrl = async({ musicInfos, quality, onToggl
   quality: LX.Quality
   isFromCache: boolean
 }> => {
-  if (!await window.lx.apiInitPromise[0]) throw new Error('source init failed')
-
   let musicInfo: LX.Music.MusicInfoOnline | null = null
   let lastErr: any = null
   // eslint-disable-next-line no-cond-assign
@@ -276,7 +283,7 @@ export const getOnlineOtherSourceMusicUrl = async({ musicInfos, quality, onToggl
     const tryQualitys = getTryQualityList(quality ?? appSetting['player.playQuality'], musicInfo, quality != null)
     for (const itemQuality of tryQualitys) {
       throwIfRequestCancelled()
-      const cachedUrl = await getStoreMusicUrl(musicInfo, itemQuality)
+      const cachedUrl = await getCachedOnlineUrl(musicInfo, itemQuality)
       if (cachedUrl && !isRefresh) return { url: cachedUrl, musicInfo, quality: itemQuality, isFromCache: true }
 
       let reqPromise
@@ -319,14 +326,14 @@ export const handleGetOnlineMusicUrl = async({ musicInfo, quality, onToggleSourc
   quality: LX.Quality
   isFromCache: boolean
 }> => {
-  if (!await window.lx.apiInitPromise[0]) throw new Error('source init failed')
+  if (!isMusicFreeSource(musicInfo.source) && !await window.lx.apiInitPromise[0]) throw new Error('source init failed')
 
   // 从目标音质开始逐级降级尝试，全部失败后才进入换源流程
   const tryQualitys = getTryQualityList(quality ?? appSetting['player.playQuality'], musicInfo, quality != null)
   let lastErr: any = new Error('get music url failed')
   for (const targetQuality of tryQualitys) {
     throwIfRequestCancelled()
-    const cachedUrl = await getStoreMusicUrl(musicInfo, targetQuality)
+    const cachedUrl = await getCachedOnlineUrl(musicInfo, targetQuality)
     if (cachedUrl && !isRefresh) return { url: cachedUrl, musicInfo, quality: targetQuality, isFromCache: true }
 
     let reqPromise

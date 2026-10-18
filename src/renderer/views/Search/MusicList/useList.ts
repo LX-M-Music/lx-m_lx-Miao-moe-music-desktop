@@ -8,6 +8,7 @@ import { addHistoryWord } from '@renderer/store/search/action'
 import { search as searchMusic, resetListInfo, listInfos, type ListInfo } from '@renderer/store/search/music'
 import { assertApiSupport } from '@renderer/store/utils'
 import { filterSearchSongs } from '@renderer/utils/searchMusicFilter'
+import { sourceNames } from '@renderer/store'
 
 export type SearchSource = LX.OnlineSource | 'all'
 
@@ -27,7 +28,7 @@ export default () => {
     noItemLabel: '',
   })
   const mergeSongs = ref(false)
-  const filtered = computed(() => filterSearchSongs(listInfo.value.list, 'all', mergeSongs.value, song => assertApiSupport(song.source)))
+  const filtered = computed(() => filterSearchSongs(listInfo.value.list, 'all', mergeSongs.value, song => assertApiSupport(song.source), source => sourceNames.value[source as LX.OnlineSource] ?? source))
   const displayList = computed(() => filtered.value.list)
   const sourceLabels = computed(() => filtered.value.sourceLabels)
 

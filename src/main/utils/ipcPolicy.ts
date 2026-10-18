@@ -3,6 +3,7 @@ import { CMMON_EVENT_NAME, WIN_MAIN_RENDERER_EVENT_NAME, WIN_LYRIC_RENDERER_EVEN
 import { PLUGIN_IPC, isPluginId } from '@common/optionalPlugins'
 import { BACKUP_IPC } from '@common/backup'
 import { SOURCE_PLUGIN_IPC } from '@common/sourcePlugin'
+import { MUSIC_FREE_IPC, isMusicFreeSource } from '@common/musicFree'
 
 type Role = 'main' | 'lyric' | 'userApi'
 type SenderEvent = Pick<Electron.IpcMainEvent, 'sender' | 'senderFrame'>
@@ -59,6 +60,13 @@ for (const name of [SOURCE_PLUGIN_IPC.load, SOURCE_PLUGIN_IPC.call, SOURCE_PLUGI
 checks.set(SOURCE_PLUGIN_IPC.load, obj)
 checks.set(SOURCE_PLUGIN_IPC.call, shape({ id: str, callId: str, method: str, args: Array.isArray }))
 checks.set(SOURCE_PLUGIN_IPC.cancel, shape({ id: str, callId: str }))
+for (const name of [MUSIC_FREE_IPC.list, MUSIC_FREE_IPC.import, MUSIC_FREE_IPC.remove, MUSIC_FREE_IPC.configure, MUSIC_FREE_IPC.call, MUSIC_FREE_IPC.cancel]) known.add(name)
+checks.set(MUSIC_FREE_IPC.list, empty)
+checks.set(MUSIC_FREE_IPC.import, v => obj(v) && ((typeof v.script === 'string' && v.script.length <= 2 * 1024 * 1024) || str(v.url)))
+checks.set(MUSIC_FREE_IPC.remove, isMusicFreeSource)
+checks.set(MUSIC_FREE_IPC.configure, shape({ id: isMusicFreeSource, enabled: bool, variables: obj }))
+checks.set(MUSIC_FREE_IPC.call, shape({ id: isMusicFreeSource, callId: str, method: str, args: Array.isArray }))
+checks.set(MUSIC_FREE_IPC.cancel, shape({ id: isMusicFreeSource, callId: str }))
 const add = (prefix: string, names: string, check: Check) => { for (const name of names.split(' ')) checks.set(prefix + name, check) }
 add('common_', 'get_env_params clear_env_params_deeplink get_system_fonts list_custom_fonts get_app_setting', empty)
 add('common_', 'read_custom_font', str)

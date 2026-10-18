@@ -246,6 +246,12 @@ function init() {
       return handleFail('renderer-scripts')
     }),
     startMain().then(() => handleSuccess('main')).catch(() => handleFail('main')),
+    new Promise((resolve, reject) => {
+      webpack(require('./musicfree/webpack.config')).watch({}, (error, stats) => {
+        if (error || stats.hasErrors()) reject(error ?? Error(stats.toString({ all: false, errors: true })))
+        else { resolve(); if (electronProcess) runElectronDelay() }
+      })
+    }),
   ]).then(startElectron).catch(err => {
     console.error(err)
   })

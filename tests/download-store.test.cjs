@@ -22,7 +22,7 @@ function fixture(t, options={}){
     './state':{downloadList:list},'@common/utils/vueTools':{markRaw:x=>x,toRaw:x=>x},
     '@renderer/core/music/online':{getMusicUrl:options.url|| (async()=> 'https://audio.test/new'),getLyricInfo:async()=>{lyrics++;return{lyric:'[00:01.000] line'}},getPicUrl:async()=>''},
     '../setting':{appSetting:settings},'..':{qualityList:{value:{kw:['128k','320k']}}},'@renderer/worker/utils':{proxyCallback:x=>x},'@renderer/utils':{joinPath:path.join,arrPush:(a,b)=>a.push(...b)},
-    '@common/constants':{DOWNLOAD_STATUS:{RUN:'run',WAITING:'waiting',PAUSE:'pause',ERROR:'error',COMPLETED:'completed'}},'../index':{proxy:{}},'./utils':{buildSavePath:()=> 'C:/downloads'},
+    '@common/constants':{DOWNLOAD_STATUS:{RUN:'run',WAITING:'waiting',PAUSE:'pause',ERROR:'error',COMPLETED:'completed'}},'../index':{proxy:options.proxy||{}},'./utils':{buildSavePath:()=> 'C:/downloads'},
     '@renderer/plugins/Toast':message=>toasts.push(message),'@common/utils/nodejs':{getFileStats:async filePath=>existingPaths.has(filePath)?{isFile:()=>true,size:1000}:null},
   })('src/renderer/store/download/action.ts')
   t.after(async()=>{writeGate.resolve();await actions.pauseDownloadTasks(list);await new Promise(resolve=>setTimeout(resolve,150));global.window=previous;if(previousNavigator)Object.defineProperty(global,'navigator',previousNavigator);else delete global.navigator})
@@ -79,6 +79,19 @@ test('C01: an obsolete URL lookup cannot start a paused or replaced download',as
   old.resolve('https://audio.test/old');await flush();assert.deepEqual(f.started,[])
   recent.resolve('https://audio.test/current');await flush();await flush()
   assert.deepEqual(f.started,['a']);assert.equal(info.metadata.url,'https://audio.test/current')
+})
+
+test('MusicFree resumes with a fresh relay URL and keeps loopback traffic out of the configured proxy',async t=>{
+  const info=task('musicfree-download')
+  info.metadata.musicInfo.source='musicfree_0123456789abcdef01234567'
+  info.metadata.url='http://127.0.0.1:11111/musicfree/'+'a'.repeat(48)
+  const fresh='http://127.0.0.1:22222/musicfree/'+'b'.repeat(48)
+  let lookups=0
+  const f=fixture(t,{list:[info],url:async()=>{lookups++;return fresh},proxy:{enable:true,host:'proxy.example',port:'7890'}})
+  await f.actions.startDownloadTasks(f.list);await flush();await flush()
+  assert.equal(lookups,1)
+  assert.equal(info.metadata.url,fresh)
+  assert.equal(f.startArgs[0][0],undefined)
 })
 test('C09/C10: completion waits for tags; failed post-processing retries without redownloading audio',async t=>{
   const f=fixture(t), info=f.list[0]

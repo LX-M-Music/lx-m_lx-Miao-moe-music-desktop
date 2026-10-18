@@ -292,6 +292,7 @@ node --test tests/list-loading.electron.test.cjs
 | 播放记录上报 | [playHistoryReporter.ts](./src/renderer/utils/playHistoryReporter.ts) |
 | 桌面歌词 | [SettingDesktopLyric.vue](./src/renderer/views/Setting/components/SettingDesktopLyric.vue)、[App.vue](./src/renderer-lyric/App.vue) |
 | 插件商店与官方插件 | [安装管理](./src/main/modules/optionalPlugins/manager.ts)、[插件源码](./src/optional-plugins)、[构建与发布](./plugins/README.md) |
+| MusicFree 音源兼容 | [使用与兼容范围](./doc/musicfree-compatibility.md)、[统一自定义源导入管理](./src/renderer/views/Setting/components/UserApiModal.vue)、[隔离运行环境](./src/main/modules/musicFree) |
 
 <details>
 <summary><strong>开发者扩展音源加载器</strong></summary>

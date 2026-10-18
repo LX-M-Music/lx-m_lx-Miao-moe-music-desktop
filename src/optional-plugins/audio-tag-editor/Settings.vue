@@ -71,6 +71,8 @@ import { editor } from './session'
 import { text, fieldNames } from './text'
 import { dirty, errorText, confirmDiscard, report, loadFile, validateDownloadTarget, withEditorAction } from './actions'
 
+const props = defineProps({ afterSave: { type: Function, default: undefined } })
+
 const fileName = computed(() => editor.snapshot ? path.basename(editor.snapshot.filePath) : '')
 const coverPreview = computed(() => editor.cover?.data ? `data:${editor.cover.mime};base64,${editor.cover.data}` : '')
 watch(() => JSON.stringify(editor.tags), () => { editor.saved = false })
@@ -122,6 +124,7 @@ const save = async() => {
     editor.snapshot = snapshot
     editor.tags = { ...snapshot.tags }
     editor.cover = snapshot.cover
+    await props.afterSave?.(snapshot)
     // Let the dirty-state watcher settle before showing the saved confirmation.
     await nextTick()
     editor.saved = true

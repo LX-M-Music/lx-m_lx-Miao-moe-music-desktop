@@ -1,4 +1,5 @@
 import { updateListMusics } from '@renderer/store/list/action'
+import { isMusicFreeSource } from '@common/musicFree'
 import { appSetting } from '@renderer/store/setting'
 import {
   saveLyric,
@@ -53,7 +54,7 @@ export const getMusicUrl = async({ musicInfo, quality, isRefresh, allowToggleSou
   //   // return Promise.reject(new Error('该歌曲没有可播放的音频'))
   // }
   // 先按候选音质顺序探测缓存，命中即可直接播放（无需等待音源初始化）
-  if (!isRefresh) {
+  if (!isRefresh && !isMusicFreeSource(musicInfo.source)) {
     for (const itemQuality of getTryQualityList(quality ?? appSetting['player.playQuality'], musicInfo, quality != null)) {
       const cachedUrl = await getStoreMusicUrl(musicInfo, itemQuality)
       if (cachedUrl) {
@@ -65,8 +66,8 @@ export const getMusicUrl = async({ musicInfo, quality, isRefresh, allowToggleSou
 
   return handleGetOnlineMusicUrl({ musicInfo, quality, onToggleSource, isRefresh, allowToggleSource }).then(({ url, quality: targetQuality, musicInfo: targetMusicInfo, isFromCache }) => {
     setLastTryQuality(musicInfo.id, targetQuality)
-    if (targetMusicInfo.id != musicInfo.id && !isFromCache) void saveMusicUrl(targetMusicInfo, targetQuality, url)
-    void saveMusicUrl(musicInfo, targetQuality, url)
+    if (targetMusicInfo.id != musicInfo.id && !isFromCache && !isMusicFreeSource(targetMusicInfo.source)) void saveMusicUrl(targetMusicInfo, targetQuality, url)
+    if (!isMusicFreeSource(musicInfo.source) && !isMusicFreeSource(targetMusicInfo.source)) void saveMusicUrl(musicInfo, targetQuality, url)
     return url
   })
 }

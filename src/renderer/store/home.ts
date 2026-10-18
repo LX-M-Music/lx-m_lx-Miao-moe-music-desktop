@@ -105,6 +105,8 @@ const persist = () => {
 }
 
 const fetchFeedParts = async(source: LX.OnlineSource, prev: SourceFeedState | undefined) => {
+  if (source.startsWith('musicfree_')) throw new Error('MusicFree home feed is not available')
+  const cookieSource = source as Exclude<LX.OnlineSource, `musicfree_${string}`>
   const sdk = music[source]
   // 并行拉取四个板块，单项失败时回落到上一次缓存（无缓存则留空），不阻塞其他板块
   const [playlists, hotWords, boards, favorites] = await Promise.all([
@@ -118,8 +120,8 @@ const fetchFeedParts = async(source: LX.OnlineSource, prev: SourceFeedState | un
       .then((board: { list: HomeBoardItem[] }) => (board.list ?? []).slice(0, BOARDS_LIMIT))
       .catch(() => null),
     // 收藏歌单：仅在平台 Cookie 有效时拉取；未登录视为显式空列表
-    hasCookie(source) && isCookieValid(source)
-      ? getRemotePlaylists(source, getCookie(source))
+    hasCookie(cookieSource) && isCookieValid(cookieSource)
+      ? getRemotePlaylists(cookieSource, getCookie(cookieSource))
         .then((list: HomeFavoriteItem[]) => list.slice(0, FAVORITES_LIMIT).map(({ id, name }) => ({ id, name })))
         .catch(() => null)
       : Promise.resolve([] as HomeFavoriteItem[]),

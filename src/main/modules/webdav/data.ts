@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import defaultSetting from '@common/defaultSetting'
 import { LIST_IDS, QUALITYS } from '@common/constants'
 import { WebDAVError } from './errors'
+import { isMusicFreeSource } from '@common/musicFree'
 
 export const SECTIONS: LX.WebDAV.Section[] = ['playlists', 'downloadHistory', 'downloadTasks', 'settings', 'dislike']
 export const selectedSections = (setting: LX.AppSetting) => SECTIONS.filter(section => setting[`sync.webdav.${section}`])
@@ -36,9 +37,10 @@ export const portableSettings = (settings: Partial<LX.AppSetting>): Partial<LX.A
 const validMusic = (value: unknown, onlineOnly = false): value is LX.Music.MusicInfo => {
   if (!isRecord(value) || typeof value.id != 'string' || !value.id || typeof value.name != 'string' || typeof value.singer != 'string') return false
   if (value.interval != null && typeof value.interval != 'string') return false
-  if (!['kw', 'kg', 'tx', 'wy', 'mg', ...(onlineOnly ? [] : ['local'])].includes(String(value.source))) return false
+  if (!['kw', 'kg', 'tx', 'wy', 'mg', ...(onlineOnly ? [] : ['local'])].includes(String(value.source)) && !isMusicFreeSource(value.source)) return false
   const meta = value.meta
   if (!isRecord(meta) || !['string', 'number'].includes(typeof meta.songId) || typeof meta.albumName != 'string') return false
+  if (isMusicFreeSource(value.source) && !isRecord(meta.musicfree)) return false
   return value.source == 'local'
     ? typeof meta.filePath == 'string' && typeof meta.ext == 'string'
     : Array.isArray(meta.qualitys) && isRecord(meta._qualitys)

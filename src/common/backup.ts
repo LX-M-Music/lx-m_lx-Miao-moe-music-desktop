@@ -4,6 +4,7 @@ import { LIST_IDS, QUALITYS } from './constants'
 import { toNewMusicInfo, fixNewMusicInfoQuality } from './utils/tools'
 import migrateSetting from './utils/migrateSetting'
 import { validateLibraryPreferences, type LibraryPreferences } from './library'
+import { isMusicFreeSource } from './musicFree'
 
 export const BACKUP_IPC = { export: 'backup_export', preview: 'backup_preview', restore: 'backup_restore', discard: 'backup_discard' } as const
 export const MAX_BACKUP_FILE = 64 * 1024 * 1024
@@ -73,10 +74,11 @@ export const validateBackupSettings = (value: any): Partial<LX.AppSetting> => {
   return result
 }
 const music = (value: any): LX.Music.MusicInfo => {
-  if (!record(value) || !text(value.id) || !value.id || !text(value.name) || !text(value.singer) || !['local', 'kw', 'kg', 'tx', 'wy', 'mg'].includes(value.source)) fail('song')
+  if (!record(value) || !text(value.id) || !value.id || !text(value.name) || !text(value.singer) || !(['local', 'kw', 'kg', 'tx', 'wy', 'mg'].includes(value.source) || isMusicFreeSource(value.source))) fail('song')
   if (value.interval != null && !text(value.interval, 80)) fail('song.interval')
   const meta = value.meta
   if (!record(meta) || !(text(meta.songId) || finite(meta.songId)) || !text(meta.albumName)) fail('song.meta')
+  if (isMusicFreeSource(value.source) && !record(meta.musicfree)) fail('song.musicfree')
   if (meta.picUrl != null && !text(meta.picUrl, 1024 * 1024)) fail('song.cover')
   if (value.source === 'local') {
     if (!text(meta.filePath) || !text(meta.ext, 32)) fail('song.path')

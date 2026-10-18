@@ -19,6 +19,7 @@ export const toNewMusicInfo = (oldMusicInfo: any): LX.Music.MusicInfo => {
     meta.filePath = oldMusicInfo.filePath ?? oldMusicInfo.songmid ?? ''
     meta.ext = oldMusicInfo.ext ?? /\.(\w+)$/.exec(meta.filePath)?.[1] ?? ''
   } else {
+    if (oldMusicInfo.musicfree) meta.musicfree = oldMusicInfo.musicfree
     meta.qualitys = oldMusicInfo.types
     meta._qualitys = oldMusicInfo._types
     meta.albumId = oldMusicInfo.albumId
@@ -75,6 +76,7 @@ export const toOldMusicInfo = (minfo: LX.Music.MusicInfo) => {
     oInfo.types = []
     oInfo._types = {}
   } else {
+    if (minfo.meta.musicfree) oInfo.musicfree = minfo.meta.musicfree
     oInfo.albumId = minfo.meta.albumId
     oInfo.types = minfo.meta.qualitys
     oInfo._types = minfo.meta._qualitys

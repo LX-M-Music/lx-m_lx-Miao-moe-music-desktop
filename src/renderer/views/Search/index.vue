@@ -1,8 +1,10 @@
 <template>
   <div :class="$style.container">
     <div :class="$style.header">
-      <base-tab :model-value="source" :list="sources" @change="handleSourceChange" />
-      <base-tab :model-value="searchType" :list="searchTypes" @change="handleTypeChange" />
+      <div ref="dom_sourceTabs" :class="$style.sourceTabs" data-search-sources>
+        <base-tab :model-value="source" :list="sources" @change="handleSourceChange" />
+      </div>
+      <base-tab :class="$style.typeTabs" :model-value="searchType" :list="searchTypes" @change="handleTypeChange" />
     </div>
     <common-motion-view :class="$style.main" :motion-key="`${source}:${searchType}:${page}:${searchText}`">
       <song-list-list v-if="searchType == 'songlist'" v-show="searchText" :page="page" :source-id="source" />
@@ -22,12 +24,14 @@ import { searchText } from '@renderer/store/search/state'
 import { getSearchSetting, setSearchSetting } from '@renderer/utils/data'
 import { sources as _sources } from '@renderer/store/search/music'
 import { sources as _entitySources } from '@renderer/store/search/entity'
+import { sources as _songlistSources } from '@renderer/store/search/songlist'
+import { initMusicFreeSources } from '@renderer/store/musicFree'
 
 import MusicList from './MusicList/index.vue'
 import SongListList from './SongListList/index.vue'
 import EntityList from './EntityList/index.vue'
 import BlankView from './components/BlankView.vue'
-import { computed, ref } from '@common/utils/vueTools'
+import { computed, ref, watch, onMounted } from '@common/utils/vueTools'
 import { sourceNames } from '@renderer/store'
 
 const source = ref('kw')
@@ -35,7 +39,7 @@ const searchType = ref('music')
 const page = ref(1)
 const searchTypeIds = ['music', 'songlist', 'singer', 'album']
 const normalizeType = type => searchTypeIds.includes(type) ? type : 'music'
-const getTypeSources = type => type == 'singer' || type == 'album' ? _entitySources : _sources
+const getTypeSources = type => type == 'singer' || type == 'album' ? _entitySources : type == 'songlist' ? _songlistSources : _sources
 const normalizeSource = (source, type) => getTypeSources(type).includes(source) ? source : 'all'
 const getQueryValue = value => Array.isArray(value) ? value[0] : value
 const normalizePage = value => {
@@ -44,6 +48,7 @@ const normalizePage = value => {
 }
 
 const verifyQueryParams = async(to, from, next) => {
+  await initMusicFreeSources().catch(error => { console.warn('MusicFree sources:', error) })
   let _source = getQueryValue(to.query.source)
   let _type = getQueryValue(to.query.type)
   const _page = getQueryValue(to.query.page)
@@ -104,6 +109,10 @@ export default {
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const dom_sourceTabs = ref(null)
+    const revealSource = () => dom_sourceTabs.value?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    onMounted(revealSource)
+    watch([source, searchType], revealSource, { flush: 'post' })
 
     const sources = computed(() => {
       return getTypeSources(searchType.value).map(id => {
@@ -146,6 +155,7 @@ export default {
 
 
     return {
+      dom_sourceTabs,
       sources,
       source,
       handleSourceChange,
@@ -174,6 +184,16 @@ export default {
   flex-flow: row nowrap;
   justify-content: space-between;
 }
+
+.sourceTabs {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  :global(ul) { width: max-content; }
+  :global(li) { flex: none; white-space: nowrap; }
+}
+.typeTabs { flex: none; }
 
 .main {
   position: relative;

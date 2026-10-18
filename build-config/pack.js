@@ -79,6 +79,12 @@ function build() {
       console.error(`\n${err}\n`)
       process.exit(1)
     }),
+    pack('./musicfree/webpack.config').then(result => {
+      results += result + '\n\n'
+    }).catch(err => {
+      console.error(err)
+      process.exit(1)
+    }),
   ]).then(handleSuccess)
 }
 

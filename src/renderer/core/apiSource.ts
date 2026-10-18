@@ -3,6 +3,7 @@ import { appSetting, setApiSource } from '@renderer/store/setting'
 import { setUserApi as setUserApiAction } from '@renderer/utils/ipc'
 import musicSdk from '@renderer/utils/musicSdk'
 import apiSourceInfo from '@renderer/utils/musicSdk/api-source-info'
+import { isMusicFreeSource } from '@common/musicFree'
 
 let prevId = ''
 export const setUserApi = async(apiId: string) => {
@@ -19,7 +20,7 @@ export const setUserApi = async(apiId: string) => {
   }
 
   if (/^user_api/.test(apiId)) {
-    qualityList.value = {}
+    qualityList.value = Object.fromEntries(Object.entries(qualityList.value).filter(([id]) => isMusicFreeSource(id)))
     userApi.status = false
     userApi.message = 'initing'
 
@@ -37,7 +38,7 @@ export const setUserApi = async(apiId: string) => {
     })
   } else {
     // @ts-expect-error
-    qualityList.value = musicSdk.supportQuality[apiId] ?? {}
+    qualityList.value = { ...Object.fromEntries(Object.entries(qualityList.value).filter(([id]) => isMusicFreeSource(id))), ...(musicSdk.supportQuality[apiId] ?? {}) }
     apiSource.value = apiId
     void setUserApiAction(apiId)
     if (!window.lx.apiInitPromise[1]) window.lx.apiInitPromise[2](true)

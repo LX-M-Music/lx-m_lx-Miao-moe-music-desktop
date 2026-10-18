@@ -81,7 +81,7 @@ import { markRaw } from 'vue'
 import { rankMusicToggleCandidates } from '@renderer/utils/musicToggleCandidates'
 import { appSetting } from '@renderer/store/setting'
 
-const sources = ['kw', 'kg', 'tx', 'wy', 'mg']
+const getSources = () => musicSdk.sources.filter(({ id }) => musicSdk[id]?.musicSearch).map(({ id }) => id)
 
 export default {
   props: {
@@ -115,6 +115,7 @@ export default {
   computed: {
     appSetting() { return appSetting },
     defaultSource() {
+      const sources = getSources()
       return [this.preferredSource, this.musicInfo?.source].find(source => sources.includes(source)) ?? sources[0]
     },
     rankedLists() {
@@ -122,7 +123,7 @@ export default {
     },
     tabs() {
       const prefix = getSourceI18nPrefix()
-      return sources.map(source => ({ id: source, label: window.i18n.t(prefix + source) }))
+      return getSources().map(source => ({ id: source, label: source.startsWith('musicfree_') ? musicSdk[source]?.name ?? source : window.i18n.t(prefix + source) }))
     },
     list() {
       return this.rankedLists.find(item => item.source === this.source)?.list ?? []
@@ -178,6 +179,7 @@ export default {
       }
     },
     async loadList() {
+      const sources = getSources()
       this.toggleMusicInfo = null
       const musicInfo = this.musicInfo
       const preferred = this.defaultSource

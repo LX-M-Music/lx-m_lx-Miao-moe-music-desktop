@@ -18,6 +18,7 @@ import optionalPlugins from '@main/modules/optionalPlugins'
 import backup from '@main/modules/backup'
 import library from './library'
 import sourcePlugins from '@main/modules/sourcePlugins'
+import musicFree from '@main/modules/musicFree'
 import { sendEvent } from '../main'
 
 export * from './app'
@@ -51,6 +52,7 @@ export default () => {
   backup()
   library()
   sourcePlugins()
+  musicFree()
 
   global.lx.event_app.on('updated_config', (keys, setting) => {
     sendConfigChange(setting)
