@@ -85,6 +85,8 @@ test('automatic source matching rejects differing versions and includes the five
   const imports = Object.fromEntries(['kw', 'kg', 'tx', 'wy', 'mg', 'bd'].map(source => ['./' + source + '/index', {}]))
   Object.assign(imports, { './xm': {}, './api-source': {}, './versionChars': versionChars,
     './plugins/loader': { loadLocalSourcePlugins: () => [], loadRemoteSourcePlugins: async() => [] },
+    '@common/musicFree': load('src/common/musicFree.ts'),
+    './plugins/sourceEvents': require('./helpers/load-typescript.cjs')({ '@common/utils/vueTools': require('vue') })('src/renderer/utils/musicSdk/plugins/sourceEvents.js'),
   })
   const sdk = load('src/renderer/utils/musicSdk/index.js', imports).default
   const original = { name: 'A Song', singer: 'Artist', albumName: 'Album', interval: '03:00', source: 'kw' }

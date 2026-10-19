@@ -62,10 +62,20 @@ export const openMusicFreeRequest = async(raw: string, options: PublicRequestOpt
         })
       }) as any,
     })
+    let incoming: IncomingMessage | undefined
+    // Cancellation must also close a response whose headers have already arrived.
+    const abort = () => {
+      const error = Object.assign(sourceError('MUSICFREE_REQUEST_CANCELLED', 'MusicFree 网络请求已取消'), { name: 'AbortError' })
+      incoming?.destroy(error)
+      request.destroy(error)
+    }
     const timer = setTimeout(() => { request.destroy(sourceError('MUSICFREE_REQUEST_TIMEOUT', 'MusicFree 网络请求超时')) }, Math.min(Math.max(Number(options.timeout) || 15000, 1000), 60000))
-    request.on('error', error => { clearTimeout(timer); reject(error) })
+    const cleanup = () => { clearTimeout(timer); options.signal?.removeEventListener('abort', abort) }
+    options.signal?.addEventListener('abort', abort, { once: true })
+    request.on('error', error => { incoming?.destroy(error); cleanup(); reject(error) })
     request.on('response', response => {
-      response.once('close', () => { clearTimeout(timer) })
+      incoming = response
+      response.once('close', cleanup)
       if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0) && response.headers.location) {
         response.destroy()
         if (redirects >= 5) { reject(sourceError('MUSICFREE_REDIRECT_LIMIT', 'MusicFree 重定向次数过多')); return }
@@ -78,7 +88,8 @@ export const openMusicFreeRequest = async(raw: string, options: PublicRequestOpt
         } catch (error) { reject(error) }
       } else resolve(response)
     })
-    request.end(options.data)
+    if (options.signal?.aborted) abort()
+    else request.end(options.data)
   })
 }
 

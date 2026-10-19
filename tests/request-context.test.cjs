@@ -52,7 +52,7 @@ test('B16: automatic source matching returns a fast match and cancels unused slo
       ? { source, list: [{ ...original, source, songmid: 'match' }] }
       : context.awaitRequest({ promise: new Promise(() => {}), cancelHttp: () => stopped.push(source) }) } }
   }
-  Object.assign(overrides, { './xm': {}, './api-source': {}, './plugins/loader': { loadLocalSourcePlugins: () => [] } })
+  Object.assign(overrides, { './xm': {}, './api-source': {}, './plugins/loader': { loadLocalSourcePlugins: () => [] }, '@common/utils/vueTools': require('vue') })
   const sdkLoad = require('./helpers/load-typescript.cjs')(overrides)
   context = sdkLoad('src/renderer/utils/requestContext.js')
   const sdk = sdkLoad('src/renderer/utils/musicSdk/index.js').default

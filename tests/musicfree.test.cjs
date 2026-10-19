@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const http = require('node:http')
 const vm = require('node:vm')
 const { test } = require('node:test')
 const loader = require('./helpers/load-typescript.cjs')
@@ -79,6 +80,33 @@ test('MusicFree network policy rejects local targets and malformed headers', asy
   assert.throws(() => musicFreeHeaders({ Referer: 'https://example.com\r\nInjected: yes' }))
   assert.deepEqual(musicFreeHeaders({ 'User-Agent': 'MusicFree', Cookie: 'explicit=value' }), { 'user-agent': 'MusicFree', cookie: 'explicit=value' })
   await assert.rejects(requestMusicFree('https://example.com', { data: { not: 'serialized' } }).promise, /正文/)
+})
+
+test('MusicFree cancellation closes a stalled response even when the HTTP transport ignores AbortSignal', { timeout: 4000 }, async t => {
+  let started, closed
+  const didStart = new Promise(resolve => { started = resolve })
+  const didClose = new Promise(resolve => { closed = resolve })
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200); response.write('[')
+    response.once('close', closed)
+    started()
+  })
+  t.after(async() => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const transport = { ...http, request: (url, options) => {
+    assert.equal(url.hostname, 'cancellation-fixture.example')
+    const legacyOptions = { ...options, lookup: undefined }
+    delete legacyOptions.signal
+    return http.request('http://127.0.0.1:' + server.address().port, legacyOptions)
+  } }
+  const api = loader({ 'node:http': transport })('src/main/modules/musicFree/network.ts')
+  const request = api.requestMusicFree('http://cancellation-fixture.example/slow')
+  await didStart
+  request.cancelHttp()
+  await assert.rejects(request.promise)
+  let timer
+  try { await Promise.race([didClose, new Promise((_resolve, reject) => { timer = setTimeout(() => reject(Error('Cancelled connection remained open')), 1000) })]) }
+  finally { clearTimeout(timer) }
 })
 
 test('MusicFree configuration is encrypted at rest and failure never replaces saved records', async() => {

@@ -4,8 +4,9 @@ const webpack = require('webpack')
 const { auditPackages } = require('./audit.cjs')
 const root = path.resolve(__dirname, '../..')
 const target = process.argv[2]
-if (!['main', 'renderer', 'renderer-lyric', 'renderer-scripts'].includes(target)) throw new Error('Unknown build target')
-const compiler = webpack(require(`../${target}/webpack.config.prod.js`))
+if (!['main', 'renderer', 'renderer-lyric', 'renderer-scripts', 'musicfree'].includes(target)) throw new Error('Unknown build target')
+const configPath = target === 'musicfree' ? '../musicfree/webpack.config.js' : `../${target}/webpack.config.prod.js`
+const compiler = webpack(require(configPath))
 compiler.run((error, stats) => compiler.close(() => {
   if (error || stats.hasErrors()) {
     console.error(error ?? stats.toString({ all: false, errors: true, errorDetails: true }))

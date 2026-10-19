@@ -61,6 +61,7 @@ function playerFixture(cover, getPic) {
   const exports = {}
   const modules = {
     '@renderer/utils/requestContext': requestContext,
+    '@common/musicFree': require('./helpers/load-typescript.cjs')()('src/common/musicFree.ts'),
     '@renderer/utils/musicSdk/requestCache': require('./helpers/load-typescript.cjs')()('src/renderer/utils/musicSdk/requestCache.js'),
     '@renderer/store': { qualityList: [] },
     '@renderer/store/utils': {},

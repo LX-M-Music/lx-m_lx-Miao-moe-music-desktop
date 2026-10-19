@@ -61,7 +61,7 @@ function modalFixture(searchSource = searchResults, current = original) {
     '@renderer/store/player/state': { playMusicInfo: state },
     '@renderer/store/setting': { appSetting: { 'common.showErrorDialog': false } },
     '@renderer/utils': { toNewMusicInfo: song => song, toOldMusicInfo: song => song },
-    '@renderer/utils/musicSdk': Object.fromEntries(sources.map(source => [source, { musicSearch: { search: (...args) => searchSource(source, ...args) } }])),
+    '@renderer/utils/musicSdk': { sources: sources.map(id => ({ id })), ...Object.fromEntries(sources.map(source => [source, { musicSearch: { search: (...args) => searchSource(source, ...args) } }])) },
     '@renderer/utils/musicToggleCandidates': candidates,
     vue: { markRaw: value => value },
   }

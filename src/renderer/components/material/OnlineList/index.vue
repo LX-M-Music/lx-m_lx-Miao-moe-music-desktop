@@ -298,7 +298,7 @@ export default {
       if (quality === 'hires' || quality === 'atmos' || quality === 'master') {
         if (!item.meta._qualitys.flac24bit) return false
       }
-      return (qualityList.value[item.source] || []).includes(quality)
+      return (qualityList.value[item.source] ?? []).includes(quality)
     }
 
     const coverErrorSet = reactive(new Set())
@@ -306,7 +306,7 @@ export default {
       coverErrorSet.add(getCoverKey(item))
     }
     const qualityBadgeLabel = (item) => {
-      const maxQ = getMaxQuality(item, qualityList.value[item.source] || [])
+      const maxQ = getMaxQuality(item, qualityList.value[item.source] ?? [])
       switch (maxQ) {
         case 'master': return 'tag__master'
         case 'atmos_plus': return 'tag__atmos_plus'

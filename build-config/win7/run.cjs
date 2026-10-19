@@ -94,7 +94,7 @@ const prepare = async(refreshLock = false) => {
 const build = async() => {
   // Keep each compiler in its own process to bound memory use.
   await fs.rm(insideWorkspace(path.join(workspace, 'dist')), { recursive: true, force: true })
-  for (const target of ['main', 'renderer', 'renderer-lyric', 'renderer-scripts']) {
+  for (const target of ['main', 'renderer', 'renderer-lyric', 'renderer-scripts', 'musicfree']) {
     await run(['build-config/win7/compile.cjs', target])
   }
   const compilerPackages = require('./audit.cjs').auditPackages([path.join(workspace, 'dist/plugin-compiler/node_modules')])
