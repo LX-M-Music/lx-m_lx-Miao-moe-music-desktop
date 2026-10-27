@@ -1,4 +1,5 @@
 import log from 'electron-log/node'
+import os from 'node:os'
 import { installConsoleRedaction, redactArguments } from '../sensitive'
 
 installConsoleRedaction()
@@ -16,6 +17,14 @@ export const getPlatform = (platform: NodeJS.Platform = process.platform) => {
     case 'darwin': return 'mac'
     default: return 'linux'
   }
+}
+
+export const getOSVersion = (): string => {
+  const release = os.release()
+  const [major, , build] = release.split('.')
+  // Windows 11 still reports the NT 10.0 kernel version.
+  if (isWin && major == '10' && Number(build) >= 22000) return '11'
+  return /^\d+$/.test(major) ? major : release
 }
 
 

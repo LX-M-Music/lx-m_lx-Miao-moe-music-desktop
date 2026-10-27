@@ -1,6 +1,7 @@
 <template>
   <div
     ref="dom_lyric"
+    :data-desktop-lyric-single-line="setting['desktopLyric.isSingleLine'] || null"
     :class="classNames"
     :style="lrcStyles" @wheel="handleWheel" @pointerdown="handleLyricPointerDown"
   >
@@ -12,6 +13,7 @@
 
 <script>
 import { setting } from '@lyric/store/state'
+import { lyric } from '@lyric/store/lyric'
 import { computed, useCssModule } from '@common/utils/vueTools'
 import useLyric from './useLyric'
 
@@ -25,6 +27,7 @@ export default {
     // const isFontWeightExtended = computed(() => setting['desktopLyric.style.isFontWeightExtended'])
     const classNames = computed(() => {
       const name = [styles.lyric]
+      if (setting['desktopLyric.isSingleLine']) name.push(styles.singleLine)
       if (isMsDown.value) name.push(styles.draging)
       if (setting['desktopLyric.style.isZoomActiveLrc']) name.push(styles.lrcActiveZoom)
       if (setting['desktopLyric.style.ellipsis']) name.push(styles.ellipsis)
@@ -34,6 +37,8 @@ export default {
       return name
     })
     const lrcStyles = computed(() => ({
+      '--single-line-height': (setting['desktopLyric.style.isZoomActiveLrc'] ? 1.44 : 1.2) +
+        (lyric.lines[lyric.line]?.extendedLyrics.filter(Boolean).length ?? 0) * (setting['desktopLyric.style.isZoomActiveLrc'] ? 1.25 : 1.08) + 0.4,
       fontFamily: setting['desktopLyric.style.font'],
       fontSize: Math.trunc(setting['desktopLyric.style.fontSize']) + 'px',
       opacity: setting['desktopLyric.style.opacity'] / 100,
@@ -53,6 +58,7 @@ export default {
     } = useLyric(isComputeHeight)
 
     return {
+      setting,
       classNames,
       lrcStyles,
 
@@ -70,6 +76,7 @@ export default {
 @import '@lyric/assets/styles/layout.less';
 
 .lyric {
+  touch-action: none;
   position: relative;
   text-align: center;
   height: 100%;
@@ -275,4 +282,40 @@ export default {
 //   align-items: center;
 // }
 
+
+.singleLine {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  container-type: size;
+  overflow: hidden;
+
+  .lyricSpace { display: none; }
+  > div:not(.lyricSpace) {
+    min-height: 0;
+    font-size: min(1em, calc((100cqh - 4px) / var(--single-line-height)));
+  }
+  :global {
+    .line-content {
+      display: flex;
+      flex-direction: column;
+      gap: .12em;
+      margin: 0;
+      white-space: nowrap;
+    }
+    br { display: none; }
+    .line, .extended {
+      display: block !important;
+      flex: none;
+      width: 100%;
+      min-width: 0;
+    }
+    .extended { margin: 0; }
+    .font-lrc, .shadow {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+}
 </style>

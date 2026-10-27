@@ -60,7 +60,7 @@ $Plan = $null
 try {
   $Plan = Read-Json $PlanFile
   $TempRoot = [IO.Path]::GetFullPath([IO.Path]::GetDirectoryName($PlanFile))
-  if ($Plan.schema -ne 1 -or $Plan.nonce -notmatch '^[a-f0-9-]{36}$' -or [int]$Plan.oldPid -le 0 -or @('portable','single-file') -notcontains $Plan.kind) { throw 'Invalid update plan' }
+  if ($Plan.schema -ne 1 -or $Plan.nonce -notmatch '^[a-f0-9-]{36}$' -or [int]$Plan.oldPid -le 0 -or @('installed','portable','single-file') -notcontains $Plan.kind) { throw 'Invalid update plan' }
   if ([IO.Path]::GetFileName($TempRoot) -notmatch '^lx-m-update-' -or [IO.Path]::GetFullPath($Plan.stage) -ne [IO.Path]::Combine($TempRoot, 'app')) { throw 'Invalid update staging directory' }
   if (![IO.Path]::IsPathRooted($Plan.root) -or [IO.Path]::GetFullPath([IO.Path]::GetDirectoryName($Plan.executable)) -ne [IO.Path]::GetFullPath($Plan.root)) { throw 'Invalid application directory' }
   Assert-NoLinks $TempRoot
@@ -99,16 +99,31 @@ try {
     $Saved = Under-Root $Backup $Entry.path
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Target)) | Out-Null
     $HadOld = [IO.File]::Exists($Target)
+    $Replaced = $false
     if ($HadOld) {
       [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Saved)) | Out-Null
-      $MoveDeadline = [DateTime]::UtcNow.AddSeconds(30)
-      while ($true) {
-        try { [IO.File]::Move($Target, $Saved); break }
-        catch { if ([DateTime]::UtcNow -gt $MoveDeadline) { throw }; Start-Sleep -Milliseconds 100 }
+      try {
+        # ReplaceFile swaps the bytes while keeping the destination path, ACLs
+        # and creation time, so pinned shortcuts and shell icons stay valid.
+        [IO.File]::Replace($Source, $Target, $Saved)
+        $Replaced = $true
+      } catch {
+        $Replaced = $false
       }
     }
-    $null = $Changed.Add(@{ target = $Target; saved = $Saved; hadOld = $HadOld })
-    [IO.File]::Copy($Source, $Target, $false)
+    if ($Replaced) {
+      $null = $Changed.Add(@{ target = $Target; saved = $Saved; hadOld = $true })
+    } else {
+      if ($HadOld) {
+        $MoveDeadline = [DateTime]::UtcNow.AddSeconds(30)
+        while ($true) {
+          try { [IO.File]::Move($Target, $Saved); break }
+          catch { if ([DateTime]::UtcNow -gt $MoveDeadline) { throw }; Start-Sleep -Milliseconds 100 }
+        }
+      }
+      $null = $Changed.Add(@{ target = $Target; saved = $Saved; hadOld = $HadOld })
+      [IO.File]::Copy($Source, $Target, $false)
+    }
     if ((Get-Sha256 $Target) -ne $Entry.sha256) { throw 'Replacement hash mismatch' }
   }
   foreach ($Entry in $Plan.obsolete) {

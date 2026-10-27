@@ -1,7 +1,7 @@
-import { markRaw, reactive } from '@common/utils/vueTools'
+import { reactive, shallowReactive } from '@common/utils/vueTools'
 
 
-export const lyrics = markRaw<{
+export const lyrics = shallowReactive<{
   lyric: string
   tlyric: string | null
   rlyric: string | null

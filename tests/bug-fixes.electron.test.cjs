@@ -153,6 +153,7 @@ test('production UI recovers search failures, local imports and missing download
     })
 
     await t.test('mixed local import lists failed files and clears loading while retaining valid songs', async() => {
+      await page.evaluate(() => window.lxData.updateSetting({ 'common.showErrorDialog': true }))
       const missing = path.join(output, 'failed-import.mp3')
       await app.evaluate(({ dialog }, paths) => { dialog.showOpenDialog = async() => ({ canceled: false, filePaths: paths }) }, [chosenPath, missing])
       await route(page, '/list?id=love')

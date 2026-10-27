@@ -1,5 +1,5 @@
 import { onBeforeUnmount, watch } from '@common/utils/vueTools'
-import { sendDesktopLyricInfo, setMiniPlayerActionHandler } from '@renderer/core/lyric'
+import { sendMiniPlayerInfo, setMiniPlayerActionHandler, initMiniPlayerChannel } from '@renderer/core/miniPlayer'
 import { playNext, playPrev, togglePlay } from '@renderer/core/player'
 import { musicInfo, playerCover, isPlay } from '@renderer/store/player/state'
 import { playProgress } from '@renderer/store/player/playProgress'
@@ -7,11 +7,12 @@ import { volume, isMute } from '@renderer/store/player/volume'
 import { appSetting } from '@renderer/store/setting'
 
 export default () => {
+  initMiniPlayerChannel()
   let coverGeneration = 0
   let cover = { id: null as string | null, url: '' }
   const sendState = () => {
-    if (!appSetting['desktopLyric.enable']) return
-    sendDesktopLyricInfo({
+    if (!appSetting['miniPlayer.enable']) return
+    sendMiniPlayerInfo({
       action: 'set_player_state',
       data: {
         id: musicInfo.id,
@@ -26,9 +27,9 @@ export default () => {
       },
     })
   }
-  const sendCover = () => { sendDesktopLyricInfo({ action: 'set_player_cover', data: cover }) }
+  const sendCover = () => { sendMiniPlayerInfo({ action: 'set_player_cover', data: cover }) }
 
-  watch([() => appSetting['desktopLyric.enable'], () => musicInfo.id, playerCover], async([enabled, id, src]) => {
+  watch([() => appSetting['miniPlayer.enable'], () => musicInfo.id, playerCover], async([enabled, id, src]) => {
     const generation = ++coverGeneration
     cover = { id, url: '' }
     if (!enabled) return
@@ -54,12 +55,12 @@ export default () => {
   }, { immediate: true })
 
   watch([
-    () => appSetting['desktopLyric.enable'], () => musicInfo.id, () => musicInfo.name,
+    () => appSetting['miniPlayer.enable'], () => musicInfo.id, () => musicInfo.name,
     () => musicInfo.singer, () => musicInfo.album, isPlay, volume, isMute,
     () => playProgress.nowPlayTime, () => playProgress.maxPlayTime,
   ], sendState)
 
-  const handleAction = async(request: LX.DesktopLyric.PlayerRequest) => {
+  const handleAction = async(request: LX.MiniPlayer.Request) => {
     switch (request.action) {
       case 'get_player_state': sendState(); sendCover(); break
       case 'player_toggle_play': togglePlay(); break
@@ -77,7 +78,7 @@ export default () => {
     }
   }
   setMiniPlayerActionHandler(request => {
-    void handleAction(request).catch(() => { sendDesktopLyricInfo({ action: 'player_action_failed' }) })
+    void handleAction(request).catch(() => { sendMiniPlayerInfo({ action: 'player_action_failed' }) })
   })
   onBeforeUnmount(() => {
     coverGeneration++

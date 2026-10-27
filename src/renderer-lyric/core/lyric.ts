@@ -16,7 +16,7 @@ export const init = () => {
     shadowContent: true,
     activeLineClassName: 'active',
     rate: setting['player.playbackRate'],
-    isVertical: !setting['desktopLyric.singleLine'] && setting['desktopLyric.direction'] == 'vertical',
+    isVertical: setting['desktopLyric.direction'] == 'vertical',
     onPlay(line, text) {
       setText(text, Math.max(line, 0))
       // console.log(line, text)

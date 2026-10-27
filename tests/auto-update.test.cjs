@@ -56,7 +56,7 @@ async function mockArchive(_archive, directory, executable) {
   }
 }
 
-function fixture(t, { request, launch, installed = true, openError = '', deadlineMs, sources, getSources, speedTest, settings = { 'common.useUpdateMirror': true }, edition = 'installed', prepareArchive, prepareDifferential, relaunch } = {}) {
+function fixture(t, { request, launch, installed = true, openError = '', deadlineMs, sources, getSources, speedTest, settings = { 'common.useUpdateMirror': true }, edition = 'installed', prepareArchive, prepareDifferential, prepareSetup, relaunch } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lx-update-test-'))
   const installDirectory = path.join(root, "应用 & player's music")
   fs.mkdirSync(installDirectory)
@@ -123,6 +123,7 @@ function fixture(t, { request, launch, installed = true, openError = '', deadlin
       prepareArchiveUpdate: prepareArchive ?? portableApi.prepareArchiveUpdate,
       prepareDifferentialUpdate: prepareDifferential ?? portableApi.prepareDifferentialUpdate,
     },
+    './updateSetup': { prepareSetupUpdate: prepareSetup ?? (async() => { throw Error('setup staging unavailable in this fixture') }) },
     './updateRelaunch': { async launchWindowsRelaunch(...args) { relaunches.push(args); await relaunch?.(...args) } },
     './updateSources': {
       getUpdateSources: getSources ?? (url => sources ?? [{ url, name: 'example.test' }]),
@@ -194,6 +195,56 @@ test('single-file downloads the entire executable and hands the original filenam
   assert.equal(stage.files[0].path, 'renamed music.exe')
   assert.deepEqual(fs.readFileSync(path.join(stage.directory, stage.files[0].source)), sample)
   assert.equal(directory, path.dirname(f.findFile(singleName)))
+})
+
+async function mockSetup(options) {
+  const bytes = Buffer.from('installed application payload')
+  const marker = Buffer.from(JSON.stringify({ schema: 1, appId: 'com.lx-m.music.desktop', edition: 'installed', arch: 'x64', win7: false, version: options.version }))
+  await fs.promises.mkdir(path.join(options.directory, 'resources'), { recursive: true })
+  await fs.promises.writeFile(path.join(options.directory, 'update.exe'), bytes)
+  await fs.promises.writeFile(path.join(options.directory, 'resources/lx-update-runtime.json'), marker)
+  return {
+    root: path.dirname(options.executable),
+    executable: options.executable,
+    directory: options.directory,
+    files: [
+      { path: path.basename(options.executable), source: 'update.exe', size: bytes.length, sha256: sha256(bytes) },
+      { path: 'resources/lx-update-runtime.json', source: 'resources/lx-update-runtime.json', size: marker.length, sha256: sha256(marker) },
+    ],
+    obsolete: [],
+  }
+}
+
+test('installed Setup is staged in place and handed to the restart helper instead of the installer', async(t) => {
+  const f = fixture(t, { edition: 'installed', prepareSetup: mockSetup })
+  await f.download({ fileName })
+  assert.equal(f.launches.length, 0)
+  f.emit('quit_update')
+  for (let i = 0; !f.quits && i < 100; i++) await delay(10)
+  assert.equal(f.quits, 1)
+  assert.equal(f.launches.length, 0)
+  assert.equal(f.relaunches.length, 1)
+  const [stage, kind, version] = f.relaunches[0]
+  assert.equal(kind, 'installed')
+  assert.equal(version, '9.0.0')
+  assert.equal(stage.executable, f.app.getPath())
+  assert.deepEqual(stage.files.map(file => file.path).sort(), ['LX-M Music.exe', 'resources/lx-update-runtime.json'])
+  assert.equal(fs.readFileSync(path.join(stage.directory, 'update.exe'), 'utf8'), 'installed application payload')
+})
+
+test('installed falls back to the silent installer when in-place staging or the restart helper fails', async(t) => {
+  for (const overrides of [
+    { prepareSetup: async() => { throw Error('Setup payload unreadable') } },
+    { prepareSetup: mockSetup, relaunch: async() => { throw Error('original folder is read-only') } },
+  ]) {
+    const f = fixture(t, { edition: 'installed', ...overrides })
+    await f.download({ fileName })
+    f.emit('quit_update')
+    for (let i = 0; !f.quits && i < 100; i++) await delay(10)
+    assert.equal(f.quits, 1)
+    assert.equal(f.launches.length, 1)
+    assert.deepEqual(f.launches[0].slice(1), [f.installDirectory, path.join(f.installDirectory, 'resources')])
+  }
 })
 
 test('full green archive uses portable staging and its restart helper instead of an installer', async(t) => {

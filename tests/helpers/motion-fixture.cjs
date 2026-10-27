@@ -6,7 +6,7 @@ const { _electron } = require('playwright-core')
 
 const project = process.env.LX_TEST_PROJECT ? path.resolve(process.env.LX_TEST_PROJECT) : path.resolve(__dirname, '../..')
 
-async function launch({ record = false, hidden = false, profilePath, initializeMotion = true, reducedMotion = 'no-preference', rendererPath = process.env.LX_TEST_RENDERER_PATH, disableHardwareAcceleration = true, args = [] } = {}) {
+async function launch({ record = false, hidden = process.env.LX_TEST_HIDDEN === '1', profilePath, initializeMotion = true, reducedMotion = 'no-preference', rendererPath = process.env.LX_TEST_RENDERER_PATH, mainPath, disableHardwareAcceleration = true, args = [] } = {}) {
   if (process.env.LX_TEST_PROJECT) rendererPath = path.join(project, 'dist/index.html')
   const output = profilePath ?? await fs.mkdtemp(path.join(os.tmpdir(), 'lx-motion-check-'))
   await fs.mkdir(path.join(output, 'portable'), { recursive: true })
@@ -26,7 +26,7 @@ ${rendererPath ? `electron.app.on('web-contents-created', (_event, contents) => 
     return loadURL(renderer ? renderer + parsed.search : url, options);
   };
 });` : ''}
-require(${JSON.stringify(path.join(project, 'dist/main.js'))});`)
+require(${JSON.stringify(mainPath ?? path.join(project, 'dist/main.js'))});`)
   const env = { ...process.env, PORTABLE_EXECUTABLE_DIR: output }
   delete env.ELECTRON_RUN_AS_NODE
   const app = await _electron.launch({
@@ -35,7 +35,25 @@ require(${JSON.stringify(path.join(project, 'dist/main.js'))});`)
     env,
     ...(record ? { recordVideo: { dir: path.join(output, 'video'), size: { width: 1114, height: 718 } } } : {}),
   })
-  let page = await app.firstWindow()
+  if (process.env.LX_TEST_NATIVE_CAPTURE === '1') {
+    const useNativeCapture = page => {
+      const screenshot = page.screenshot.bind(page)
+      page.screenshot = async(options = {}) => options.clip || options.fullPage || (options.type && options.type !== 'png')
+        ? screenshot(options)
+        : captureHidden(app, page, options.path)
+    }
+    app.on('window', useNativeCapture)
+    for (const page of app.windows()) useNativeCapture(page)
+  }
+  const startupOutput = []
+  const keepStartupOutput = chunk => { startupOutput.push(chunk.toString()); if (startupOutput.length > 30) startupOutput.shift() }
+  if (mainPath) { app.process().stdout?.on('data', keepStartupOutput); app.process().stderr?.on('data', keepStartupOutput) }
+  let page
+  try { page = await app.firstWindow() } catch (error) {
+    if (mainPath) console.error(startupOutput.join('').slice(-4000))
+    throw error
+  }
+  if (mainPath) { app.process().stdout?.off('data', keepStartupOutput); app.process().stderr?.off('data', keepStartupOutput) }
   // Development mode opens detached DevTools before the application page.
   if (page.url().startsWith('devtools:')) {
     page = app.windows().find(page => !page.url().startsWith('devtools:')) ?? await app.waitForEvent('window', {
@@ -159,4 +177,17 @@ const showDetail = (page, show) => page.evaluate(show => { window.__motionDetail
 const settled = page => page.waitForFunction(() => !document.querySelector('[data-cover-flight]') &&
   Array.from(document.querySelectorAll('[data-motion-outlet]')).every(el => el.getAnimations().length === 0))
 
-module.exports = { launch, seedTrack, seedLyrics, route, showDetail, settled }
+// Native capture can request a fresh frame while keeping test windows hidden.
+// Playwright's stable-frame screenshot can time out on hidden Windows windows.
+async function captureHidden(app, page, filename) {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const window = await app.browserWindow(page)
+  try {
+    const png = await window.evaluate(async window => (await window.webContents.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG().toString('base64'))
+    const buffer = Buffer.from(png, 'base64')
+    if (filename) await fs.writeFile(filename, buffer)
+    return buffer
+  } finally { await window.dispose() }
+}
+
+module.exports = { launch, seedTrack, seedLyrics, route, showDetail, settled, captureHidden }

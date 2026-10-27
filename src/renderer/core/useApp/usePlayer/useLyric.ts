@@ -10,8 +10,11 @@ import {
   init,
   sendInfo,
   setPlaybackRate,
+  syncLyricPosition,
 } from '@renderer/core/lyric'
 import { appSetting } from '@renderer/store/setting'
+import { isPlay } from '@renderer/store/player/state'
+import { playProgress } from '@renderer/store/player/playProgress'
 
 const handleApplyPlaybackRate = debounce(setPlaybackRate, 300)
 
@@ -27,6 +30,11 @@ export default () => {
   watch(() => appSetting['player.isShowLyricRoma'], setLyric)
   watch(() => appSetting['player.isSwapLyricTranslationAndRoma'], setLyric)
   watch(() => appSetting['player.isPlayLxlrc'], setLyric)
+  // A paused seek emits no play event. Restore both lyric renderers from the
+  // actual audio position without restarting playback.
+  watch(() => playProgress.nowPlayTime, () => {
+    if (!isPlay.value) syncLyricPosition(true, true)
+  })
 
   window.app_event.on('play', play)
   window.app_event.on('pause', pause)

@@ -4,9 +4,9 @@ const { test } = require('node:test')
 const { launch, seedTrack } = require('./helpers/motion-fixture.cjs')
 const { dragWindow, nativeHitTest } = require('./helpers/native-window-drag.cjs')
 
-test('offscreen lyrics cannot disable the mini-player title bar', { skip: process.platform !== 'win32', timeout: 90000 }, async t => {
-  const fixture = await launch({ rendererPath: path.resolve('dist/index.html') })
-  const { app, page, output } = fixture
+test('playback-only mini player keeps native dragging, clickable controls and saved bounds', { skip: process.platform !== 'win32', timeout: 120000 }, async t => {
+  const fixture = await launch({ hidden: true, rendererPath: path.resolve('dist/index.html') })
+  const { app, page } = fixture
   const errors = []
   let window
   try {
@@ -15,85 +15,46 @@ test('offscreen lyrics cannot disable the mini-player title bar', { skip: proces
       screen.getCursorScreenPoint = () => global.__miniPointer
     })
     await seedTrack(page)
-    await page.evaluate(() => {
-      window.lxData.musicInfo.lrc = Array.from({ length: 30 }, (_, i) => `[00:${String(i).padStart(2, '0')}.00]迷你播放器标题栏拖动测试一二三四五六七八九十第${i + 1}句`).join('\n')
-      window.app_event.lyricUpdated()
-      window.lxData.updateSetting({
-        'desktopLyric.enable': true,
-        'desktopLyric.isLock': false,
-        'desktopLyric.isAlwaysOnTop': false,
-        'desktopLyric.direction': 'horizontal',
-        'desktopLyric.width': 450,
-        'desktopLyric.height': 300,
-        'desktopLyric.x': 140,
-        'desktopLyric.y': 140,
-      })
-    })
-    const mini = app.windows().find(window => window.url().includes('lyric.html')) ?? await app.waitForEvent('window', { predicate: window => window.url().includes('lyric.html') })
-    mini.setDefaultTimeout(7000)
+    await page.evaluate(() => window.lxData.updateSetting({ 'miniPlayer.enable': true, 'miniPlayer.isLock': false, 'miniPlayer.width': 450, 'miniPlayer.height': 240, 'miniPlayer.x': 140, 'miniPlayer.y': 140 }))
+    const mini = app.windows().find(p => p.url().includes('mini=true')) ?? await app.waitForEvent('window', { predicate: p => p.url().includes('mini=true') })
+    mini.setDefaultTimeout(6000)
     mini.on('pageerror', error => errors.push(error.message))
-    await mini.locator('.font-lrc').first().waitFor()
+    await mini.locator('[data-mini-player]').waitFor()
     window = await app.browserWindow(mini)
     for (const mode of [
-      { name: 'normal player', showPlayer: true, autoHide: false, background: 92 },
-      { name: 'automatically hidden controls', showPlayer: true, autoHide: true, background: 92 },
-      { name: 'transparent lyrics only', showPlayer: false, autoHide: true, background: 0 },
+      { name: 'visible controls', autoHide: false, background: 100 },
+      { name: 'automatically hidden controls', autoHide: true, background: 100 },
+      { name: 'transparent player', autoHide: true, background: 0 },
     ]) {
       await t.test(mode.name, async() => {
-        await page.evaluate(mode => window.lxData.updateSetting({
-          'desktopLyric.showPlayer': mode.showPlayer,
-          'desktopLyric.autoHideControls': mode.autoHide,
-          'desktopLyric.style.backgroundOpacity': mode.background,
-        }), mode)
-        await mini.waitForFunction(showPlayer => document.querySelector('[data-mini-lyrics]').classList.contains('with-player') === showPlayer, mode.showPlayer)
+        await page.evaluate(mode => window.lxData.updateSetting({ 'miniPlayer.autoHideControls': mode.autoHide, 'miniPlayer.backgroundOpacity': mode.background }), mode)
         await mini.mouse.move(90, 20)
         await mini.waitForFunction(() => getComputedStyle(document.querySelector('.mini-header')).opacity === '1')
-        // Move a wrapped lyric beyond the clipped viewport onto the header's
-        // coordinates. Its native no-drag region used to disable this caption.
-        await mini.locator('[data-mini-lyrics] > div').evaluate(el => {
-          const font = el.querySelector('.font-lrc').getBoundingClientRect()
-          const brand = document.querySelector('.mini-brand').getBoundingClientRect()
-          el.scrollTop += font.y - brand.y
-        })
-        await mini.waitForTimeout(350)
-        assert.equal(await nativeHitTest(app, mini, '.mini-brand'), 2, 'the title remains a native caption after lyrics scroll above it')
-        assert.equal(await nativeHitTest(app, mini, '.mini-brand span'), 2, 'the title text remains draggable too')
-        if (mode.showPlayer) assert.equal(await nativeHitTest(app, mini, '.mini-track-info h1'), 2, 'song information remains draggable')
-        assert.equal(await nativeHitTest(app, mini, '.mini-window-buttons button'), 1, 'window controls remain clickable')
-        if (mode.showPlayer) assert.equal(await nativeHitTest(app, mini, '.mini-progress input'), 1, 'the progress slider remains clickable')
+        assert.equal(await mini.locator('[data-mini-lyrics], .font-lrc').count(), 0)
+        assert.equal(await nativeHitTest(app, mini, '.mini-brand'), 2)
+        assert.equal(await nativeHitTest(app, mini, '.mini-track-info h1'), 2)
+        assert.equal(await nativeHitTest(app, mini, '.mini-window-buttons button'), 1)
+        assert.equal(await nativeHitTest(app, mini, '.mini-progress input'), 1)
         const movement = await dragWindow(app, mini, '.mini-brand', { dx: 40, dy: 20 })
-        assert.equal(movement.x, 40)
-        assert.equal(movement.y, 20)
-        assert.deepEqual([movement.width, movement.height], [movement.expectedWidth, movement.expectedHeight], 'title dragging does not resize the window')
+        assert.deepEqual([movement.x, movement.y], [40, 20])
+        assert.deepEqual([movement.width, movement.height], [movement.expectedWidth, movement.expectedHeight])
         const moved = await window.evaluate(window => window.getBounds())
-        await page.waitForFunction(bounds => window.lxData.appSetting['desktopLyric.x'] === bounds.x && window.lxData.appSetting['desktopLyric.y'] === bounds.y, moved)
-        const optionsLabel = await page.evaluate(() => window.i18n.t('mini_player__options'))
-        if (!mode.showPlayer) {
-          const bounds = await window.evaluate(window => window.getContentBounds())
-          await app.evaluate((_, bounds) => { global.__miniPointer = { x: bounds.x + 90, y: bounds.y + 20 } }, bounds)
-        }
-        await mini.getByRole('button', { name: optionsLabel, exact: true }).click()
-        await mini.locator('#mini-options').waitFor()
-        assert.equal(await nativeHitTest(app, mini, '#mini-options label'), 1, 'the options overlay still excludes native dragging')
-        const closeLabel = await page.evaluate(() => window.i18n.t('close'))
-        await mini.locator('#mini-options').getByRole('button', { name: closeLabel, exact: true }).click()
+        await page.waitForFunction(bounds => window.lxData.appSetting['miniPlayer.x'] === bounds.x && window.lxData.appSetting['miniPlayer.y'] === bounds.y, moved)
+        await mini.locator('.mini-header button[aria-controls="mini-options"]').click()
+        assert.equal(await nativeHitTest(app, mini, '#mini-options label'), 1)
+        await mini.locator('#mini-options .mini-options-title button').click()
         await mini.locator('#mini-options').waitFor({ state: 'hidden' })
-        await app.evaluate(() => { global.__miniPointer = { x: -10000, y: -10000 } })
         if (mode.autoHide) {
           await mini.mouse.move(-20, -20)
           await mini.waitForFunction(() => getComputedStyle(document.querySelector('.mini-header')).opacity === '0')
-          assert.notEqual(await nativeHitTest(app, mini, '.mini-brand'), 2, 'a hidden header must not intercept the lyrics')
+          assert.notEqual(await nativeHitTest(app, mini, '.mini-brand'), 2)
         }
-        if (!mode.autoHide) await mini.screenshot({ path: path.join(output, 'mini-title-drag.png') })
       })
     }
-    await page.evaluate(() => window.lxData.updateSetting({ 'desktopLyric.isLock': true }))
+    await page.evaluate(() => window.lxData.updateSetting({ 'miniPlayer.isLock': true }))
     await mini.waitForFunction(() => document.querySelector('#container').classList.contains('lock'))
-    assert.notEqual(await nativeHitTest(app, mini, '.mini-brand'), 2, 'locking still disables title dragging')
+    assert.notEqual(await nativeHitTest(app, mini, '.mini-brand'), 2)
     assert.deepEqual(errors, [])
     assert.deepEqual(fixture.errors, [])
-  } finally {
-    await window?.dispose()
-    await app.close()
-  }
+  } finally { await window?.dispose(); await app.close() }
 })

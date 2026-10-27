@@ -52,11 +52,16 @@
       <div ref="dom_content_ref" class="scroll" :class="[$style.setting, {[$style.searchFiltering]: isFiltering}]" data-setting-content @wheel.passive="cancelScrollRestore" @pointerdown="cancelScrollRestore" @keydown="cancelScrollRestore">
       <p v-if="isFiltering && !visibleTocList.length" :class="$style.contentEmpty">{{ $t('setting__filter_empty') }}</p>
       <dl v-show="visibleTocList.length">
-        <component :is="avtiveComponentName" v-bind="avtiveComponentName == 'SettingBasic' ? { searchKeyword: filterQuery } : avtiveComponentName == 'SettingPluginStore' ? { pluginId: requestedPluginId } : {}" />
+        <template v-if="avtiveComponentName == 'SettingDesktopLyric'">
+          <setting-desktop-lyric />
+          <setting-mini-player />
+        </template>
+        <component :is="avtiveComponentName" v-else v-bind="avtiveComponentName == 'SettingBasic' ? { searchKeyword: filterQuery } : avtiveComponentName == 'SettingPluginStore' ? { pluginId: requestedPluginId } : {}" />
         <!-- <SettingBasic />
         <SettingPlay />
         <SettingPlayDetail />
         <SettingDesktopLyric />
+        <SettingMiniPlayer />
         <SettingSearch />
         <SettingList />
         <SettingDownload />
@@ -96,6 +101,7 @@ import SettingPlay from './components/SettingPlay.vue'
 import SettingPluginStore from './components/SettingPluginStore.vue'
 import SettingPlayDetail from './components/SettingPlayDetail.vue'
 import SettingDesktopLyric from './components/SettingDesktopLyric.vue'
+import SettingMiniPlayer from './components/SettingMiniPlayer.vue'
 import SettingSearch from './components/SettingSearch.vue'
 import SettingList from './components/SettingList.vue'
 import SettingDownload from './components/SettingDownload.vue'
@@ -118,6 +124,7 @@ export default {
     SettingPluginStore,
     SettingPlayDetail,
     SettingDesktopLyric,
+    SettingMiniPlayer,
     SettingSearch,
     SettingList,
     SettingDownload,
@@ -189,7 +196,7 @@ export default {
         { id: 'SettingPlay', title: t('setting__play'), prefixes: ['setting__play', 'setting__player'], excludes: ['setting__play_detail', 'setting__play_timeout', ...(!isMac ? ['setting__play_statusbar_lyric'] : [])] },
         { id: 'SettingPluginStore', title: t('setting__plugins'), prefixes: ['setting__plugins'], keys: ['audio_visualization', 'setting__desktop_lyric_audio_visualization'], entries: pluginSearchEntries.value },
         { id: 'SettingPlayDetail', title: t('setting__play_detail'), prefixes: ['setting__play_detail'] },
-        { id: 'SettingDesktopLyric', title: t('setting__desktop_lyric'), prefixes: ['setting__desktop_lyric'], keys: ['desktop_lyric__lrc_active_zoom_on'], excludes: ['setting__desktop_lyric_audio_visualization', ...(isLinux ? ['setting__desktop_lyric_hover_hide'] : [])] },
+        { id: 'SettingDesktopLyric', title: t('setting__desktop_lyric_mini_player'), prefixes: ['setting__desktop_lyric', 'setting__mini_player', 'mini_player'], keys: ['desktop_lyric__lrc_active_zoom_on', 'player__mini_player_on', 'player__mini_player_off'], excludes: ['setting__desktop_lyric_audio_visualization', ...(isLinux ? ['setting__desktop_lyric_hover_hide'] : [])] },
         { id: 'SettingSearch', title: t('setting__search'), prefixes: ['setting__search', 'setting__odc_clear_search'] },
         { id: 'SettingList', title: t('setting__list'), prefixes: ['setting__list'] },
         { id: 'SettingDownload', title: t('setting__download'), prefixes: ['setting__download'], keys: ['setting_download_save_group_list_name', 'setting__is_enable'] },
@@ -236,11 +243,15 @@ export default {
     })
 
     const legacyPluginId = name => typeof name === 'string' && name.startsWith('SettingPlugin_') ? name.slice('SettingPlugin_'.length) : ''
-    const resolveRequestedTab = name => tocList.value.find(tab => tab.id === name)?.id ?? (legacyPluginId(name) ? 'SettingPluginStore' : null)
+    // The mini player used to be a separate panel; keep old routes and sessions working.
+    const TAB_ALIASES = { SettingMiniPlayer: 'SettingDesktopLyric' }
+    const resolveTabId = name => typeof name === 'string' ? TAB_ALIASES[name] ?? name : name
+    const resolveRequestedTab = name => tocList.value.find(tab => tab.id === resolveTabId(name))?.id ?? (legacyPluginId(name) ? 'SettingPluginStore' : null)
     const requestedPluginId = computed(() => typeof route.query.plugin === 'string' && route.query.plugin ? route.query.plugin : legacyPluginId(route.query.name))
     const requestedTab = resolveRequestedTab(route.query.name)
     const savedView = !requestedTab ? settingSession.current : null
-    const rememberedView = savedView && tocList.value.some(tab => tab.id === savedView.id) ? savedView : null
+    const rememberedId = savedView ? resolveTabId(savedView.id) : null
+    const rememberedView = savedView && tocList.value.some(tab => tab.id === rememberedId) ? { ...savedView, id: rememberedId } : null
     const avtiveComponentName = ref(requestedTab ?? rememberedView?.id ?? (savedView ? 'SettingPluginStore' : tocList.value[0].id))
     settingFilter.value = filterQuery.value = rememberedView?.query ?? ''
 

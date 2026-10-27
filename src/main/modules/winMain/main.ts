@@ -5,7 +5,7 @@ import path from 'node:path'
 import { type WindowState, windowSizeList } from '@common/config'
 import { WIN_MAIN_RENDERER_EVENT_NAME } from '@common/ipcNames'
 import { createTaskBarButtons, getWindowSizeInfo, getWindowSizing } from './utils'
-import { getPlatform, isLinux, isWin, log } from '@common/utils'
+import { getOSVersion, getPlatform, isLinux, isWin, log } from '@common/utils'
 import { getProxy, openDevTools as handleOpenDevTools } from '@main/utils'
 import { mainSend } from '@common/mainIpc'
 import { sendFocus, sendTaskbarButtonClick } from './rendererEvent'
@@ -47,7 +47,8 @@ const fitWindowBounds = (bounds: Electron.Rectangle): Electron.Rectangle => {
 const updateWindowResizeMode = () => {
   if (!browserWindow) return
   const expanded = windowFullscreen || getWindowState().isMaximized
-  if (browserWindow.isResizable() === expanded) browserWindow.setResizable(!expanded)
+  const resizable = !expanded || (windowFullscreen && (isLinux || !!global.envParams.cmdParams.dt))
+  if (browserWindow.isResizable() !== resizable) browserWindow.setResizable(resizable)
   browserWindow.setAspectRatio(expanded ? 0 : windowAspectRatio)
   if (!expanded) {
     const area = screen.getDisplayMatching(browserWindow.getBounds()).workArea
@@ -268,7 +269,7 @@ export const createWindow = () => {
 
   const winURL = process.env.NODE_ENV !== 'production' ? 'http://localhost:9080' : `file://${path.join(encodePath(__dirname), 'index.html')}`
   registerIpcWindow(browserWindow.webContents, 'main', winURL)
-  void browserWindow.loadURL(winURL + `?os=${getPlatform()}&dt=${global.envParams.cmdParams.dt}&dark=${shouldUseDarkColors}&theme=${encodeURIComponent(JSON.stringify(theme))}`)
+  void browserWindow.loadURL(winURL + `?os=${getPlatform()}&osver=${encodeURIComponent(getOSVersion())}&dt=${global.envParams.cmdParams.dt}&dark=${shouldUseDarkColors}&theme=${encodeURIComponent(JSON.stringify(theme))}`)
 
   winEvent()
 
@@ -417,7 +418,8 @@ export const toggleDevTools = () => {
 
 export const setFullScreen = (isFullscreen: boolean): boolean => {
   if (!browserWindow) return false
-  if (isLinux && isFullscreen) browserWindow.setResizable(true)
+  // Opaque Windows windows also require this when entering fullscreen from maximized mode.
+  if ((isLinux || global.envParams.cmdParams.dt) && isFullscreen) browserWindow.setResizable(true)
   browserWindow.setFullScreen(isFullscreen)
   return isFullscreen
 }

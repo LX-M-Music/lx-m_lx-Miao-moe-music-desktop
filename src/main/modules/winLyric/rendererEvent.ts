@@ -30,7 +30,9 @@ export default () => {
   })
 
   mainOn<LX.DesktopLyric.NewBounds>(WIN_LYRIC_RENDERER_EVENT_NAME.set_win_bounds, ({ params: options }) => {
-    setBounds(getLyricWindowBounds(getBounds()!, options))
+    const bounds = getBounds()
+    if (!bounds || global.lx.appSetting['desktopLyric.isLock']) return
+    setBounds(getLyricWindowBounds(bounds, options))
   })
 
   mainOn<boolean>(WIN_LYRIC_RENDERER_EVENT_NAME.set_win_resizeable, ({ params: resizable }) => {

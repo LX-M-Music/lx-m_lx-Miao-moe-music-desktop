@@ -7,10 +7,11 @@
       </svg>
     </button>
     <button :class="$style.titleBtn" :aria-label="toggleDesktopLyricBtnTitle" @click="toggleDesktopLyric" @contextmenu="toggleLockDesktopLyric">
-      <svg xmlns="http://www.w3.org/2000/svg" height="100%" viewBox="0 0 24 24" :style="{ opacity: appSetting['desktopLyric.enable'] ? 1 : 'var(--player-control-opacity, .7)' }">
-        <use xlink:href="#icon-mini-player" />
+      <svg xmlns="http://www.w3.org/2000/svg" height="100%" viewBox="0 0 512 512" :style="{ opacity: appSetting['desktopLyric.enable'] ? 1 : 'var(--player-control-opacity, .7)' }">
+        <use :xlink:href="appSetting['desktopLyric.enable'] ? '#icon-desktop-lyric-on' : '#icon-desktop-lyric-off'" />
       </svg>
     </button>
+    <common-toggle-mini-player-btn :class="$style.titleBtn" />
     <common-volume-btn />
     <common-toggle-play-mode-btn />
     <common-play-queue-btn />

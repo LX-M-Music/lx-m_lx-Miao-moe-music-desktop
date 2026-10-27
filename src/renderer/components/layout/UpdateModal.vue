@@ -129,9 +129,12 @@ export default {
     progressLabel() {
       if (this.isCancelling) return '正在停止更新…'
       if (this.versionInfo.status == 'testing') return '正在测速更新节点…'
-      if (this.versionInfo.status == 'preparing') return this.versionInfo.downloadProgress?.mode == 'differential' ? '正在比对并复用本地文件…' : '正在准备便携版更新…'
+      if (this.versionInfo.status == 'preparing') {
+        const mode = this.versionInfo.downloadProgress?.mode
+        return mode == 'differential' ? '正在比对并复用本地文件…' : mode == 'setup' ? '正在解包并校验安装包…' : '正在准备便携版更新…'
+      }
       if (this.versionInfo.status == 'verifying') return '正在校验更新文件…'
-      if (this.versionInfo.status == 'installing') return ['portable', 'single-file'].includes(this.versionInfo.newVersion?.edition) ? '正在准备替换程序，稍后将自动重启…' : '正在启动安装，稍后将自动重启…'
+      if (this.versionInfo.status == 'installing') return ['portable', 'single-file', 'installed'].includes(this.versionInfo.newVersion?.edition) ? '正在准备替换程序，稍后将自动重启…' : '正在启动安装，稍后将自动重启…'
       if (this.versionInfo.downloadProgress?.mode == 'differential') return '正在下载差分数据…'
       return '正在下载更新…'
     },

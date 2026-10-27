@@ -38,7 +38,7 @@ const handleToggle = (id) => {
     },
   })
 }
-watch(() => props.source, async(source) => {
+watch(() => [props.source, props.sortId], async([source, sortId]) => {
   // const source = (await getLeaderboardSetting()).source as LX.OnlineSource
   if (!source) return
   const _list = [...(sortList[source] ?? [])]
@@ -47,7 +47,8 @@ watch(() => props.source, async(source) => {
     _list.push({ name: window.i18n.t('recommend'), id: 'recommend' })
   }
   list.splice(0, list.length, ..._list)
-  if (!props.sortId && list.length) handleToggle(list[0].id)
+  if (source === 'tx' && sortId === '5') handleToggle(3)
+  else if (!sortId && list.length) handleToggle(list[0].id)
   // console.log(list)
 }, {
   immediate: true,

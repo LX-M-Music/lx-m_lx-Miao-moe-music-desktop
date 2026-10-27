@@ -2,15 +2,15 @@ import { screen, type BrowserWindow } from 'electron'
 import { isLinux } from '@common/utils'
 import { MINI_PLAYER_UNLOCK_BUTTON, type MiniPlayerPointer } from '@common/miniPlayer'
 
-export const createLockControls = (window: BrowserWindow, onPointerChange?: (point: MiniPlayerPointer) => void) => {
+export const createLockControls = (window: BrowserWindow, onPointerChange?: (point: MiniPlayerPointer) => void, isEdgeHidden = () => false) => {
   let timer: NodeJS.Timeout | null = null
   let isOverUnlock = false
   let previousPoint: MiniPlayerPointer = null
   let previousWidth = 0
   let previousHeight = 0
-  const needsPointerTracking = () => global.lx.appSetting['desktopLyric.isLock'] ||
-    global.lx.appSetting['desktopLyric.autoHideControls'] || !global.lx.appSetting['desktopLyric.showPlayer'] ||
-    global.lx.appSetting['desktopLyric.style.backgroundOpacity'] === 0
+  const needsPointerTracking = () => global.lx.appSetting['miniPlayer.isLock'] ||
+    global.lx.appSetting['miniPlayer.autoHideControls'] ||
+    global.lx.appSetting['miniPlayer.backgroundOpacity'] === 0
 
   const stop = () => {
     if (timer) clearInterval(timer)
@@ -21,7 +21,7 @@ export const createLockControls = (window: BrowserWindow, onPointerChange?: (poi
       stop()
       return
     }
-    const locked = global.lx.appSetting['desktopLyric.isLock']
+    const locked = global.lx.appSetting['miniPlayer.isLock']
     let overUnlock = false
     let relativePoint: MiniPlayerPointer = null
     let windowWidth = 0
@@ -52,9 +52,9 @@ export const createLockControls = (window: BrowserWindow, onPointerChange?: (poi
     }
     if (force || overUnlock !== isOverUnlock) {
       isOverUnlock = overUnlock
-      // Keep lyrics click-through, but allow the recovery button to receive clicks.
+      // Keep the locked window click-through, but allow the recovery button to receive clicks.
       // Forward movement even with hover-hide disabled so the button can reveal itself.
-      window.setIgnoreMouseEvents(locked && !overUnlock, { forward: !isLinux })
+      window.setIgnoreMouseEvents(isEdgeHidden() || (locked && !overUnlock), { forward: !isLinux })
     }
   }
   const update = () => {

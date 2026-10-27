@@ -1,6 +1,8 @@
 const http = require('http')
 const https = require('https')
 const fs = require('fs')
+// Electron 22's Node HTTP client does not recognize a worker's browser URL class.
+const { URL } = require('node:url')
 const { Transform } = require('node:stream')
 const { pipeline } = require('node:stream/promises')
 const { httpOverHttp, httpsOverHttp } = require('tunnel')

@@ -103,3 +103,26 @@ test('C11: artwork follows relative redirects, bounds bytes and time, and remove
   await assert.rejects(download(base + '/image', path.join(dir, 'existing')), { code: 'EEXIST' })
   assert.equal(await fs.promises.readFile(path.join(dir, 'existing'), 'utf8'), 'keep')
 })
+
+test('artwork HTTP requests use Node URLs even when a browser worker supplies the global URL class', async t => {
+  const { URL: NodeURL } = require('node:url')
+  class BrowserURL {
+    constructor(value, base) { this.parsed = new NodeURL(value, base) }
+    get protocol() { return this.parsed.protocol }
+    get href() { return this.parsed.href }
+    toString() { return this.href }
+  }
+  const server = http.createServer((req, res) => {
+    if (req.url === '/redirect') return res.writeHead(302, { Location: '/cover' }).end()
+    res.end(gif)
+  })
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(async() => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) })
+  const module = { exports: {} }
+  require('node:vm').runInNewContext(fs.readFileSync('src/common/utils/musicMeta/downloader.js', 'utf8'), {
+    module, require, URL: BrowserURL, setTimeout, clearTimeout,
+  })
+  const file = path.join(await directory(t), 'worker-cover')
+  await module.exports(`http://127.0.0.1:${server.address().port}/redirect`, file)
+  assert.deepEqual(await fs.promises.readFile(file), gif)
+})

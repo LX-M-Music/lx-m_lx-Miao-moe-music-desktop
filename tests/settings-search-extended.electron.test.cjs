@@ -183,7 +183,7 @@ test('settings search handles all categories, input methods, dependencies and ke
       }
       const samples = [
         ['音源', 'SettingBasic'], ['播放音质', 'SettingPlay'], ['歌词', 'SettingPlayDetail'],
-        ['透明度', 'SettingDesktopLyric'], ['搜索', 'SettingSearch'], ['列表', 'SettingList'],
+        ['水平方向', 'SettingDesktopLyric'], ['迷你播放器', 'SettingDesktopLyric'], ['搜索', 'SettingSearch'], ['列表', 'SettingList'],
         ['下载目录', 'SettingDownload'], ['快捷键', 'SettingHotKey'], ['Web DAV', 'SettingSync'],
         ['端口', 'SettingOpenAPI'], ['代理', 'SettingNetwork'], ['网易云音乐', 'SettingCookie'],
         ['无缝', 'SettingAdvanced'], ['备份', 'SettingBackup'], ['托盘', 'SettingOther'],

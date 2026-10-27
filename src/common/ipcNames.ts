@@ -156,6 +156,7 @@ const modules = {
     sync_remove_server_device: 'sync_remove_server_device',
 
     process_new_desktop_lyric_client: 'process_new_desktop_lyric_client',
+    process_new_mini_player_client: 'process_new_mini_player_client',
 
     player_action_set_buttons: 'player_action_set_buttons',
     // player_action_set_thumbnail_clip: 'player_action_set_thumbnail_clip',
@@ -191,6 +192,20 @@ const modules = {
     mouse_enter_leave: 'mouse_enter_leave',
     pointer_position: 'pointer_position',
   },
+  winMiniPlayer: {
+    set_config: 'set_config',
+    get_config: 'get_config',
+    on_config_change: 'on_config_change',
+    main_window_inited: 'main_window_inited',
+    set_win_bounds: 'set_win_bounds',
+    set_win_resizeable: 'set_win_resizeable',
+    request_main_window_channel: 'request_main_window_channel',
+    show_main_window: 'show_main_window',
+    provide_main_window_channel: 'provide_main_window_channel',
+    pointer_position: 'pointer_position',
+    edge_hidden: 'edge_hidden',
+    edge_motion: 'edge_motion',
+  },
   hotKey: {
     enable: 'enable',
     status: 'status',
@@ -219,4 +234,5 @@ export const PLAYER_EVENT_NAME = modules.player
 export const DISLIKE_EVENT_NAME = modules.dislike
 export const WIN_MAIN_RENDERER_EVENT_NAME = modules.winMain
 export const WIN_LYRIC_RENDERER_EVENT_NAME = modules.winLyric
+export const WIN_MINI_PLAYER_RENDERER_EVENT_NAME = modules.winMiniPlayer
 export const HOTKEY_RENDERER_EVENT_NAME = modules.hotKey

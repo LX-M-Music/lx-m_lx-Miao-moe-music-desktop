@@ -1,6 +1,6 @@
 {
   "name": "lx-m-music-desktop",
-  "version": "2.10.2",
+  "version": "2.10.3",
   "productName": "LX-M Music",
   "description": "一个免费的音乐查找助手",
   "main": "./dist/main.js",
@@ -172,7 +172,7 @@
   },
   "dependencies": {
     "@kawarp/core": "1.2.1",
-    "@simonwep/pickr": "^1.9.1",
+    "@simonwep/pickr": "1.9.1",
     "@tailwindcss/postcss": "4.3.3",
     "axios": "^1.20.0",
     "better-sqlite3": "^12.9.0",

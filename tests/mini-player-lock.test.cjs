@@ -4,10 +4,10 @@ const { test } = require('node:test')
 const loader = require('./helpers/load-typescript.cjs')
 const geometry = loader()('src/common/miniPlayer.ts')
 
-function fixture(t, { locked = true, linux = false, hoverHide = false, autoHide = false, showPlayer = true, background = 92 } = {}) {
+function fixture(t, { locked = true, linux = false, autoHide = false, background = 92 } = {}) {
   t.mock.timers.enable({ apis: ['setInterval'] })
   const previous = global.lx
-  global.lx = { appSetting: { 'desktopLyric.isLock': locked, 'desktopLyric.isHoverHide': hoverHide, 'desktopLyric.autoHideControls': autoHide, 'desktopLyric.showPlayer': showPlayer, 'desktopLyric.style.backgroundOpacity': background } }
+  global.lx = { appSetting: { 'miniPlayer.isLock': locked, 'miniPlayer.autoHideControls': autoHide, 'miniPlayer.backgroundOpacity': background } }
   const window = new EventEmitter()
   const bounds = { x: 240, y: 120, width: 450, height: 300 }
   let point = { x: 300, y: 200 }
@@ -25,7 +25,7 @@ function fixture(t, { locked = true, linux = false, hoverHide = false, autoHide 
     electron: { screen: { getCursorScreenPoint() { reads++; return point } } },
     '@common/utils': { isLinux: linux },
     '@common/miniPlayer': geometry,
-  })('src/main/modules/winLyric/lockControls.ts')
+  })('src/main/modules/winMiniPlayer/lockControls.ts')
   const controls = createLockControls(window, point => pointers.push(point))
   const close = () => { destroyed = true; window.emit('closed') }
   t.after(() => { close(); global.lx = previous })
@@ -37,9 +37,9 @@ function fixture(t, { locked = true, linux = false, hoverHide = false, autoHide 
   return { controls, calls, pointers, bounds, corner, move, close, reads: () => reads }
 }
 
-for (const hoverHide of [false, true]) {
-  test(`locked lyrics stay click-through except at the unlock button (hover-hide ${hoverHide})`, t => {
-    const f = fixture(t, { hoverHide })
+{
+  test('locked mini player stays click-through except at the unlock button', t => {
+    const f = fixture(t)
     f.controls.update()
     assert.deepEqual(f.calls.at(-1), { ignore: true, options: { forward: true } })
     f.move(f.corner())
@@ -55,7 +55,7 @@ for (const hoverHide of [false, true]) {
 test('unlocking restores all input and stops polling', t => {
   const f = fixture(t)
   f.controls.update()
-  global.lx.appSetting['desktopLyric.isLock'] = false
+  global.lx.appSetting['miniPlayer.isLock'] = false
   f.controls.update()
   assert.equal(f.calls.at(-1).ignore, false)
   const reads = f.reads()
@@ -70,10 +70,10 @@ test('a newly opened locked window is recoverable with the pointer already at th
   assert.equal(f.calls.at(-1).ignore, false)
 })
 
-test('moving or resizing the window uses its current content coordinates, including minimum lyric size', t => {
+test('moving or resizing the window uses its current content coordinates, including minimum mini player size', t => {
   const f = fixture(t)
   f.controls.update()
-  Object.assign(f.bounds, { x: -500, y: 310, width: 38, height: 38 })
+  Object.assign(f.bounds, { x: -500, y: 310, width: 280, height: 180 })
   f.move(f.corner())
   assert.equal(f.calls.at(-1).ignore, false)
   const { top, right, width, height } = geometry.MINI_PLAYER_UNLOCK_BUTTON
@@ -113,7 +113,7 @@ test('transparent backgrounds track window entry and exit even when all player c
   const f = fixture(t, { locked: false })
   f.controls.update()
   assert.equal(f.reads(), 0)
-  global.lx.appSetting['desktopLyric.style.backgroundOpacity'] = 0
+  global.lx.appSetting['miniPlayer.backgroundOpacity'] = 0
   f.controls.update()
   assert.deepEqual(f.pointers.at(-1), { x: 60, y: 80 }, 'transparency reveals the outline for a pointer already inside')
   f.move({ x: f.bounds.x + f.bounds.width - 1, y: f.bounds.y + f.bounds.height - 1 })
@@ -121,7 +121,7 @@ test('transparent backgrounds track window entry and exit even when all player c
   assert.equal(f.calls.at(-1).ignore, false, 'transparency does not enable click-through')
   f.move({ x: f.bounds.x + f.bounds.width, y: f.bounds.y + f.bounds.height - 1 })
   assert.equal(f.pointers.at(-1), null, 'the right boundary is outside the window')
-  global.lx.appSetting['desktopLyric.style.backgroundOpacity'] = 92
+  global.lx.appSetting['miniPlayer.backgroundOpacity'] = 92
   f.controls.update()
   const reads = f.reads()
   t.mock.timers.tick(1000)
@@ -136,10 +136,10 @@ test('recovery does not depend on forwarded mouse events on Linux', t => {
   assert.equal(f.calls.at(-1).ignore, false)
 })
 
-for (const [autoHide, showPlayer] of [[true, true], [false, false], [true, false]]) {
-  test(`hidden controls receive system pointer positions without DOM events (auto-hide ${autoHide}, player ${showPlayer})`, t => {
-    const f = fixture(t, { locked: false, autoHide, showPlayer })
-    global.lx.appSetting['desktopLyric.style.backgroundOpacity'] = 0
+for (const autoHide of [true, false]) {
+  test(`hidden controls receive system pointer positions without DOM events (auto-hide ${autoHide})`, t => {
+    const f = fixture(t, { locked: false, autoHide })
+    global.lx.appSetting['miniPlayer.backgroundOpacity'] = 0
     f.controls.update()
     f.move({ x: f.bounds.x + 80, y: f.bounds.y + 20 })
     assert.deepEqual(f.pointers.at(-1), { x: 80, y: 20 })
@@ -153,7 +153,7 @@ for (const [autoHide, showPlayer] of [[true, true], [false, false], [true, false
 }
 
 test('pointer recovery follows moved and resized windows in logical screen coordinates', t => {
-  const f = fixture(t, { locked: false, showPlayer: false })
+  const f = fixture(t, { locked: false, autoHide: true })
   f.controls.update()
   Object.assign(f.bounds, { x: -600, y: 310, width: 600, height: 430 })
   f.move({ x: -520, y: 330 })
@@ -171,10 +171,10 @@ test('changing the display switches starts and stops recovery, including a point
   f.controls.update()
   f.move({ x: f.bounds.x + 80, y: f.bounds.y + 20 })
   assert.equal(f.reads(), 0)
-  global.lx.appSetting['desktopLyric.showPlayer'] = false
+  global.lx.appSetting['miniPlayer.autoHideControls'] = true
   f.controls.update()
   assert.deepEqual(f.pointers.at(-1), { x: 80, y: 20 })
-  global.lx.appSetting['desktopLyric.showPlayer'] = true
+  global.lx.appSetting['miniPlayer.autoHideControls'] = false
   f.controls.update()
   assert.equal(f.pointers.at(-1), null)
   const reads = f.reads()
@@ -182,8 +182,8 @@ test('changing the display switches starts and stops recovery, including a point
   assert.equal(f.reads(), reads)
 })
 
-test('closing an unlocked lyric-only window stops its recovery timer', t => {
-  const f = fixture(t, { locked: false, showPlayer: false })
+test('closing an unlocked mini player stops its recovery timer', t => {
+  const f = fixture(t, { locked: false, autoHide: true })
   f.controls.update()
   f.close()
   const reads = f.reads()

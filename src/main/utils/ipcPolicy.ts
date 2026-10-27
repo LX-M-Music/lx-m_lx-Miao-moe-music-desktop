@@ -1,11 +1,11 @@
 import defaultSetting from '@common/defaultSetting'
-import { CMMON_EVENT_NAME, WIN_MAIN_RENDERER_EVENT_NAME, WIN_LYRIC_RENDERER_EVENT_NAME, PLAYER_EVENT_NAME, DISLIKE_EVENT_NAME, HOTKEY_RENDERER_EVENT_NAME } from '@common/ipcNames'
+import { CMMON_EVENT_NAME, WIN_MAIN_RENDERER_EVENT_NAME, WIN_LYRIC_RENDERER_EVENT_NAME, WIN_MINI_PLAYER_RENDERER_EVENT_NAME, PLAYER_EVENT_NAME, DISLIKE_EVENT_NAME, HOTKEY_RENDERER_EVENT_NAME } from '@common/ipcNames'
 import { PLUGIN_IPC, isPluginId } from '@common/optionalPlugins'
 import { BACKUP_IPC } from '@common/backup'
 import { SOURCE_PLUGIN_IPC } from '@common/sourcePlugin'
 import { MUSIC_FREE_IPC, isMusicFreeSource } from '@common/musicFree'
 
-type Role = 'main' | 'lyric' | 'userApi'
+type Role = 'main' | 'lyric' | 'mini' | 'userApi'
 type SenderEvent = Pick<Electron.IpcMainEvent, 'sender' | 'senderFrame'>
 type Check = (value: any) => boolean
 const owners = new WeakMap<Electron.WebContents, { role: Role, url: string }>()
@@ -54,7 +54,7 @@ const shape = (fields: Record<string, Check>): Check => v => obj(v) && Object.en
 const oneOf = (...values: unknown[]): Check => v => values.includes(v)
 const optional = (check: Check): Check => v => v === undefined || check(v)
 const finite: Check = v => typeof v === 'number' && Number.isFinite(v)
-const known = new Set<string>([CMMON_EVENT_NAME, WIN_MAIN_RENDERER_EVENT_NAME, WIN_LYRIC_RENDERER_EVENT_NAME, PLAYER_EVENT_NAME, DISLIKE_EVENT_NAME, HOTKEY_RENDERER_EVENT_NAME, PLUGIN_IPC, BACKUP_IPC].flatMap(group => Object.values(group)))
+const known = new Set<string>([CMMON_EVENT_NAME, WIN_MAIN_RENDERER_EVENT_NAME, WIN_LYRIC_RENDERER_EVENT_NAME, WIN_MINI_PLAYER_RENDERER_EVENT_NAME, PLAYER_EVENT_NAME, DISLIKE_EVENT_NAME, HOTKEY_RENDERER_EVENT_NAME, PLUGIN_IPC, BACKUP_IPC].flatMap(group => Object.values(group)))
 const checks = new Map<string, Check>()
 for (const name of [SOURCE_PLUGIN_IPC.load, SOURCE_PLUGIN_IPC.call, SOURCE_PLUGIN_IPC.cancel]) known.add(name)
 checks.set(SOURCE_PLUGIN_IPC.load, obj)
@@ -113,9 +113,12 @@ add('dislike_', 'add_dislike_music_infos', objects)
 add('dislike_', 'overwrite_dislike_music_infos', v => typeof v === 'string')
 add('winLyric_', 'close get_config request_main_window_channel show_main_window', empty)
 add('winLyric_', 'set_win_resizeable mouse_enter_leave', bool)
+add('winMiniPlayer_', 'get_config request_main_window_channel show_main_window', empty)
+add('winMiniPlayer_', 'set_win_resizeable', bool)
+checks.set('winMiniPlayer_set_win_bounds', shape({ x: finite, y: finite, w: finite, h: finite }))
 add('hotKey_', 'enable', bool)
 add('hotKey_', 'status', empty)
-checks.set('winLyric_set_win_bounds', shape({ x: finite, y: finite, w: finite, h: finite }))
+checks.set('winLyric_set_win_bounds', shape({ x: finite, y: finite, w: finite, h: finite, absolute: optional(bool) }))
 const lyricAllowed = new Set(['common_get_app_setting', 'common_get_env_params', 'common_get_system_fonts', 'common_list_custom_fonts', 'common_read_custom_font', PLUGIN_IPC.list, PLUGIN_IPC.runtimeResult])
 const userApiAllowed = new Set(['userApi_init', 'userApi_response', 'userApi_openDevTools', 'userApi_showUpdateAlert', 'userApi_getProxy'])
 for (const name of userApiAllowed) known.add(name)
@@ -125,20 +128,21 @@ checks.set('userApi_showUpdateAlert', shape({ data: shape({ log: str, updateUrl:
 checks.set('userApi_openDevTools', v => empty(v) || shape({ data: empty, status: empty, message: empty })(v))
 checks.set('userApi_getProxy', empty)
 
-const settingCheck = (value: any, lyric: boolean) => obj(value) && Object.entries(value).every(([key, val]) => {
-  if (!Object.hasOwn(defaultSetting, key) || (lyric && !key.startsWith('desktopLyric.'))) return false
+const settingCheck = (value: any, role: Role) => obj(value) && Object.entries(value).every(([key, val]) => {
+  const sharedLyricToggle = role === 'lyric' && (key === 'player.isShowLyricTranslation' || key === 'player.isShowLyricRoma')
+  if (!Object.hasOwn(defaultSetting, key) || ((role === 'lyric' || role === 'mini') && !sharedLyricToggle && !key.startsWith(role === 'lyric' ? 'desktopLyric.' : 'miniPlayer.'))) return false
   const original = defaultSetting[key as keyof LX.AppSetting]
-  if (key === 'desktopLyric.x' || key === 'desktopLyric.y') return val == null || finite(val)
+  if (key === 'desktopLyric.x' || key === 'desktopLyric.y' || key === 'miniPlayer.x' || key === 'miniPlayer.y') return val == null || finite(val)
   return original == null ? val == null || typeof val === 'string' : Array.isArray(original) ? Array.isArray(val) : typeof val === typeof original
 })
 
 export const assertIpcRequest = (event: SenderEvent, channel: string, params?: unknown, rest: unknown[] = []) => {
   const owner = owners.get(event.sender)
   if (!owner || event.sender.isDestroyed() || !event.senderFrame || event.senderFrame !== event.sender.mainFrame || canonical(event.senderFrame.url) !== owner.url) fail('IPC_SENDER_DENIED', '此窗口无权调用该接口')
-  if (!known.has(channel) || (owner.role === 'userApi' ? !userApiAllowed.has(channel) : channel.startsWith('userApi_')) || (owner.role === 'lyric' && !channel.startsWith('winLyric_') && !lyricAllowed.has(channel))) fail('IPC_CHANNEL_DENIED', '此窗口无权使用该功能')
+  if (!known.has(channel) || (owner.role === 'userApi' ? !userApiAllowed.has(channel) : channel.startsWith('userApi_')) || ((owner.role === 'lyric' || owner.role === 'mini') && !channel.startsWith(owner.role === 'lyric' ? 'winLyric_' : 'winMiniPlayer_') && !lyricAllowed.has(channel))) fail('IPC_CHANNEL_DENIED', '此窗口无权使用该功能')
   validateIpcValue([params, ...rest])
   let valid: boolean
-  if (['common_set_app_setting', 'winMain_set_config', 'winLyric_set_config'].includes(channel)) valid = settingCheck(params, owner.role === 'lyric')
+  if (['common_set_app_setting', 'winMain_set_config', 'winLyric_set_config', 'winMiniPlayer_set_config'].includes(channel)) valid = settingCheck(params, owner.role)
   else if (channel.startsWith('optional_plugins:')) {
     if ([PLUGIN_IPC.list, PLUGIN_IPC.refresh].includes(channel as any)) valid = empty(params) && rest.length === 0
     else if (channel === PLUGIN_IPC.import) valid = obj(params) && rest.length === 0

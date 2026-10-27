@@ -1,7 +1,5 @@
 // 设置窗口位置、大小
-export const getMinimumSize = () => global.lx.appSetting['desktopLyric.showPlayer']
-  ? { minWidth: 280, minHeight: 180 }
-  : { minWidth: 38, minHeight: 38 }
+export const getMinimumSize = () => ({ minWidth: 38, minHeight: 38 })
 
 
 // const updateBounds = (bounds: Bounds) => {
@@ -12,13 +10,17 @@ export const getMinimumSize = () => global.lx.appSetting['desktopLyric.showPlaye
 /**
  *
  * @param bounds 当前设置
- * @param param 新设置（相对于当前设置）
+ * @param param 新设置（默认相对于当前设置，absolute 使用绝对屏幕坐标）
  * @returns
  */
-export const getLyricWindowBounds = (bounds: Electron.Rectangle, { x, y, w, h }: LX.DesktopLyric.NewBounds): Electron.Rectangle => {
+export const getLyricWindowBounds = (bounds: Electron.Rectangle, { x, y, w, h, absolute = false }: LX.DesktopLyric.NewBounds): Electron.Rectangle => {
   const { minWidth, minHeight } = getMinimumSize()
   if (w < minWidth) w = minWidth
   if (h < minHeight) h = minHeight
+  if (!absolute) {
+    x += bounds.x
+    y += bounds.y
+  }
 
   if (global.lx.appSetting['desktopLyric.isLockScreen']) {
     if (!global.envParams.workAreaSize) return bounds
@@ -31,17 +33,11 @@ export const getLyricWindowBounds = (bounds: Electron.Rectangle, { x, y, w, h }:
     const maxX = global.envParams.workAreaSize.width - w
     const maxY = global.envParams.workAreaSize.height - h
 
-    x += bounds.x
-    y += bounds.y
-
     if (x > maxX) x = maxX
     else if (x < 0) x = 0
 
     if (y > maxY) y = maxY
     else if (y < 0) y = 0
-  } else {
-    y += bounds.y
-    x += bounds.x
   }
 
   // console.log('util bounds', bounds)
@@ -51,10 +47,6 @@ export const getLyricWindowBounds = (bounds: Electron.Rectangle, { x, y, w, h }:
 
 export const watchConfigKeys = [
   'desktopLyric.enable',
-  'desktopLyric.showPlayer',
-  'desktopLyric.showBorder',
-  'desktopLyric.singleLine',
-  'desktopLyric.autoHideControls',
   'desktopLyric.isLock',
   'desktopLyric.isAlwaysOnTop',
   'desktopLyric.isAlwaysOnTopLoop',
@@ -70,6 +62,7 @@ export const watchConfigKeys = [
   'desktopLyric.scrollAlign',
   'desktopLyric.isHoverHide',
   'desktopLyric.direction',
+  'desktopLyric.isSingleLine',
   'desktopLyric.style.align',
   'desktopLyric.style.lyricUnplayColor',
   'desktopLyric.style.lyricPlayedColor',
@@ -79,7 +72,6 @@ export const watchConfigKeys = [
   'desktopLyric.style.lineGap',
   // 'desktopLyric.style.fontWeight',
   'desktopLyric.style.opacity',
-  'desktopLyric.style.backgroundOpacity',
   'desktopLyric.style.ellipsis',
   'desktopLyric.style.isFontWeightFont',
   'desktopLyric.style.isFontWeightLine',

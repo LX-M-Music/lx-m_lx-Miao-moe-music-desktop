@@ -2,10 +2,6 @@ declare namespace LX {
   namespace DesktopLyric {
     interface Config {
       'desktopLyric.enable': LX.AppSetting['desktopLyric.enable']
-      'desktopLyric.showPlayer': LX.AppSetting['desktopLyric.showPlayer']
-      'desktopLyric.showBorder': LX.AppSetting['desktopLyric.showBorder']
-      'desktopLyric.singleLine': LX.AppSetting['desktopLyric.singleLine']
-      'desktopLyric.autoHideControls': LX.AppSetting['desktopLyric.autoHideControls']
       'desktopLyric.isLock': LX.AppSetting['desktopLyric.isLock']
       'desktopLyric.isAlwaysOnTop': LX.AppSetting['desktopLyric.isAlwaysOnTop']
       'desktopLyric.isAlwaysOnTopLoop': LX.AppSetting['desktopLyric.isAlwaysOnTopLoop']
@@ -21,6 +17,7 @@ declare namespace LX {
       'desktopLyric.scrollAlign': LX.AppSetting['desktopLyric.scrollAlign']
       'desktopLyric.isHoverHide': LX.AppSetting['desktopLyric.isHoverHide']
       'desktopLyric.direction': LX.AppSetting['desktopLyric.direction']
+      'desktopLyric.isSingleLine': LX.AppSetting['desktopLyric.isSingleLine']
       'desktopLyric.style.align': LX.AppSetting['desktopLyric.style.align']
       'desktopLyric.style.font': LX.AppSetting['desktopLyric.style.font']
       'desktopLyric.style.fontSize': LX.AppSetting['desktopLyric.style.fontSize']
@@ -30,7 +27,6 @@ declare namespace LX {
       'desktopLyric.style.lyricShadowColor': LX.AppSetting['desktopLyric.style.lyricShadowColor']
       // 'desktopLyric.style.fontWeight': LX.AppSetting['desktopLyric.style.fontWeight']
       'desktopLyric.style.opacity': LX.AppSetting['desktopLyric.style.opacity']
-      'desktopLyric.style.backgroundOpacity': LX.AppSetting['desktopLyric.style.backgroundOpacity']
       'desktopLyric.style.ellipsis': LX.AppSetting['desktopLyric.style.ellipsis']
       'desktopLyric.style.isFontWeightFont': LX.AppSetting['desktopLyric.style.isFontWeightFont']
       'desktopLyric.style.isFontWeightLine': LX.AppSetting['desktopLyric.style.isFontWeightLine']
@@ -46,28 +42,6 @@ declare namespace LX {
     }
 
     type WinMainActions = 'get_info' | 'get_status' | 'get_analyser_data_array'
-
-    interface PlayerState {
-      id: string | null
-      name: string
-      singer: string
-      album: string
-      isPlay: boolean
-      position: number
-      duration: number
-      volume: number
-      isMute: boolean
-    }
-
-    type PlayerRequest = LyricAction<'get_player_state'>
-    | LyricAction<'player_toggle_play'>
-    | LyricAction<'player_prev'>
-    | LyricAction<'player_next'>
-    | LyricAction<'player_seek', { id: string, time: number }>
-    | LyricAction<'player_volume', number>
-    | LyricAction<'player_mute'>
-
-    type MainWindowRequest = LyricAction<'get_info'> | LyricAction<'get_status'> | LyricAction<'get_analyser_data_array'> | PlayerRequest
 
     interface LyricActionBase <A> {
       action: A
@@ -108,9 +82,6 @@ declare namespace LX {
     | LyricAction<'set_pause'>
     | LyricAction<'set_stop'>
     | LyricAction<'send_analyser_data_array', Uint8Array>
-    | LyricAction<'set_player_state', PlayerState>
-    | LyricAction<'set_player_cover', { id: string | null, url: string }>
-    | LyricAction<'player_action_failed'>
 
 
     interface NewBounds {
@@ -118,6 +89,7 @@ declare namespace LX {
       y: number
       w: number
       h: number
+      absolute?: boolean
     }
   }
 }

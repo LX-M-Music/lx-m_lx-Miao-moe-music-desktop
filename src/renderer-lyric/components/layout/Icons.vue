@@ -1,6 +1,17 @@
 <template>
   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" style="display: none;">
     <defs>
+      <g id="icon-translation" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 5h10M8 3v2M5 5c0 5 3 8 7 9M11 5c0 4-3 8-8 10M13 21l4-10 4 10M14.5 17h5" />
+      </g>
+      <g id="icon-romanization" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 20V4h5a4 4 0 0 1 0 8H4m5 0 5 8M17 5h5" />
+        <ellipse cx="19.5" cy="14.5" rx="2.5" ry="3.5" />
+      </g>
+      <g id="icon-single-line" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2.5" y="7.5" width="19" height="9" rx="2" />
+        <path d="M6 12h12" />
+      </g>
       <g id="icon-close" fill="currentColor">
         <!-- 0 0 24 24-->
         <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />

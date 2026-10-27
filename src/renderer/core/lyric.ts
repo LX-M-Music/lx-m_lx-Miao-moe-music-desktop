@@ -17,7 +17,7 @@ export interface RawLyricLine { time: number, text: string, extendedLyrics: stri
 export const getRawLyricLines = (): RawLyricLine[] => musicInfo.id && musicInfo.lrc ? lrc?.initInfo.lines ?? [] : []
 let desktopLyricPort: Electron.IpcRendererEvent['ports'][0] | null = null
 
-const syncLyricPosition = (syncDesktop = true, restorePaused = false) => {
+export const syncLyricPosition = (syncDesktop = true, restorePaused = false) => {
   const playing = isPlay.value
   if (!playing && !restorePaused) return
   const time = getCurrentTime()
@@ -44,10 +44,7 @@ export const sendDesktopLyricInfo = (info: LX.DesktopLyric.LyricActions, transfe
   if (transferList) desktopLyricPort.postMessage(info, transferList)
   else desktopLyricPort.postMessage(info)
 }
-let miniPlayerActionHandler: ((request: LX.DesktopLyric.PlayerRequest) => void) | null = null
-export const setMiniPlayerActionHandler = (handler: typeof miniPlayerActionHandler) => { miniPlayerActionHandler = handler }
-
-const handleDesktopLyricMessage = (request: LX.DesktopLyric.MainWindowRequest) => {
+const handleDesktopLyricMessage = (request: { action: LX.DesktopLyric.WinMainActions }) => {
   switch (request.action) {
     case 'get_info':
       sendDesktopLyricInfo({
@@ -81,9 +78,6 @@ const handleDesktopLyricMessage = (request: LX.DesktopLyric.MainWindowRequest) =
     case 'get_analyser_data_array':
       sendDesktopLyricInfo({ action: 'send_analyser_data_array', data: desktopAnalyserProvider?.() ?? new Uint8Array() })
       break
-    default:
-      miniPlayerActionHandler?.(request)
-      break
   }
 }
 export const init = () => {
@@ -113,6 +107,7 @@ export const init = () => {
   onNewDesktopLyricProcess(({ event }) => {
     console.log('onNewDesktopLyricProcess')
     const [port] = event.ports
+    desktopLyricPort?.close()
     desktopLyricPort = port
 
     port.onmessage = ({ data }) => {

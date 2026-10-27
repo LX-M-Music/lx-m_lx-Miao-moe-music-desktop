@@ -970,3 +970,8 @@ export const downloadTasksRemove = async(ids: string[]) => {
 export const downloadListClear = async() => {
   return rendererInvoke(WIN_MAIN_RENDERER_EVENT_NAME.download_list_clear)
 }
+
+export const onNewMiniPlayerProcess = (listener: LX.IpcRendererEventListener): RemoveListener => {
+  rendererOn(WIN_MAIN_RENDERER_EVENT_NAME.process_new_mini_player_client, listener)
+  return () => { rendererOff(WIN_MAIN_RENDERER_EVENT_NAME.process_new_mini_player_client, listener) }
+}

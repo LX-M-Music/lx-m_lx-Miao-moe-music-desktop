@@ -13,6 +13,27 @@ export interface UpdateFile {
   chunks: UpdateChunk[]
 }
 
+export interface UpdateInventoryEntry {
+  path: string
+  size: number
+  sha256: string
+}
+
+export interface UpdateInventory {
+  schema: 1
+  appId: 'com.lx-m.music.desktop'
+  files: UpdateInventoryEntry[]
+}
+
+export interface UpdateRuntimeMarker {
+  schema: 1
+  appId: 'com.lx-m.music.desktop'
+  edition: LX.UpdateEdition
+  arch: string
+  win7: boolean
+  version: string
+}
+
 export interface PortableManifest {
   schema: 1
   appId: 'com.lx-m.music.desktop'
@@ -67,4 +88,29 @@ export const parsePortableManifest = (value: any, runtime: LX.UpdateRuntime, ver
   }
   if (offset !== payload.size || !names.has('lx-m music.exe') || !names.has('resources/app.asar')) fail()
   return value as PortableManifest
+}
+
+// The inventory is packaged next to the application and lists the exact bytes
+// of every program file. It is used to update an installed application in place
+// from the Setup archive instead of running the NSIS installer again.
+export const parseUpdateInventory = (value: any): UpdateInventory => {
+  const fail = (): never => { throw new Error('更新包内的程序清单无效') }
+  if (!value || value.schema !== 1 || value.appId !== 'com.lx-m.music.desktop' ||
+    !Array.isArray(value.files) || value.files.length === 0 || value.files.length > 20000) fail()
+  const names = new Set<string>()
+  for (const file of value.files) {
+    if (!file || typeof file.path !== 'string' || !isManagedUpdatePath(file.path) || names.has(file.path.toLowerCase()) ||
+      !hash(file.sha256) || !integer(file.size, 1024 ** 3)) fail()
+    names.add(file.path.toLowerCase())
+  }
+  if (!names.has('lx-m music.exe') || !names.has('resources/app.asar')) fail()
+  return value as UpdateInventory
+}
+
+export const parseUpdateRuntimeMarker = (value: any): UpdateRuntimeMarker => {
+  const editions = ['installed', 'portable', 'single-file', 'development']
+  if (!value || value.schema !== 1 || value.appId !== 'com.lx-m.music.desktop' || !editions.includes(value.edition) ||
+    typeof value.arch !== 'string' || value.arch.length === 0 || typeof value.win7 !== 'boolean' ||
+    typeof value.version !== 'string' || value.version.length === 0 || value.version.length > 64) throw new Error('更新包内的版本类型信息无效')
+  return value as UpdateRuntimeMarker
 }

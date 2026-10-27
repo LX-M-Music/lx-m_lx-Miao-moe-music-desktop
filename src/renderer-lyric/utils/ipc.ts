@@ -1,13 +1,7 @@
 import { rendererSend, rendererInvoke, rendererOn, rendererOff } from '@common/rendererIpc'
 import { CMMON_EVENT_NAME, WIN_LYRIC_RENDERER_EVENT_NAME } from '@common/ipcNames'
-import type { MiniPlayerPointer } from '@common/miniPlayer'
 
 type RemoveListener = () => void
-
-export const onPointerPosition = (listener: LX.IpcRendererEventListenerParams<MiniPlayerPointer>): RemoveListener => {
-  rendererOn(WIN_LYRIC_RENDERER_EVENT_NAME.pointer_position, listener)
-  return () => { rendererOff(WIN_LYRIC_RENDERER_EVENT_NAME.pointer_position, listener) }
-}
 
 export const showMainWindow = () => { rendererSend(WIN_LYRIC_RENDERER_EVENT_NAME.show_main_window) }
 

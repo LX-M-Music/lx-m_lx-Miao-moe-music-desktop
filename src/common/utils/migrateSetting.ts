@@ -148,5 +148,25 @@ export default (setting: any): Partial<LX.AppSetting> => {
     setting.version = '2.2.0'
   }
 
+  if (compareVer(setting.version, '2.3.0') < 0) {
+    if (Object.hasOwn(setting, 'desktopLyric.showPlayer')) {
+      for (const key of ['enable', 'showBorder', 'autoHideControls', 'isLock', 'isAlwaysOnTop', 'isAlwaysOnTopLoop', 'isShowTaskbar', 'fullscreenHide', 'width', 'height', 'x', 'y', 'isLockScreen']) {
+        const oldKey = 'desktopLyric.' + key
+        const newKey = 'miniPlayer.' + key
+        if (Object.hasOwn(setting, oldKey) && !Object.hasOwn(setting, newKey)) setting[newKey] = setting[oldKey]
+      }
+      if (!Object.hasOwn(setting, 'miniPlayer.backgroundOpacity')) setting['miniPlayer.backgroundOpacity'] = setting['desktopLyric.style.backgroundOpacity'] ?? 100
+      setting['desktopLyric.enable'] = false
+      setting['desktopLyric.x'] = setting['desktopLyric.y'] = null
+      setting['desktopLyric.width'] = 450
+      setting['desktopLyric.height'] = 300
+    }
+    setting.version = '2.3.0'
+  }
+  delete setting['desktopLyric.showPlayer']
+  delete setting['desktopLyric.showBorder']
+  delete setting['desktopLyric.singleLine']
+  delete setting['desktopLyric.autoHideControls']
+  delete setting['desktopLyric.style.backgroundOpacity']
   return setting
 }

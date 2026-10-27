@@ -16,3 +16,7 @@ export const sendNewDesktopLyricClient = (port: Electron.MessagePortMain) => {
 }
 
 
+
+export const sendNewMiniPlayerClient = (port: Electron.MessagePortMain) => {
+  getWebContents().postMessage(WIN_MAIN_RENDERER_EVENT_NAME.process_new_mini_player_client, null, [port])
+}

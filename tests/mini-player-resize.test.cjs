@@ -13,10 +13,10 @@ function fixture(t) {
   global.envParams = { workAreaSize: { width: 1920, height: 1080 } }
   global.lx = {
     appSetting: {
-      'desktopLyric.x': 240, 'desktopLyric.y': 240,
-      'desktopLyric.width': 450, 'desktopLyric.height': 300,
-      'desktopLyric.showPlayer': true, 'desktopLyric.isLock': false,
-      'desktopLyric.isLockScreen': true,
+      'miniPlayer.x': 240, 'miniPlayer.y': 240,
+      'miniPlayer.width': 450, 'miniPlayer.height': 300,
+      'miniPlayer.isLock': false,
+      'miniPlayer.isLockScreen': true,
     },
     theme: { shouldUseDarkColors: false, theme: {} },
     event_app: {
@@ -39,7 +39,10 @@ function fixture(t) {
   }
   const main = loader({
     'node:path': path,
-    electron: { BrowserWindow },
+    electron: { BrowserWindow, screen: Object.assign(new EventEmitter(), {
+      getDisplayMatching: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }),
+      getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }),
+    }) },
     '@main/utils/windowLoadError': { observeWindowLoadErrors() {} },
     '@main/utils/ipcPolicy': { registerIpcWindow() {} },
     '@common/utils': { getPlatform: () => 'windows', isWin: true, isLinux: false },
@@ -47,7 +50,7 @@ function fixture(t) {
     '@common/ipcNames': loader()('src/common/ipcNames.ts'),
     '@common/utils/electron': { encodePath: value => value },
     '@common/miniPlayer': loader()('src/common/miniPlayer.ts'),
-  })('src/main/modules/winLyric/main.ts')
+  })('src/main/modules/winMiniPlayer/main.ts')
   main.createWindow()
   t.after(() => {
     main.closeWindow()
@@ -58,7 +61,7 @@ function fixture(t) {
   })
   const saved = () => {
     const setting = global.lx.appSetting
-    return { x: setting['desktopLyric.x'], y: setting['desktopLyric.y'], width: setting['desktopLyric.width'], height: setting['desktopLyric.height'] }
+    return { x: setting['miniPlayer.x'], y: setting['miniPlayer.y'], width: setting['miniPlayer.width'], height: setting['miniPlayer.height'] }
   }
   const resize = (bounds, edge = 'top-left') => {
     const window = windows.at(-1)
@@ -125,20 +128,24 @@ test('closing immediately after resizing preserves the new size and clears old s
 test('locking blocks native resizing', t => {
   const f = fixture(t)
   const bounds = f.window.getBounds()
-  global.lx.appSetting['desktopLyric.isLock'] = true
+  global.lx.appSetting['miniPlayer.isLock'] = true
   assert.equal(f.resize({ ...bounds, width: 600 }), false)
   assert.deepEqual(f.window.getBounds(), bounds)
 })
 
-function simulateFractionalScale(window) {
+function simulateFractionalScale(window, deferred = false) {
   const setBounds = window.setBounds.bind(window)
   // Fractional scaling can report a larger enclosing DIP rectangle after moving.
   // setPosition also goes through this conversion, retaining the previous size.
   window.setBounds = requested => {
     const next = { ...window.getBounds(), ...requested }
     setBounds({ ...next, width: next.width + 1, height: next.height + 1 })
-    window.emit('resize')
-    window.emit('move')
+    const notify = () => {
+      window.emit('resize')
+      window.emit('move')
+    }
+    if (deferred) setTimeout(notify, 1)
+    else notify()
   }
 }
 
@@ -185,4 +192,50 @@ test('a deliberate resize after edge dragging establishes the size for subsequen
     assert.equal(f.saved().height, 400)
     assert(f.window.bounds.width <= 601 && f.window.bounds.height <= 401)
   }
+})
+
+for (const edge of ['left', 'right']) {
+  test(`dragging up along the ${edge} edge does not learn delayed native resize notifications`, t => {
+    const f = fixture(t)
+    simulateFractionalScale(f.window, true)
+    const original = f.saved()
+    for (let i = 0; i < 60; i++) {
+      f.window.emit('will-move', { preventDefault() {} }, {
+        ...f.window.getBounds(), x: edge === 'left' ? -20 : 1920, y: 500 - i * 3,
+      })
+      t.mock.timers.tick(10)
+      if (i % 10 === 0) t.mock.timers.tick(600)
+    }
+    t.mock.timers.tick(600)
+    assert.deepEqual([f.saved().width, f.saved().height], [original.width, original.height])
+    assert.deepEqual([f.window.bounds.width, f.window.bounds.height], [original.width + 1, original.height + 1])
+  })
+}
+
+test('a native move can report resize and resized without changing the saved dimensions', t => {
+  const f = fixture(t)
+  const original = f.saved()
+  let prevented = false
+  f.window.emit('will-move', { preventDefault() { prevented = true } }, { ...f.window.bounds, x: 200, y: 200 })
+  assert.equal(prevented, false)
+  f.window.bounds = { x: 200, y: 200, width: original.width + 1, height: original.height + 1 }
+  f.window.emit('resize')
+  f.window.emit('move')
+  f.window.emit('resized')
+  t.mock.timers.tick(600)
+  assert.deepEqual(f.saved(), { ...original, x: 200, y: 200 })
+})
+
+test('explicit programmatic sizing stays authoritative despite delayed display rounding', t => {
+  const f = fixture(t)
+  simulateFractionalScale(f.window, true)
+  f.main.setBounds({ x: 0, y: 300, width: 600, height: 400 })
+  t.mock.timers.tick(1)
+  t.mock.timers.tick(600)
+  assert.deepEqual([f.saved().width, f.saved().height], [600, 400])
+  f.window.emit('will-move', { preventDefault() {} }, { ...f.window.bounds, x: -20, y: 290 })
+  t.mock.timers.tick(1)
+  t.mock.timers.tick(600)
+  assert.deepEqual([f.saved().width, f.saved().height], [600, 400])
+  assert.deepEqual([f.window.bounds.width, f.window.bounds.height], [601, 401])
 })

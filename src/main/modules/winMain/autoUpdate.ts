@@ -20,6 +20,7 @@ import { formatError } from '@common/utils/errorMessage'
 import { getUpdateSources, speedTestUpdateSources, type UpdateSource } from './updateSources'
 import { getUpdateExecutable, getUpdateRuntime } from './updateRuntime'
 import { fileHash, prepareArchiveUpdate, prepareDifferentialUpdate, validateStagedPortable, verifyStagedUpdate, type StagedUpdate } from './updatePortable'
+import { prepareSetupUpdate } from './updateSetup'
 import { launchWindowsRelaunch } from './updateRelaunch'
 
 interface DownloadedUpdate {
@@ -242,6 +243,29 @@ const downloadUpdate = async({ downloadUrl: url, fileName, digest, size, version
         files: [{ path: path.basename(getUpdateExecutable()), source, size: downloaded.size, sha256: downloaded.sha256 }],
         obsolete: [],
       }
+    } else if (process.platform === 'win32' && runtime.edition === 'installed' && version && app.isPackaged) {
+      // The Setup archive carries the same application payload the installer
+      // would extract. Staging it in place avoids running NSIS, so shortcuts,
+      // pins and the uninstaller stay untouched.
+      try {
+        const stage = await prepareSetupUpdate({
+          archive: tempPath,
+          executable: getUpdateExecutable(),
+          version,
+          runtime,
+          directory: stageDirectory,
+          resources: path.join(path.dirname(getUpdateExecutable()), 'resources'),
+          signal: controller.signal,
+          onProgress(info) { if (!controller.signal.aborted) sendStatusToWindow(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, info) },
+        })
+        const bytes = stage.files.reduce((sum, file) => sum + file.size, 0)
+        log.info(`installed update staged in place: ${stage.files.length} files, ${bytes} bytes, ${stage.obsolete.length} obsolete`)
+        downloaded.stage = stage
+      } catch (error) {
+        controller.signal.throwIfAborted()
+        log.warn('installed file update staging failed, falling back to the installer', error)
+        await fs.promises.rm(stageDirectory, { recursive: true, force: true })
+      }
     }
     if (process.platform === 'win32' && runtime.edition === 'portable' && downloaded.stage) await validateStagedPortable(downloaded.stage, runtime, version)
     if (isLinux) {
@@ -280,7 +304,17 @@ const installUpdate = async(controller: AbortController) => {
     const progress = { progress: 100, transferred: update.size, total: update.size, bytesPerSecond: 0 }
     sendStatusToWindow(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, { ...progress, phase: 'verifying' })
     if (await fileHash(update.filePath, controller.signal) !== update.sha256) throw new Error('更新安装包已发生变化，请重新下载更新')
-    if (update.stage) await verifyStagedUpdate(update.stage, controller.signal)
+    if (update.stage) {
+      try {
+        await verifyStagedUpdate(update.stage, controller.signal)
+      } catch (error) {
+        controller.signal.throwIfAborted()
+        if (update.edition !== 'installed') throw error
+        log.warn('staged in-place update is no longer valid, falling back to the installer', error)
+        await fs.promises.rm(update.stage.directory, { recursive: true, force: true }).catch(() => {})
+        update.stage = undefined
+      }
+    }
     controller.signal.throwIfAborted()
 
     const installDirectory = path.dirname(app.getPath('exe'))
@@ -289,8 +323,18 @@ const installUpdate = async(controller: AbortController) => {
     // success or remove the file handed to it.
     updateState.installController = null
     sendStatusToWindow(WIN_MAIN_RENDERER_EVENT_NAME.update_progress, { ...progress, phase: 'installing' })
-    if (process.platform === 'win32' && update.stage && (update.edition === 'portable' || update.edition === 'single-file')) {
-      await launchWindowsRelaunch(update.stage, update.edition, update.version!, path.dirname(update.filePath))
+    if (process.platform === 'win32' && update.stage && (update.edition === 'portable' || update.edition === 'single-file' || update.edition === 'installed')) {
+      try {
+        await launchWindowsRelaunch(update.stage, update.edition, update.version!, path.dirname(update.filePath))
+      } catch (error) {
+        // A read-only installation directory cannot be updated in place. The
+        // installer was downloaded anyway, so the NSIS path stays available.
+        if (!isWindowsInstall) throw error
+        log.warn('in-place update failed, falling back to the installer', error)
+        if (update.stage) await fs.promises.rm(update.stage.directory, { recursive: true, force: true }).catch(() => {})
+        update.stage = undefined
+        await launchWindowsInstaller(update.filePath, installDirectory, process.resourcesPath)
+      }
     } else if (isWindowsInstall) {
       log.info(`starting silent update: ${update.filePath} -> ${installDirectory}`)
       await launchWindowsInstaller(update.filePath, installDirectory, process.resourcesPath)

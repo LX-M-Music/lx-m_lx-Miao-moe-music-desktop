@@ -14,7 +14,7 @@ export interface RelaunchPlan {
   nonce: string
   oldPid: number
   version: string
-  kind: 'portable' | 'single-file'
+  kind: 'portable' | 'single-file' | 'installed'
   root: string
   executable: string
   stage: string

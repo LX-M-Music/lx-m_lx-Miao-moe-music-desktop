@@ -341,15 +341,22 @@ declare global {
       /**
        * 是否启用桌面歌词
        */
+      'miniPlayer.enable': boolean
+      'miniPlayer.showBorder': boolean
+      'miniPlayer.autoHideControls': boolean
+      'miniPlayer.isLock': boolean
+      'miniPlayer.isAlwaysOnTop': boolean
+      'miniPlayer.isAlwaysOnTopLoop': boolean
+      'miniPlayer.isShowTaskbar': boolean
+      'miniPlayer.fullscreenHide': boolean
+      'miniPlayer.width': number
+      'miniPlayer.height': number
+      'miniPlayer.x': number | null
+      'miniPlayer.y': number | null
+      'miniPlayer.isLockScreen': boolean
+      'miniPlayer.backgroundOpacity': number
+
       'desktopLyric.enable': boolean
-      /** 显示迷你播放器的封面、歌曲和播放控制；关闭后仅显示歌词 */
-      'desktopLyric.showPlayer': boolean
-      /** 显示迷你播放器边框 */
-      'desktopLyric.showBorder': boolean
-      /** 只显示当前一句原文，横向单行并直接换句 */
-      'desktopLyric.singleLine': boolean
-      /** 鼠标移出窗口后隐藏控制，悬停或键盘聚焦时恢复 */
-      'desktopLyric.autoHideControls': boolean
 
       /**
        * 是否锁定桌面歌词
@@ -431,6 +438,9 @@ declare global {
        */
       'desktopLyric.direction': 'horizontal' | 'vertical'
 
+      /** 只显示当前一句歌词及其翻译、罗马音 */
+      'desktopLyric.isSingleLine': boolean
+
       /**
        * 歌词对齐方式
        */
@@ -475,11 +485,6 @@ declare global {
        * 桌面歌词字体透明度
        */
       'desktopLyric.style.opacity': number
-
-      /**
-       * 桌面歌词背景不透明度（0–100）
-       */
-      'desktopLyric.style.backgroundOpacity': number
 
       /**
        * 桌面歌词是否允许换行

@@ -85,7 +85,7 @@ function fixture(t, kind = 'portable', mode = 'confirm') {
   }
 }
 
-for (const kind of ['portable', 'single-file']) test('native helper waits, replaces and restarts the original renamed ' + kind + ' application', { skip: !windows, timeout: 30000 }, async(t) => {
+for (const kind of ['installed', 'portable', 'single-file']) test('native helper waits, replaces and restarts the original renamed ' + kind + ' application', { skip: !windows, timeout: 30000 }, async(t) => {
   const f = fixture(t, kind)
   const original = fs.readFileSync(f.executable)
   f.start()
@@ -102,15 +102,15 @@ for (const kind of ['portable', 'single-file']) test('native helper waits, repla
   assert.deepEqual(fs.readFileSync(f.executable), f.bytes)
   assert.equal(fs.readFileSync(path.join(f.root, 'portable/userData/music.db'), 'utf8'), 'user music database')
   assert.equal(fs.readFileSync(path.join(f.root, 'notes.txt'), 'utf8'), 'my extra file')
-  assert.equal(fs.existsSync(path.join(f.root, 'resources/obsolete.dll')), kind === 'single-file')
+  assert.equal(fs.existsSync(path.join(f.root, 'resources/obsolete.dll')), kind !== 'portable')
   assert.equal(fs.readFileSync(path.join(f.root, 'resources/changed.dll'), 'utf8'), 'locally edited program')
   for (let i = 0; fs.existsSync(f.stage) && i < 100; i++) await delay(25)
   assert(!fs.existsSync(f.stage), JSON.stringify(await f.result()))
   assert(!fs.existsSync(path.join(f.root, '.lx-m-update-backup-' + f.plan.nonce)))
 })
 
-test('failed new process rolls back all program files and relaunches the previous application', { skip: !windows, timeout: 30000 }, async(t) => {
-  const f = fixture(t, 'portable', 'fail')
+for (const kind of ['installed', 'portable']) test('failed new process rolls back all ' + kind + ' program files and relaunches the previous application', { skip: !windows, timeout: 30000 }, async(t) => {
+  const f = fixture(t, kind, 'fail')
   const original = fs.readFileSync(f.executable)
   f.start(); await f.ready(); await f.exitOld()
   const result = await f.result()

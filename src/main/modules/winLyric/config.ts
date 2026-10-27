@@ -1,5 +1,5 @@
 import { isLinux } from '@common/utils'
-import { closeWindow, createWindow, getBounds, isExistWindow, alwaysOnTopTools, setBounds, updateMouseLock, setSkipTaskbar, updateMinimumSize } from './main'
+import { closeWindow, createWindow, getBounds, isExistWindow, alwaysOnTopTools, setBounds, updateMouseLock, setSkipTaskbar } from './main'
 import { sendConfigChange, sendMouseLeave } from './rendererEvent'
 import { buildLyricConfig, getLyricWindowBounds, initWindowSize, watchConfigKeys } from './utils'
 import { mouseCheckTools } from './mouseCheckTools'
@@ -18,7 +18,6 @@ export const setLrcConfig = (keys: Array<keyof LX.AppSetting>, setting: Partial<
 
   if (isExistWindow()) {
     sendConfigChange(buildLyricConfig(setting))
-    if (keys.includes('desktopLyric.showPlayer')) updateMinimumSize()
     if (keys.includes('desktopLyric.isLock') && isLock != global.lx.appSetting['desktopLyric.isLock']) {
       isLock = global.lx.appSetting['desktopLyric.isLock']
       if (global.lx.appSetting['desktopLyric.isLock']) {
@@ -37,7 +36,7 @@ export const setLrcConfig = (keys: Array<keyof LX.AppSetting>, setting: Partial<
         }
       }
     }
-    if (keys.some(key => key === 'desktopLyric.isLock' || key === 'desktopLyric.autoHideControls' || key === 'desktopLyric.showPlayer' || key === 'desktopLyric.style.backgroundOpacity')) updateMouseLock()
+    if (keys.includes('desktopLyric.isLock')) updateMouseLock()
     if (keys.includes('desktopLyric.isAlwaysOnTop') && isAlwaysOnTop != global.lx.appSetting['desktopLyric.isAlwaysOnTop']) {
       isAlwaysOnTop = global.lx.appSetting['desktopLyric.isAlwaysOnTop']
       alwaysOnTopTools.setAlwaysOnTop(global.lx.appSetting['desktopLyric.isAlwaysOnTopLoop'])

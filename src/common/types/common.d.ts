@@ -138,7 +138,7 @@ declare namespace LX {
     testedSources?: number
     totalSources?: number
     source?: string
-    mode?: 'full' | 'differential'
+    mode?: 'full' | 'differential' | 'setup'
     reusedBytes?: number
   }
   interface UpdateDownloadInfo {

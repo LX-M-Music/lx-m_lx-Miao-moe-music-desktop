@@ -10,8 +10,8 @@ const ui = [
   'win7-audio-output', 'bug-fixes', 'builtin-features', 'audio-tag-editor-downloads',
   'plugin-devkit', 'plugin-source', 'plugin-formats', 'folia-lyrics', 'audio-visualizer',
   'volume-normalization', 'auto-update', 'list-trash', 'song-drag',
-  'mini-player', 'mini-player-recovery', 'settings-reveal', 'settings-session',
-  'settings-search-extended', 'webdav', 'window-controls', 'upstream-2.12',
+  'mini-player', 'mini-player-recovery', 'mini-player-edge-drag', 'mini-player-edge-hide', 'mini-player-edge-motion-preference', 'desktop-lyric-drag', 'desktop-lyric-controls', 'settings-reveal', 'settings-session',
+  'settings-search-extended', 'webdav', 'window-controls', 'upstream-2.12', 'upstream-2.12.6',
   'kawarp-renderer', 'kawarp-background', 'adaptive-background-colors',
 ].map(name => name + '.electron.test.cjs')
 const files = process.argv.includes('--core') ? unit : [...unit, ...ui]

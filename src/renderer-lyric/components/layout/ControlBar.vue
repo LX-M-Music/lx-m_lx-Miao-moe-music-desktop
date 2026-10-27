@@ -1,7 +1,7 @@
 <template>
   <div :class="$style.container">
     <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated fadeOut">
-      <div v-show="!isShowThemeList" :class="$style.btns" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart">
+      <div v-show="!isShowThemeList" :class="$style.btns" @pointerdown="handleLyricPointerDown">
         <button :class="$style.btn" :title="$t('desktop_lyric__close')" @click="handleClose">
           <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="20px" viewBox="0 0 24 24" space="preserve">
             <use xlink:href="#icon-close" />
@@ -51,21 +51,56 @@
             <use xlink:href="#icon-top-on" />
           </svg>
         </button>
+        <button
+          :class="[$style.btn, { [$style.selected]: setting['player.isShowLyricTranslation'] }]"
+          :title="$t('desktop_lyric__translation_' + (setting['player.isShowLyricTranslation'] ? 'off' : 'on'))"
+          :aria-pressed="setting['player.isShowLyricTranslation']" :disabled="!hasTranslation"
+          data-desktop-lyric-action="translation" @click="toggleExtendedLyric('player.isShowLyricTranslation')"
+        >
+          <svg aria-hidden="true" height="20px" viewBox="0 0 24 24"><use xlink:href="#icon-translation" /></svg>
+        </button>
+        <button
+          :class="[$style.btn, { [$style.selected]: setting['player.isShowLyricRoma'] }]"
+          :title="$t('desktop_lyric__romanization_' + (setting['player.isShowLyricRoma'] ? 'off' : 'on'))"
+          :aria-pressed="setting['player.isShowLyricRoma']" :disabled="!hasRomanization"
+          data-desktop-lyric-action="romanization" @click="toggleExtendedLyric('player.isShowLyricRoma')"
+        >
+          <svg aria-hidden="true" height="20px" viewBox="0 0 24 24"><use xlink:href="#icon-romanization" /></svg>
+        </button>
+        <button
+          :class="[$style.btn, { [$style.selected]: setting['desktopLyric.isSingleLine'] }]"
+          :title="$t('desktop_lyric__single_line_' + (setting['desktopLyric.isSingleLine'] ? 'off' : 'on'))"
+          :aria-pressed="setting['desktopLyric.isSingleLine']"
+          data-desktop-lyric-action="single-line" @click="handleSingleLine"
+        >
+          <svg aria-hidden="true" height="20px" viewBox="0 0 24 24"><use xlink:href="#icon-single-line" /></svg>
+        </button>
       </div>
     </transition>
   </div>
 </template>
 
 <script>
-import { ref } from '@common/utils/vueTools'
+import { computed, ref } from '@common/utils/vueTools'
 import { setting } from '@lyric/store/state'
 import { updateSetting } from '@lyric/store/action'
+import { lyric, lyrics } from '@lyric/store/lyric'
 import useDrag from './useDrag'
 
 export default {
   setup() {
     const isShowThemeList = ref(false)
-    const { handleLyricMouseDown, handleLyricTouchStart } = useDrag()
+    const { handleLyricPointerDown } = useDrag()
+    const hasTranslation = computed(() => !!lyrics.tlyric && !!lyric.lines.length)
+    const hasRomanization = computed(() => !!lyrics.rlyric && !!lyric.lines.length)
+
+    const toggleExtendedLyric = key => {
+      if (key === 'player.isShowLyricTranslation' ? !hasTranslation.value : !hasRomanization.value) return
+      updateSetting({ [key]: !setting[key] })
+    }
+    const handleSingleLine = () => {
+      updateSetting({ 'desktopLyric.isSingleLine': !setting['desktopLyric.isSingleLine'] })
+    }
 
     const handleClose = () => {
       updateSetting({ 'desktopLyric.enable': false })
@@ -108,6 +143,10 @@ export default {
     return {
       setting,
       isShowThemeList,
+      hasTranslation,
+      hasRomanization,
+      toggleExtendedLyric,
+      handleSingleLine,
 
       handleClose,
       handleLock,
@@ -115,8 +154,7 @@ export default {
       handleZoomLrc,
       handleFontChange,
       handleOpactiyChange,
-      handleLyricMouseDown,
-      handleLyricTouchStart,
+      handleLyricPointerDown,
     }
   },
 }
@@ -139,6 +177,7 @@ export default {
 }
 
 .btns {
+  touch-action: none;
   display: flex;
   flex-flow: row wrap;
   align-items: center;
@@ -156,6 +195,14 @@ export default {
   transition: opacity @transition-theme;
   &:hover {
     opacity: .7;
+  }
+  &.selected {
+    background-color: rgba(255, 255, 255, .16);
+    box-shadow: inset 0 -2px currentColor;
+  }
+  &:disabled {
+    opacity: .35;
+    cursor: default;
   }
 }
 

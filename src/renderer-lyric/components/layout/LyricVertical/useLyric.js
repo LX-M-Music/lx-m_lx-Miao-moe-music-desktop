@@ -2,7 +2,7 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick } from '@common/utils/
 import { scrollXRTo } from '@common/utils/renderer'
 import { lyric } from '@lyric/store/lyric'
 import { isPlay, setting } from '@lyric/store/state'
-import useLyricDrag from '../useLyricDrag'
+import useDrag from '../useDrag'
 
 const getOffsetTop = (contentWidth, lineWidth) => {
   switch (setting['desktopLyric.scrollAlign']) {
@@ -28,9 +28,12 @@ export default (isComputeWidth) => {
 
   const handleScrollLrc = (duration = 300) => {
     if (!dom_lines?.length || !dom_lyric.value) return
+    if (setting['desktopLyric.isSingleLine']) {
+      dom_lyric.value.scrollLeft = 0
+      return
+    }
     if (isStopScroll) return
     let dom_p = dom_lines[lyric.line]
-    let target = 0
 
     if (dom_p) {
       let offset = 0
@@ -39,11 +42,10 @@ export default (isComputeWidth) => {
         offset = prevActiveLine < lyric.line ? ((dom_lines[prevActiveLine]?.clientWidth ?? 0) - prevLineWidth) : 0
         // console.log(prevActiveLine, dom_lines[prevActiveLine]?.clientHeight ?? 0, prevLineWidth, offset)
       }
-      target = dom_p.offsetLeft + offset - getOffsetTop(dom_lyric.value.clientWidth, dom_p.clientWidth)
+      cancelScrollFn = scrollXRTo(dom_lyric.value, dom_p ? (dom_p.offsetLeft + offset - getOffsetTop(dom_lyric.value.clientWidth, dom_p.clientWidth)) : 0, duration)
+    } else {
+      cancelScrollFn = scrollXRTo(dom_lyric.value, 0, duration)
     }
-    // A layout change needs an immediate position; the animation helper divides by its duration.
-    if (duration === 0) dom_lyric.value.scrollLeft = target
-    else cancelScrollFn = scrollXRTo(dom_lyric.value, target, duration)
   }
   const clearLyricScrollTimeout = () => {
     if (!timeout) return
@@ -60,8 +62,8 @@ export default (isComputeWidth) => {
     }, 3000)
   }
 
-  const { isMsDown, handleLyricPointerDown } = useLyricDrag({
-    onStart: (x) => {
+  const { isMsDown, handleLyricPointerDown } = useDrag({
+    onStart: (x, y) => {
       if (delayScrollTimeout) {
         clearTimeout(delayScrollTimeout)
         delayScrollTimeout = null
@@ -69,7 +71,8 @@ export default (isComputeWidth) => {
       msDownX = x
       msDownScrollX = dom_lyric.value.scrollLeft
     },
-    onMove: (x) => {
+    onMove: (x, y) => {
+      if (setting['desktopLyric.isSingleLine']) return
       isStopScroll ||= true
       if (cancelScrollFn) {
         cancelScrollFn()
@@ -81,6 +84,7 @@ export default (isComputeWidth) => {
   })
 
   const handleWheel = (event) => {
+    if (setting['desktopLyric.isSingleLine']) return
     console.log(event.deltaY)
     if (cancelScrollFn) {
       cancelScrollFn()
@@ -91,31 +95,20 @@ export default (isComputeWidth) => {
   }
 
   const setLyric = (lines) => {
-    const currentLine = lyric.line
-    const previousLine = dom_lines?.[currentLine]
-    const lineOffset = previousLine && dom_lyric.value && previousLine.time == lines[currentLine]?.time
-      ? previousLine.offsetLeft - dom_lyric.value.scrollLeft
-      : null
-    if (cancelScrollFn) {
-      cancelScrollFn()
-      cancelScrollFn = null
-    }
     const dom_line_content = document.createDocumentFragment()
-    for (const line of lines) {
+    // Move the engine's original node, keeping per-word progress and extended rows.
+    const current = Math.max(0, Math.min(lyric.line, lines.length - 1))
+    const visible = setting['desktopLyric.isSingleLine'] ? lines.slice(current, current + 1) : lines
+    for (const line of visible) {
       dom_line_content.appendChild(line.dom_line)
     }
     dom_lyric_text.value.textContent = ''
     dom_lyric_text.value.appendChild(dom_line_content)
     nextTick(() => {
+      if (!dom_lyric.value) return
       dom_lines = dom_lyric.value.querySelectorAll('.line-content')
       line_widths = Array.from(dom_lines).map(l => l.clientWidth)
-      const currentLineDom = dom_lines[currentLine]
-      if (lineOffset != null && currentLineDom) {
-        dom_lyric.value.scrollLeft = currentLineDom.offsetLeft - lineOffset
-      } else {
-        handleScrollLrc()
-      }
-      isSetedLines = false
+      handleScrollLrc()
     })
   }
 
@@ -138,11 +131,16 @@ export default (isComputeWidth) => {
 
   let delayScrollTimeout
   const scrollLine = (line, oldLine) => {
+    if (setting['desktopLyric.isSingleLine']) {
+      setLyric(lyric.lines)
+      return
+    }
     setImmediate(() => {
       prevActiveLine = line
     })
     if (line < 0) return
-    if (isSetedLines) return
+    if (line == 0 && isSetedLines) return isSetedLines = false
+    isSetedLines &&= false
     if (oldLine == null || line - oldLine != 1) return handleScrollLrc()
 
     if (setting['desktopLyric.isDelayScroll']) {
@@ -157,25 +155,28 @@ export default (isComputeWidth) => {
 
   watch(() => lyric.lines, initLrc)
   watch(() => lyric.line, scrollLine)
-
-  const updateLayout = () => {
-    line_widths = Array.from(dom_lines ?? []).map(line => line.clientWidth)
-    cancelScrollFn?.()
-    handleScrollLrc(0)
-  }
-  const resizeObserver = new window.ResizeObserver(updateLayout)
-  watch(() => [setting['desktopLyric.style.fontSize'], setting['desktopLyric.style.lineGap'], setting['desktopLyric.scrollAlign']], () => { nextTick(updateLayout) })
+  watch(() => setting['desktopLyric.isSingleLine'], () => {
+    clearLyricScrollTimeout()
+    if (delayScrollTimeout) {
+      clearTimeout(delayScrollTimeout)
+      delayScrollTimeout = null
+    }
+    if (cancelScrollFn) {
+      cancelScrollFn()
+      cancelScrollFn = null
+    }
+    isStopScroll = false
+    setLyric(lyric.lines)
+  })
 
   onMounted(() => {
     initLrc(lyric.lines, null)
-    resizeObserver.observe(dom_lyric.value)
   })
 
   onBeforeUnmount(() => {
-    resizeObserver.disconnect()
     clearLyricScrollTimeout()
-    clearTimeout(delayScrollTimeout)
-    cancelScrollFn?.()
+    if (delayScrollTimeout) clearTimeout(delayScrollTimeout)
+    if (cancelScrollFn) cancelScrollFn()
   })
 
   return {

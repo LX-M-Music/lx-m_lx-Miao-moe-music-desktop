@@ -1,87 +1,90 @@
-import { onMounted, onBeforeUnmount } from '@common/utils/vueTools'
+import { ref, onMounted, onBeforeUnmount, watch } from '@common/utils/vueTools'
 import { setWindowBounds, setWindowResizeable } from '@lyric/utils/ipc'
 import { isWin } from '@common/utils'
+import { setting } from '@lyric/store/state'
 
-export default () => {
-  const winEvent = {
-    isMsDown: false,
-    msDownX: 0,
-    msDownY: 0,
-    windowW: 0,
-    windowH: 0,
-  }
+export default ({ onStart, onMove } = {}) => {
+  const isMsDown = ref(false)
+  let drag = null
 
-  const handleLyricDown = (target, x, y) => {
-    winEvent.isMsDown = true
-    winEvent.msDownX = x
-    winEvent.msDownY = y
-    winEvent.windowW = window.innerWidth
-    winEvent.windowH = window.innerHeight
-    // https://github.com/lyswhut/lx-music-desktop/issues/2244
-    if (isWin) setWindowResizeable(false)
+  const endDrag = () => {
+    const previous = drag
+    drag = null
+    isMsDown.value = false
+    if (!previous) return
+    if (previous.target.hasPointerCapture(previous.id)) previous.target.releasePointerCapture(previous.id)
+    if (!previous.isLyric && isWin) setWindowResizeable(true)
   }
-  const handleLyricMouseDown = event => {
-    console.log(event.target, event.currentTarget)
-    if (event.target !== event.currentTarget) return
-    handleLyricDown(event.target, event.clientX, event.clientY)
-  }
-  const handleLyricTouchStart = event => {
-    if (event.changedTouches.length) {
-      const touch = event.changedTouches[0]
-      if (touch.target !== touch.currentTarget) return
-      handleLyricDown(event.target, touch.clientX, touch.clientY)
+  const handleLyricPointerDown = event => {
+    if (drag || event.button !== 0 || !event.isPrimary || setting['desktopLyric.isLock']) return
+    // The toolbar only drags from its background; buttons keep their own input.
+    if (!onStart && event.target !== event.currentTarget) return
+    const isLyric = !!onStart && !!event.target.closest('.font-lrc, .extended')
+    drag = {
+      id: event.pointerId,
+      target: event.currentTarget,
+      isLyric,
+      x: event.screenX,
+      y: event.screenY,
+      windowX: window.screenX,
+      windowY: window.screenY,
+      lastX: event.screenX,
+      lastY: event.screenY,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }
+    isMsDown.value = isLyric
+    event.currentTarget.setPointerCapture(event.pointerId)
+    if (isLyric) onStart(event.clientX, event.clientY)
+    else {
+      // https://github.com/lyswhut/lx-music-desktop/issues/2244
+      if (isWin) setWindowResizeable(false)
+      event.preventDefault()
     }
   }
-  const handleMouseMsUp = () => {
-    winEvent.isMsDown = false
-    if (isWin) setWindowResizeable(true)
-  }
-
-  const handleMove = (x, y) => {
-    if (!winEvent.isMsDown) return
-    // https://github.com/lyswhut/lx-music-desktop/issues/2244
-    if (isWin) {
+  const handlePointerMove = event => {
+    if (!drag || drag.id !== event.pointerId) return
+    if (setting['desktopLyric.isLock'] || (event.pointerType === 'mouse' && !event.buttons)) {
+      endDrag()
+      return
+    }
+    if (drag.isLyric) onMove(event.clientX, event.clientY)
+    else {
+      // Both the cursor and window origin are fixed in screen coordinates.
+      // Absolute targets avoid client-coordinate feedback, queued deltas and
+      // accumulated native DIP rounding at fractional display scales.
+      if (event.screenX === drag.lastX && event.screenY === drag.lastY) return
+      drag.lastX = event.screenX
+      drag.lastY = event.screenY
       setWindowBounds({
-        x: x - winEvent.msDownX,
-        y: y - winEvent.msDownY,
-        w: winEvent.windowW,
-        h: winEvent.windowH,
-      })
-    } else {
-      setWindowBounds({
-        x: x - winEvent.msDownX,
-        y: y - winEvent.msDownY,
-        w: window.innerWidth,
-        h: window.innerHeight,
+        x: drag.windowX + event.screenX - drag.x,
+        y: drag.windowY + event.screenY - drag.y,
+        w: drag.width,
+        h: drag.height,
+        absolute: true,
       })
     }
   }
-  const handleMouseMsMove = event => {
-    handleMove(event.clientX, event.clientY)
-  }
-  const handleTouchMove = (e) => {
-    if (e.changedTouches.length) {
-      const touch = e.changedTouches[0]
-      handleMove(touch.clientX, touch.clientY)
-    }
+  const handlePointerUp = event => {
+    if (drag?.id === event.pointerId) endDrag()
   }
 
+  watch(() => setting['desktopLyric.isLock'], locked => { if (locked) endDrag() })
   onMounted(() => {
-    document.addEventListener('mousemove', handleMouseMsMove)
-    document.addEventListener('mouseup', handleMouseMsUp)
-    document.addEventListener('touchmove', handleTouchMove)
-    document.addEventListener('touchend', handleMouseMsUp)
+    document.addEventListener('pointermove', handlePointerMove)
+    document.addEventListener('pointerup', handlePointerUp)
+    document.addEventListener('pointercancel', handlePointerUp)
+    document.addEventListener('lostpointercapture', handlePointerUp)
+    window.addEventListener('blur', endDrag)
   })
-
   onBeforeUnmount(() => {
-    document.removeEventListener('mousemove', handleMouseMsMove)
-    document.removeEventListener('mouseup', handleMouseMsUp)
-    document.removeEventListener('touchmove', handleTouchMove)
-    document.removeEventListener('touchend', handleMouseMsUp)
+    endDrag()
+    document.removeEventListener('pointermove', handlePointerMove)
+    document.removeEventListener('pointerup', handlePointerUp)
+    document.removeEventListener('pointercancel', handlePointerUp)
+    document.removeEventListener('lostpointercapture', handlePointerUp)
+    window.removeEventListener('blur', endDrag)
   })
 
-  return {
-    handleLyricMouseDown,
-    handleLyricTouchStart,
-  }
+  return { isMsDown, handleLyricPointerDown }
 }

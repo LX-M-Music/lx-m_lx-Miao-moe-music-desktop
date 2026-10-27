@@ -1,24 +1,23 @@
 <template>
-  <section ref="root" class="mini-player" :class="{ 'native-drag': nativeDrag && !setting['desktopLyric.isLock'], 'native-controls-hover': nativeControlsHover, 'lyrics-only': !setting['desktopLyric.showPlayer'], 'auto-hide-controls': setting['desktopLyric.autoHideControls'], 'options-open': optionsOpen }" data-mini-player>
-    <header ref="header" class="mini-header mini-controls" data-mini-controls @pointerdown="dragWindow">
+  <section ref="root" class="mini-player" :class="{ 'native-drag': nativeDrag && !setting['miniPlayer.isLock'] && edgeMotion.phase === 'shown', 'native-controls-hover': nativeControlsHover, 'auto-hide-controls': setting['miniPlayer.autoHideControls'], 'options-open': optionsOpen }" data-mini-player>
+    <header class="mini-header mini-controls" data-mini-controls @pointerdown="dragWindow">
       <span class="mini-brand">LX-M <span>{{ $t('mini_player__title') }}</span></span>
       <div class="mini-window-buttons">
         <button type="button" :title="$t('mini_player__show_main')" :aria-label="$t('mini_player__show_main')" @click="showMainWindow">
           <svg viewBox="0 0 24 24"><path d="M9 4H4v16h16v-5M13 4h7v7M20 4 10 14" /></svg>
         </button>
-        <button type="button" :class="{ active: setting['desktopLyric.isAlwaysOnTop'] }" :aria-pressed="setting['desktopLyric.isAlwaysOnTop']" :title="$t('mini_player__pin')" :aria-label="$t('mini_player__pin')" @click="updateSetting({ 'desktopLyric.isAlwaysOnTop': !setting['desktopLyric.isAlwaysOnTop'] })">
+        <button type="button" :class="{ active: setting['miniPlayer.isAlwaysOnTop'] }" :aria-pressed="setting['miniPlayer.isAlwaysOnTop']" :title="$t('mini_player__pin')" :aria-label="$t('mini_player__pin')" @click="updateSetting({ 'miniPlayer.isAlwaysOnTop': !setting['miniPlayer.isAlwaysOnTop'] })">
           <svg viewBox="0 0 24 24"><path d="m8 3 8 0-1 6 3 4v2H6v-2l3-4ZM12 15v6" /></svg>
         </button>
         <button ref="optionsButton" type="button" :title="$t('mini_player__options')" :aria-label="$t('mini_player__options')" :aria-expanded="optionsOpen" aria-controls="mini-options" @click="optionsOpen = !optionsOpen">
           <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></svg>
         </button>
-        <button type="button" :title="$t('desktop_lyric__close')" :aria-label="$t('desktop_lyric__close')" @click="updateSetting({ 'desktopLyric.enable': false })">
+        <button type="button" :title="$t('mini_player__close')" :aria-label="$t('mini_player__close')" @click="updateSetting({ 'miniPlayer.enable': false })">
           <svg viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6" /></svg>
         </button>
       </div>
     </header>
     <div class="mini-header-no-drag" aria-hidden="true" />
-    <template v-if="setting['desktopLyric.showPlayer']">
       <div class="mini-track" data-mini-track @pointerdown="dragWindow">
         <div class="mini-cover">
           <img v-if="miniPlayerCover && !coverFailed" :src="miniPlayerCover" :alt="$t('music_cover')" draggable="false" @error="coverFailed = true">
@@ -56,30 +55,15 @@
           </div>
         </div>
       </div>
-    </template>
     <transition name="mini-options">
       <div v-if="optionsOpen" id="mini-options" class="mini-options" role="dialog" :aria-label="$t('mini_player__options')" @keydown.esc.stop.prevent="closeOptions">
         <div class="mini-options-title"><strong>{{ $t('mini_player__options') }}</strong><button type="button" :aria-label="$t('close')" @click="closeOptions">×</button></div>
-        <label><input type="checkbox" :checked="setting['desktopLyric.style.backgroundOpacity'] === 0" @change="setTransparent"><span>{{ $t('mini_player__transparent') }}</span></label>
-        <label><input type="checkbox" :checked="setting['desktopLyric.showBorder']" @change="updateSetting({ 'desktopLyric.showBorder': $event.target.checked })"><span>{{ $t('setting__desktop_lyric_show_border') }}</span></label>
-        <label><input type="checkbox" :checked="setting['desktopLyric.autoHideControls']" @change="updateSetting({ 'desktopLyric.autoHideControls': $event.target.checked })"><span>{{ $t('mini_player__hide_controls') }}</span></label>
-        <label><input type="checkbox" :checked="!setting['desktopLyric.showPlayer']" @change="updateSetting({ 'desktopLyric.showPlayer': !$event.target.checked })"><span>{{ $t('mini_player__lyrics_only') }}</span></label>
-        <label :title="$t('setting__desktop_lyric_single_line_tip')"><input type="checkbox" :checked="setting['desktopLyric.singleLine']" @change="updateSetting({ 'desktopLyric.singleLine': $event.target.checked })"><span>{{ $t('setting__desktop_lyric_single_line') }}</span></label>
-        <label class="mini-opacity-control">
-          <span class="mini-opacity-heading"><span>{{ $t('mini_player__lyric_transparency') }}</span><span aria-hidden="true">{{ lyricTransparency }}%</span></span>
-          <input
-            type="range" min="0" max="100" step="1" :value="lyricTransparency"
-            :aria-label="$t('mini_player__lyric_transparency')" :aria-valuetext="`${lyricTransparency}%`" aria-describedby="mini-opacity-tip"
-            @input="changeLyricTransparency"
-          >
-          <span id="mini-opacity-tip" class="mini-opacity-tip">{{ $t('mini_player__lyric_transparency_tip') }}</span>
-        </label>
+        <label><input type="checkbox" :checked="setting['miniPlayer.backgroundOpacity'] === 0" @change="setTransparent"><span>{{ $t('mini_player__transparent') }}</span></label>
+        <label><input type="checkbox" :checked="setting['miniPlayer.showBorder']" @change="updateSetting({ 'miniPlayer.showBorder': $event.target.checked })"><span>{{ $t('mini_player__show_border') }}</span></label>
+        <label><input type="checkbox" :checked="setting['miniPlayer.autoHideControls']" @change="updateSetting({ 'miniPlayer.autoHideControls': $event.target.checked })"><span>{{ $t('mini_player__hide_controls') }}</span></label>
         <p>{{ $t('mini_player__hide_tip') }}</p>
-        <div class="mini-font-buttons">
-          <button type="button" :aria-label="$t('desktop_lyric__font_decrease')" @click="changeFont(-1)">A−</button>
-          <span>{{ $t('mini_player__lyric_size') }}</span>
-          <button type="button" :aria-label="$t('desktop_lyric__font_increase')" @click="changeFont(1)">A＋</button>
-          <button type="button" :title="$t('desktop_lyric__lock')" :aria-label="$t('desktop_lyric__lock')" @click="lockWindow"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4" /></svg></button>
+        <div class="mini-lock-button">
+          <button type="button" :title="$t('mini_player__lock')" :aria-label="$t('mini_player__lock')" @click="lockWindow"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4" /></svg></button>
         </div>
       </div>
     </transition>
@@ -89,23 +73,12 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { miniPlayer, miniPlayerCover, nativePointer, playerActionFailed, setting } from '@lyric/store/state'
-import { updateSetting } from '@lyric/store/action'
-import { sendDesktopLyricInfo } from '@lyric/core/mainWindowChannel'
-import { setWindowBounds, showMainWindow } from '@lyric/utils/ipc'
+import { edgeMotion, miniPlayer, miniPlayerCover, nativePointer, playerActionFailed, setting, updateSetting } from './state'
+import { sendPlayerRequest } from './channel'
+import { setWindowBounds, showMainWindow } from './ipc'
 
 const root = ref<HTMLElement>()
-const header = ref<HTMLElement>()
-const headerBounds = ref<DOMRect | null>(null)
-const updateHeaderBounds = () => { headerBounds.value = header.value?.getBoundingClientRect() ?? null }
-const headerObserver = new ResizeObserver(updateHeaderBounds)
-const nativeControlsHover = computed(() => {
-  const point = nativePointer.value
-  if (!point || setting['desktopLyric.isLock']) return false
-  if (setting['desktopLyric.showPlayer']) return true
-  const bounds = headerBounds.value
-  return !!bounds && point.x >= bounds.left && point.x < bounds.right && point.y >= bounds.top && point.y < bounds.bottom
-})
+const nativeControlsHover = computed(() => nativePointer.value !== null && !setting['miniPlayer.isLock'])
 const optionsButton = ref<HTMLButtonElement>()
 const optionsOpen = ref(false)
 const coverFailed = ref(false)
@@ -115,24 +88,23 @@ const nativeDrag = window.os === 'windows'
 let seekId: string | null = null
 let seeking = false
 let drag: { id: number, x: number, y: number, width: number, height: number } | null = null
-let opaqueBackground = setting['desktopLyric.style.backgroundOpacity'] || 92
+let opaqueBackground = setting['miniPlayer.backgroundOpacity'] || 92
 
 watch(miniPlayerCover, () => { coverFailed.value = false })
-watch(() => setting['desktopLyric.showPlayer'], () => { void nextTick(updateHeaderBounds) })
 watch(optionsOpen, async open => {
   if (!open) return
   await nextTick()
   root.value?.querySelector<HTMLInputElement>('#mini-options input')?.focus()
 })
-watch(() => setting['desktopLyric.isLock'], locked => { if (locked) { drag = null; optionsOpen.value = false } })
+watch(() => setting['miniPlayer.isLock'], locked => { if (locked) { drag = null; optionsOpen.value = false } })
 watch(() => miniPlayer.id, () => { seekPreview.value = null })
 const formatTime = (value: number) => {
   const seconds = Math.max(0, Number.isFinite(value) ? Math.floor(value) : 0)
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
 }
-const command = (request: LX.DesktopLyric.PlayerRequest) => {
+const command = (request: LX.MiniPlayer.Request) => {
   playerActionFailed.value = false
-  sendDesktopLyricInfo(request)
+  sendPlayerRequest(request)
 }
 const beginSeek = () => { seeking = true; seekId = miniPlayer.id }
 const previewSeek = (event: Event) => {
@@ -148,25 +120,18 @@ const finishSeek = (event: Event) => {
 const changeVolume = (event: Event) => { command({ action: 'player_volume', data: Number((event.target as HTMLInputElement).value) }) }
 const setTransparent = (event: Event) => {
   if ((event.target as HTMLInputElement).checked) {
-    opaqueBackground = setting['desktopLyric.style.backgroundOpacity'] || 92
-    updateSetting({ 'desktopLyric.style.backgroundOpacity': 0 })
-  } else updateSetting({ 'desktopLyric.style.backgroundOpacity': opaqueBackground })
-}
-const changeFont = (step: number) => { updateSetting({ 'desktopLyric.style.fontSize': Math.max(10, Math.min(80, setting['desktopLyric.style.fontSize'] + step)) }) }
-const lyricTransparency = computed(() => Math.round(100 - setting['desktopLyric.style.opacity']))
-const changeLyricTransparency = (event: Event) => {
-  const value = Number((event.target as HTMLInputElement).value)
-  if (!Number.isFinite(value)) return
-  updateSetting({ 'desktopLyric.style.opacity': 100 - Math.max(0, Math.min(100, Math.round(value))) })
+    opaqueBackground = setting['miniPlayer.backgroundOpacity'] || 92
+    void updateSetting({ 'miniPlayer.backgroundOpacity': 0 })
+  } else void updateSetting({ 'miniPlayer.backgroundOpacity': opaqueBackground })
 }
 const closeOptions = (event: Event) => {
   optionsOpen.value = false
   // Restore keyboard navigation without leaving pointer-closed controls focused.
   if (event instanceof KeyboardEvent || (event instanceof MouseEvent && event.detail === 0)) optionsButton.value?.focus()
 }
-const lockWindow = () => { optionsOpen.value = false; updateSetting({ 'desktopLyric.isLock': true }) }
+const lockWindow = () => { optionsOpen.value = false; void updateSetting({ 'miniPlayer.isLock': true }) }
 const dragWindow = (event: PointerEvent) => {
-  if (nativeDrag || event.button !== 0 || setting['desktopLyric.isLock'] || (event.target as Element).closest('button, input')) return
+  if (nativeDrag || event.button !== 0 || setting['miniPlayer.isLock'] || (event.target as Element).closest('button, input')) return
   drag = { id: event.pointerId, x: event.screenX, y: event.screenY, width: window.innerWidth, height: window.innerHeight }
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
   event.preventDefault()
@@ -184,8 +149,6 @@ const outsideClick = (event: PointerEvent) => {
   if (optionsOpen.value && !(event.target as Element).closest('#mini-options') && !optionsButton.value?.contains(event.target as Node)) optionsOpen.value = false
 }
 onMounted(() => {
-  updateHeaderBounds()
-  if (header.value) headerObserver.observe(header.value)
   document.addEventListener('pointerdown', outsideClick)
   document.addEventListener('pointermove', moveWindow)
   document.addEventListener('pointerup', endDrag)
@@ -193,7 +156,6 @@ onMounted(() => {
   window.addEventListener('blur', endDrag)
 })
 onBeforeUnmount(() => {
-  headerObserver.disconnect()
   document.removeEventListener('pointerdown', outsideClick)
   document.removeEventListener('pointermove', moveWindow)
   document.removeEventListener('pointerup', endDrag)
@@ -237,21 +199,18 @@ onBeforeUnmount(() => {
 .native-drag {
   .mini-header, .mini-track { -webkit-app-region: drag; user-select: none; }
   .mini-window-buttons, .mini-options, button, input { -webkit-app-region: no-drag; }
-  &.auto-hide-controls .mini-header, &.lyrics-only .mini-header { -webkit-app-region: no-drag; }
-  // Chromium 108 can retain a lyric caption over an opacity-zero header.
+  &.auto-hide-controls .mini-header { -webkit-app-region: no-drag; }
   // Keep its exclusion outside the faded controls and remove it when they show.
-  &.auto-hide-controls, &.lyrics-only { .mini-header-no-drag { display: block; } }
+  &.auto-hide-controls { .mini-header-no-drag { display: block; } }
 }
-#main:hover .native-drag:not(.lyrics-only) .mini-header,
+#main:hover .native-drag .mini-header,
 .native-drag.native-controls-hover .mini-header,
 .native-drag:has(.mini-controls :focus-visible) .mini-header,
-.native-drag.options-open .mini-header,
-.native-drag.lyrics-only .mini-header:hover { -webkit-app-region: drag; }
-#main:hover .native-drag:not(.lyrics-only) .mini-header-no-drag,
+.native-drag.options-open .mini-header { -webkit-app-region: drag; }
+#main:hover .native-drag .mini-header-no-drag,
 .native-drag.native-controls-hover .mini-header-no-drag,
 .native-drag:has(.mini-controls :focus-visible) .mini-header-no-drag,
-.native-drag.options-open .mini-header-no-drag,
-.native-drag.lyrics-only .mini-header:hover ~ .mini-header-no-drag { display: none; }
+.native-drag.options-open .mini-header-no-drag { display: none; }
 .mini-brand { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--mini-accent); white-space: nowrap; pointer-events: none; span { margin-left: 6px; font-weight: 400; letter-spacing: 0; color: rgba(255,255,255,.6); } }
 .mini-window-buttons { display: flex; gap: 2px; }
 .mini-track { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 12px 0 8px; cursor: move; }
@@ -263,35 +222,23 @@ onBeforeUnmount(() => {
 .mini-song-buttons { display: flex; align-items: center; gap: 8px; .mini-play { width: 38px; height: 38px; border-radius: 50%; color: #111820; background-image: linear-gradient(rgba(255, 255, 255, .22), rgba(255, 255, 255, 0)), var(--mini-accent); background-color: var(--mini-accent); box-shadow: 0 4px 16px rgba(0, 0, 0, .3); transition: filter .18s ease, transform .18s ease; &:hover { filter: brightness(1.1); transform: scale(1.04); background: var(--mini-accent); } &:active { transform: scale(.96); } } }
 .mini-volume { display: flex; align-items: center; gap: 5px; input { width: 66px; } }
 .mini-controls { transition: opacity .18s ease; }
-.auto-hide-controls, .lyrics-only { .mini-controls { opacity: 0; pointer-events: none; } }
-#main:hover .mini-player:not(.lyrics-only) .mini-controls,
+.auto-hide-controls { .mini-controls { opacity: 0; pointer-events: none; } }
+#main:hover .mini-player .mini-controls,
 .native-controls-hover .mini-controls,
 .mini-player:has(.mini-controls :focus-visible) .mini-controls,
-.options-open .mini-controls,
-.lyrics-only .mini-header:hover { opacity: 1; pointer-events: auto; }
-.lyrics-only {
-  padding: 0;
-  // Only the header itself wakes the controls; hovering lyrics must not cover them.
-  .mini-header { position: absolute; top: 8px; left: 12px; right: 12px; z-index: 3; padding: 0 6px; border-radius: 8px; background: rgba(17,22,30,.88); pointer-events: auto; }
-}
+.options-open .mini-controls { opacity: 1; pointer-events: auto; }
 .lock .mini-controls { visibility: hidden; pointer-events: none !important; }
 .mini-options { position: absolute; top: 44px; right: 10px; left: 10px; z-index: 5; max-height: calc(100% - 54px); overflow-y: auto; box-sizing: border-box; padding: 12px 16px; background: rgba(28, 34, 43, .92); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.15); border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.3); label { display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer; input { margin: 0; accent-color: var(--mini-accent); } } p { font-size: 11px; line-height: 1.5; opacity: .6; margin: 5px 0 8px; } }
 .mini-options-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
 .mini-options::-webkit-scrollbar { width: 6px; }
 .mini-options::-webkit-scrollbar-thumb { border-radius: 3px; background: rgba(255,255,255,.25); }
 .mini-options::-webkit-scrollbar-track { background: transparent; }
-.mini-options label.mini-opacity-control { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 5px; padding: 12px 0 8px; border-top: 1px solid rgba(255,255,255,.1); }
-.mini-opacity-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
-.mini-opacity-tip { font-size: 11px; line-height: 1.5; opacity: .6; }
-.mini-font-buttons { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,.1); span { font-size: 12px; } }
+.mini-lock-button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,.1); span { font-size: 12px; } }
 .mini-options-enter-active, .mini-options-leave-active { transition: opacity .16s ease, transform .16s ease; }
 .mini-options-enter-from, .mini-options-leave-to { opacity: 0; transform: translateY(-5px); }
 .mini-error { position: absolute; bottom: 4px; left: 12px; right: 12px; z-index: 5; background: #402626; padding: 8px; border-radius: 6px; }
 @media (max-width: 340px) { .mini-player { padding-left: 12px; padding-right: 12px; } .mini-brand span { display: none; } .mini-track { gap: 10px; } .mini-volume input { width: 55px; } }
-// Keep the settings entry inside even the smallest lyrics-only title bar.
-@media (max-width: 210px) { .lyrics-only { .mini-header { left: 4px; right: 4px; padding: 0; justify-content: flex-end; } .mini-brand { display: none; } } }
-@media (max-width: 133px) { .lyrics-only .mini-window-buttons > button:not([aria-controls]):not(:last-child) { display: none; } }
-@media (max-width: 69px) { .lyrics-only .mini-window-buttons > button:last-child { display: none; } }
 @media (max-height: 240px) { .mini-track { padding-top: 6px; padding-bottom: 4px; } .mini-cover { width: 48px; height: 48px; border-radius: 8px; } .mini-track-info small { display: none; } .mini-track-info h1 { font-size: 15px; margin-bottom: 2px; } .mini-transport { padding-bottom: 0; } }
+:root[data-low-power-mode='true'] .mini-player * { transition: none !important; backdrop-filter: none; }
 @media (prefers-reduced-motion: reduce) { .mini-player *, .mini-options-enter-active, .mini-options-leave-active { transition: none !important; } }
 </style>

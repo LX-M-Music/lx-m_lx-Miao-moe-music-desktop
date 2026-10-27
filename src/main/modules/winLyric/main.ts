@@ -2,18 +2,15 @@ import path from 'node:path'
 import { BrowserWindow } from 'electron'
 import { observeWindowLoadErrors } from '@main/utils/windowLoadError'
 import { registerIpcWindow } from '@main/utils/ipcPolicy'
-import { getPlatform, isWin } from '@common/utils'
+import { getPlatform, isWin, isLinux } from '@common/utils'
 import { initWindowSize, getMinimumSize, getLyricWindowBounds } from './utils'
 import { mainSend } from '@common/mainIpc'
 import { encodePath } from '@common/utils/electron'
-import { createLockControls } from './lockControls'
-import { WIN_LYRIC_RENDERER_EVENT_NAME } from '@common/ipcNames'
 
 // require('./event')
 // require('./rendererEvent')
 
 let browserWindow: Electron.BrowserWindow | null = null
-let lockControls: ReturnType<typeof createLockControls> | null = null
 let isWinBoundsUpdateing = false
 let lastSetBoundsTime = 0
 const SET_BOUNDS_GRACE_MS = 800
@@ -67,7 +64,6 @@ const winEvent = () => {
     if (saveBoundsTimer) clearTimeout(saveBoundsTimer)
     if (browserWindow === window) {
       browserWindow = null
-      lockControls = null
     }
   })
 
@@ -217,7 +213,6 @@ export const createWindow = () => {
       backgroundThrottling: false,
     },
   })
-  lockControls = createLockControls(browserWindow, point => { sendEvent(WIN_LYRIC_RENDERER_EVENT_NAME.pointer_position, point) })
   observeWindowLoadErrors(browserWindow)
 
   const winURL = process.env.NODE_ENV !== 'production' ? 'http://localhost:9081/lyric.html' : `file://${path.join(encodePath(__dirname), 'lyric.html')}`
@@ -255,16 +250,6 @@ export const getBounds = (): Electron.Rectangle | null => {
   return browserWindow.getBounds()
 }
 
-export const updateMinimumSize = () => {
-  if (!browserWindow) return
-  const { minWidth, minHeight } = getMinimumSize()
-  browserWindow.setMinimumSize(minWidth, minHeight)
-  const bounds = browserWindow.getBounds()
-  if (bounds.width < minWidth || bounds.height < minHeight) {
-    setBounds({ ...bounds, width: Math.max(minWidth, bounds.width), height: Math.max(minHeight, bounds.height) })
-  }
-}
-
 export const setBounds = (bounds: Electron.Rectangle) => {
   if (!browserWindow) return
   isWinBoundsUpdateing = true
@@ -273,7 +258,7 @@ export const setBounds = (bounds: Electron.Rectangle) => {
 }
 
 
-export const updateMouseLock = () => { lockControls?.update() }
+export const updateMouseLock = () => { browserWindow?.setIgnoreMouseEvents(global.lx.appSetting['desktopLyric.isLock'], { forward: !isLinux }) }
 
 export const setSkipTaskbar = (skip: boolean) => {
   if (!browserWindow) return

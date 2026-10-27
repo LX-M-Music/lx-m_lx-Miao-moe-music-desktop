@@ -6,7 +6,7 @@ const isMac = process.platform == 'darwin'
 const isWin = process.platform == 'win32'
 
 const defaultSetting: LX.AppSetting = {
-  version: '2.2.0',
+  version: '2.3.0',
 
   'common.windowSizeId': 3,
   'common.windowWidth': 0,
@@ -80,11 +80,22 @@ const defaultSetting: LX.AppSetting = {
   'playDetail.style.align': 'center',
   'playDetail.isDelayScroll': true,
 
+  'miniPlayer.enable': false,
+  'miniPlayer.showBorder': false,
+  'miniPlayer.autoHideControls': false,
+  'miniPlayer.isLock': false,
+  'miniPlayer.isAlwaysOnTop': false,
+  'miniPlayer.isAlwaysOnTopLoop': false,
+  'miniPlayer.isShowTaskbar': false,
+  'miniPlayer.fullscreenHide': true,
+  'miniPlayer.width': 450,
+  'miniPlayer.height': 240,
+  'miniPlayer.x': null,
+  'miniPlayer.y': null,
+  'miniPlayer.isLockScreen': isWin,
+  'miniPlayer.backgroundOpacity': 100,
+
   'desktopLyric.enable': false,
-  'desktopLyric.showPlayer': true,
-  'desktopLyric.showBorder': false,
-  'desktopLyric.singleLine': false,
-  'desktopLyric.autoHideControls': false,
   'desktopLyric.isLock': false,
   'desktopLyric.isAlwaysOnTop': false,
   'desktopLyric.isAlwaysOnTopLoop': false,
@@ -101,6 +112,7 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.scrollAlign': 'center',
   'desktopLyric.isHoverHide': false,
   'desktopLyric.direction': 'horizontal',
+  'desktopLyric.isSingleLine': false,
   'desktopLyric.style.align': 'center',
   'desktopLyric.style.font': '',
   'desktopLyric.style.fontSize': 20,
@@ -110,7 +122,6 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.lyricShadowColor': 'rgba(0, 0, 0, 0.18)',
   // 'desktopLyric.style.fontWeight': false,
   'desktopLyric.style.opacity': 95,
-  'desktopLyric.style.backgroundOpacity': 100,
   'desktopLyric.style.ellipsis': false,
   'desktopLyric.style.isZoomActiveLrc': false,
   'desktopLyric.style.isFontWeightFont': true,

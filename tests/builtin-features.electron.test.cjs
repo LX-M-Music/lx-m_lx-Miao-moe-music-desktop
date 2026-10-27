@@ -51,7 +51,7 @@ test('built-in effects and tag editing work offline and supersede legacy package
       await showDetail(page, true)
       await settled(page)
       const button = page.locator('[data-sound-effect-button]')
-      assert.equal(await button.evaluate(element => element.previousElementSibling.querySelector('use').getAttribute('xlink:href')), '#icon-mini-player')
+      assert.equal(await button.evaluate(element => element.previousElementSibling.querySelector('use').getAttribute('xlink:href')), '#icon-desktop-lyric-off')
       await page.screenshot({ path: path.join(profilePath, 'builtin-sound-button.png') })
       await button.click()
       await page.locator('[data-plugin-sound-dialog]').waitFor()

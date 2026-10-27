@@ -4,7 +4,7 @@
 
 | 当前版本 | 对应附件 | 更新行为 |
 | --- | --- | --- |
-| 安装版 | `ARCH-Setup.exe` | 校验完整安装包，在原目录静默安装并重启。 |
+| 安装版 | `ARCH-Setup.exe` | 从安装包内的应用载荷中只解出变化的文件，原地替换并重启；目录不可写或解包失败时回退静默安装。 |
 | 便携目录版 | `win_ARCH-green.7z`，Win7 为 `win7_ARCH-green.7z` | 优先差分更新；不可用时下载同类型完整压缩包，在原目录替换程序并重启。 |
 | 单文件版 | `ARCH-portable.exe` | 下载完整单文件程序，退出后替换原 EXE，并从原目录启动新版。原文件改名也能更新。 |
 
@@ -29,6 +29,14 @@ LX-M.Music-vVERSION-win_x64-green-update.bin
 
 缺少附件或摘要、清单不匹配、节点不支持精确 Range、数据损坏时，自动退回同类型完整便携包。没有差分附件的历史 Release 也可更新。完整包由随程序分发的 7za 解压，解压前检查路径，再检查包内架构和新包类型标记。
 
+## 安装版原地更新
+
+electron-builder 的 NSIS 安装包由安装器外壳和原样嵌入的 `app-ARCH.7z` 应用载荷组成，载荷目录与安装目录的文件布局一致，并包含 `resources/lx-update-inventory.json`（每个程序文件的大小和 SHA-256）与 `resources/lx-update-runtime.json`（包类型、版本、架构、Win7 标记）。下载并校验 `Setup.exe` 后，主进程用随包的 `resources/update-tools/7za.exe` 读出这两个文件，先与安装目录中的同名文件逐个比对，再用 7-Zip 的路径列表只解出变化的文件，逐文件校验 SHA-256 和 PE 架构后交给重启助手。
+
+这样更新不会运行 NSIS，也不会搬走或重建安装目录：`.lnk`、任务栏固定项、注册表项、协议注册和用户数据都保持原样，重启助手用 `ReplaceFile` 同卷交换文件，替换期间原路径不会消失。安装包缺少清单、清单不是 `installed` 类型、版本或架构不符、安装目录不可写、文件名被改过或任一校验失败时，自动回退为原来的静默安装（安装包已在本地，无需重新下载）。
+
+`Setup.exe` 里的载荷依据 electron-builder 的 NSIS 打包方式；升级 electron-builder 或改用 ZIP 载荷后需重新回归，识别不到时只会回退安装器，不会破坏现有安装。安装版的“应用和功能”版本号由 NSIS 写入，原地更新不会刷新它，卸载仍可用。
+
 ## 替换、重启和数据
 
 下载和文件重建均在独立临时目录完成。原应用仍在运行时不会替换文件。重启助手先验证暂存文件并检查原目录能否写入，准备成功后旧程序才退出。助手使用 Windows 自带的 JScript GUI 宿主独立启动隐藏 PowerShell，等待旧进程退出后备份并替换列出的程序文件，再启动原位置的新程序。
@@ -42,7 +50,7 @@ PowerShell 脚本避免使用 PowerShell 3 之后才提供的 JSON/哈希命令�
 ## 回归验证
 
 ```powershell
-node --test tests/auto-update.test.cjs tests/update-sources.test.cjs tests/windows-update-editions.test.cjs tests/portable-differential-update.test.cjs tests/portable-archive-update.test.cjs tests/windows-update-relaunch.test.cjs
+node --test tests/auto-update.test.cjs tests/update-sources.test.cjs tests/windows-update-editions.test.cjs tests/windows-update-setup-staging.test.cjs tests/portable-differential-update.test.cjs tests/portable-archive-update.test.cjs tests/windows-update-relaunch.test.cjs
 node --test --test-concurrency=1 tests/auto-update.electron.test.cjs tests/update-speed-test.electron.test.cjs tests/portable-update.electron.test.cjs
 ```
 

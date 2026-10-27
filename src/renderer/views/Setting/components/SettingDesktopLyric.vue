@@ -4,16 +4,6 @@ dd
   .gap-top
     base-checkbox(id="setting_desktop_lyric_enable" :model-value="appSetting['desktopLyric.enable']" :label="$t('setting__desktop_lyric_enable')" @update:model-value="updateSetting({ 'desktopLyric.enable': $event })")
   .gap-top
-    base-checkbox(id="setting_mini_player_show_player" :model-value="appSetting['desktopLyric.showPlayer']" :label="$t('setting__desktop_lyric_show_player')" @update:model-value="updateSetting({ 'desktopLyric.showPlayer': $event })")
-  .gap-top
-    base-checkbox(id="setting_mini_player_show_border" :model-value="appSetting['desktopLyric.showBorder']" :label="$t('setting__desktop_lyric_show_border')" @update:model-value="updateSetting({ 'desktopLyric.showBorder': $event })")
-  .gap-top
-    base-checkbox(id="setting_mini_player_single_line" :model-value="appSetting['desktopLyric.singleLine']" :label="$t('setting__desktop_lyric_single_line')" @update:model-value="updateSetting({ 'desktopLyric.singleLine': $event })")
-    svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__desktop_lyric_single_line_tip')")
-  .gap-top
-    base-checkbox(id="setting_mini_player_hide_controls" :model-value="appSetting['desktopLyric.autoHideControls']" :label="$t('setting__desktop_lyric_hide_controls')" @update:model-value="updateSetting({ 'desktopLyric.autoHideControls': $event })")
-    svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('mini_player__hide_tip')")
-  .gap-top
     base-checkbox(id="setting_desktop_lyric_lock" :model-value="appSetting['desktopLyric.isLock']" :label="$t('setting__desktop_lyric_lock')" @update:model-value="updateSetting({ 'desktopLyric.isLock': $event })")
   .gap-top
     base-checkbox(id="setting_desktop_lyric_fullscreen_hide" :model-value="appSetting['desktopLyric.fullscreenHide']" :label="$t('setting__desktop_lyric_fullscreen_hide')" @update:model-value="updateSetting({ 'desktopLyric.fullscreenHide': $event })")
@@ -93,22 +83,6 @@ dd
     .p.gap-top
       base-btn.btn(min @click="resetColor") {{ $t('setting__desktop_lyric_color_reset') }}
 dd
-  h3#desktop_lyric_background_opacity
-    | {{ $t('setting__desktop_lyric_background_opacity', { num: appSetting['desktopLyric.style.backgroundOpacity'] }) }}
-    svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__desktop_lyric_background_opacity_tip')")
-  .p(:class="$style.backgroundControl")
-    base-input(
-      v-model="backgroundOpacity"
-      :class="$style.backgroundInput"
-      type="number"
-      :min="0" :max="100" :step="1"
-      aria-labelledby="desktop_lyric_background_opacity"
-      @change="changeBackgroundOpacity"
-      @submit="changeBackgroundOpacity"
-    )
-    span %
-    base-btn.btn(min @click="changeBackgroundOpacity(100)") {{ $t('setting__desktop_lyric_background_opaque') }}
-dd
   h3#desktop_lyric_font {{ $t('setting__desktop_lyric_font') }}
   div
     base-selection.gap-teft(:list="fontList" :model-value="appSetting['desktopLyric.style.font']" item-key="id" item-name="label" @update:model-value="updateSetting({ 'desktopLyric.style.font': $event })")
@@ -122,7 +96,7 @@ dd
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from '@common/utils/vueTools'
+import { ref, computed, onMounted, onBeforeUnmount } from '@common/utils/vueTools'
 import { getSystemFonts } from '@renderer/utils/ipc'
 import { isLinux } from '@common/utils'
 import { appSetting, updateSetting } from '@renderer/store/setting'
@@ -289,20 +263,6 @@ export default {
       void updateSetting({ 'desktopLyric.style.lineGap': Math.min(Math.max(gap, 0), 25) })
     }
 
-    const backgroundOpacity = ref(appSetting['desktopLyric.style.backgroundOpacity'])
-    watch(() => appSetting['desktopLyric.style.backgroundOpacity'], value => {
-      backgroundOpacity.value = value
-    })
-    const changeBackgroundOpacity = (value) => {
-      const opacity = value === '' ? NaN : Number(value)
-      const normalized = Number.isFinite(opacity)
-        ? Math.min(100, Math.max(0, Math.round(opacity)))
-        : appSetting['desktopLyric.style.backgroundOpacity']
-      backgroundOpacity.value = normalized
-      if (normalized === appSetting['desktopLyric.style.backgroundOpacity']) return
-      void updateSetting({ 'desktopLyric.style.backgroundOpacity': normalized })
-    }
-
     const {
       lyric_unplay_color_ref,
       lyric_played_color_ref,
@@ -331,8 +291,6 @@ export default {
       appSetting,
       updateSetting,
       changeLineGap,
-      backgroundOpacity,
-      changeBackgroundOpacity,
       lyric_unplay_color_ref,
       lyric_played_color_ref,
       lyric_shadow_color_ref,
@@ -353,16 +311,6 @@ export default {
   display: flex;
   flex-flow: row wrap;
   gap: 16px;
-}
-.backgroundControl {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.backgroundInput {
-  width: 80px;
-  max-width: 100%;
 }
 .item {
   width: 70px;

@@ -6,12 +6,12 @@ import { inflateRaw } from 'node:zlib'
 import { promisify } from 'node:util'
 import type { Dispatcher } from 'undici'
 import { requestWithCompatibility } from '@common/utils/undiciCompat'
-import { isManagedUpdatePath, isSafeUpdatePath, parsePortableManifest, type UpdateFile } from '@common/updateManifest'
+import { isManagedUpdatePath, isSafeUpdatePath, parsePortableManifest, parseUpdateRuntimeMarker, type UpdateFile } from '@common/updateManifest'
 import type { UpdateSource } from './updateSources'
 
 const inflate = promisify(inflateRaw)
 const hash = (data: Buffer) => crypto.createHash('sha256').update(data).digest('hex')
-const inventoryPath = 'resources/lx-update-inventory.json'
+export const UPDATE_INVENTORY_PATH = 'resources/lx-update-inventory.json'
 
 const writeAt = async(handle: fs.promises.FileHandle, bytes: Buffer, position: number) => {
   let written = 0
@@ -48,8 +48,8 @@ export const fileHash = async(filePath: string, signal: AbortSignal) => {
 
 const targetPath = (name: string, executable: string) => name.toLowerCase() === 'lx-m music.exe' ? path.basename(executable) : name
 
-const obsoleteFiles = async(root: string, files: StagedUpdate['files'], signal: AbortSignal): Promise<StagedUpdate['obsolete']> => {
-  const inventory = path.join(root, inventoryPath)
+const obsoleteFiles = async(root: string, files: StagedUpdate['files'], signal: AbortSignal, keep: string[] = []): Promise<StagedUpdate['obsolete']> => {
+  const inventory = path.join(root, UPDATE_INVENTORY_PATH)
   assertUnlinkedPath(inventory)
   try {
     const stat = await fs.promises.stat(inventory)
@@ -57,6 +57,7 @@ const obsoleteFiles = async(root: string, files: StagedUpdate['files'], signal: 
     const info = JSON.parse(await fs.promises.readFile(inventory, 'utf8'))
     if (info.schema !== 1 || info.appId !== 'com.lx-m.music.desktop' || !Array.isArray(info.files) || info.files.length > 10000) return []
     const current = new Set(files.map(file => file.path.toLowerCase()))
+    for (const name of keep) current.add(name.toLowerCase())
     const obsolete: StagedUpdate['obsolete'] = []
     for (const entry of info.files) {
       signal.throwIfAborted()
@@ -72,11 +73,14 @@ const obsoleteFiles = async(root: string, files: StagedUpdate['files'], signal: 
   }
 }
 
-const makeStage = async(directory: string, executable: string, files: Array<Pick<UpdateFile, 'path' | 'size' | 'sha256'>>, signal: AbortSignal): Promise<StagedUpdate> => {
+// `keep` lists the application files that legitimately stay unchanged. A full
+// archive stages every file, while an installed in-place update stages only the
+// changed bytes and must not treat the untouched files as obsolete.
+export const makeStage = async(directory: string, executable: string, files: Array<Pick<UpdateFile, 'path' | 'size' | 'sha256'>>, signal: AbortSignal, keep: string[] = []): Promise<StagedUpdate> => {
   const root = path.dirname(executable)
   assertUnlinkedPath(root)
   const staged = files.map(file => ({ ...file, source: file.path, path: targetPath(file.path, executable) }))
-  return { root, executable, directory, files: staged, obsolete: await obsoleteFiles(root, staged, signal) }
+  return { root, executable, directory, files: staged, obsolete: await obsoleteFiles(root, staged, signal, keep.map(name => targetPath(name, executable))) }
 }
 
 export const verifyStagedUpdate = async(stage: StagedUpdate, signal: AbortSignal) => {
@@ -91,23 +95,27 @@ export const verifyStagedUpdate = async(stage: StagedUpdate, signal: AbortSignal
   }
 }
 
-export const validateStagedPortable = async(stage: StagedUpdate, runtime: LX.UpdateRuntime, version: string) => {
+export const validateStagedEdition = async(stage: StagedUpdate, runtime: LX.UpdateRuntime, version: string, edition: LX.UpdateEdition) => {
   const markerPath = path.join(stage.directory, 'resources/lx-update-runtime.json')
   if (fs.existsSync(markerPath)) {
-    const marker = JSON.parse(await fs.promises.readFile(markerPath, 'utf8'))
-    if (marker.schema !== 1 || marker.appId !== 'com.lx-m.music.desktop' || marker.edition !== 'portable' || marker.version !== version || marker.arch !== runtime.arch || marker.win7 !== runtime.win7) throw new Error('便携包内的版本类型、版本号或架构与本次更新不匹配')
+    const marker = parseUpdateRuntimeMarker(JSON.parse(await fs.promises.readFile(markerPath, 'utf8')))
+    if (marker.edition !== edition || marker.version !== version || marker.arch !== runtime.arch || marker.win7 !== runtime.win7) throw new Error('更新包内的版本类型、版本号或架构与本次更新不匹配')
   }
   const file = await fs.promises.open(path.join(stage.directory, 'LX-M Music.exe'), 'r')
   try {
     const header = Buffer.alloc(64)
     await file.read(header, 0, header.length, 0)
     const offset = header.readUInt32LE(60)
-    if (header.subarray(0, 2).toString() !== 'MZ' || offset > 1024 * 1024) throw new Error('便携包内的程序无效')
+    if (header.subarray(0, 2).toString() !== 'MZ' || offset > 1024 * 1024) throw new Error('更新包内的程序无效')
     const pe = Buffer.alloc(6)
     await file.read(pe, 0, pe.length, offset)
     const machine = { x64: 0x8664, ia32: 0x14c, arm64: 0xaa64 }[runtime.arch]
-    if (pe.readUInt32LE(0) !== 0x4550 || !machine || pe.readUInt16LE(4) !== machine) throw new Error('便携包内的程序架构与当前版本不匹配')
+    if (pe.readUInt32LE(0) !== 0x4550 || !machine || pe.readUInt16LE(4) !== machine) throw new Error('更新包内的程序架构与当前版本不匹配')
   } finally { await file.close() }
+}
+
+export const validateStagedPortable = async(stage: StagedUpdate, runtime: LX.UpdateRuntime, version: string) => {
+  await validateStagedEdition(stage, runtime, version, 'portable')
 }
 
 interface DifferentialOptions {
