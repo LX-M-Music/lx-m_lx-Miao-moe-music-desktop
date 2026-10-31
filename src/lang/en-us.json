@@ -858,7 +858,7 @@
   "setting__advanced_ui_anim_speed": "Animation speed",
   "setting__advanced_ui_anim_speed_tip": "0.5 = twice as slow / 1.0 = default / 1.5 = half again as fast.",
   "setting__advanced_play": "Playback Enhancements",
-  "setting__advanced_background": "Ambient background",
+  "setting__advanced_background": "Ambient background (Experimental)",
   "setting__advanced_background_enabled": "Enable ambient background",
   "setting__advanced_background_play_detail_mask": "Dark overlay on playback page",
   "setting__advanced_background_play_detail_mask_tip": "Darken the ambient background on the playback detail page to make lyrics and controls clearer. Turn off to show the background without dimming.",

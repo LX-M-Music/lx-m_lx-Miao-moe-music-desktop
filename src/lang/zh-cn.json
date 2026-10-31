@@ -859,7 +859,7 @@
   "setting__advanced_ui_anim_speed": "动画速率",
   "setting__advanced_ui_anim_speed_tip": "0.5 = 慢一倍 / 1.0 = 默认 / 1.5 = 快一半。",
   "setting__advanced_play": "播放增强",
-  "setting__advanced_background": "动态背景",
+  "setting__advanced_background": "动态背景（实验性功能）",
   "setting__advanced_background_enabled": "启用动态背景",
   "setting__advanced_background_play_detail_mask": "播放页黑色遮罩",
   "setting__advanced_background_play_detail_mask_tip": "压暗播放详情页的动态背景，让歌词和控件更清晰。关闭后显示未压暗的动态背景。",
