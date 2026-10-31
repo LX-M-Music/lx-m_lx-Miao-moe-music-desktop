@@ -9,7 +9,7 @@ export interface Artwork {
 // Keep a small, origin-clean image for both Kawarp and the static fallback.
 // Loading happens outside Kawarp so a cancelled request cannot update a disposed renderer.
 const cache = new Map<string, Artwork>()
-let memoryLimit = 6
+let memoryLimit = 4
 const trimMemory = () => {
   while (cache.size > memoryLimit) cache.delete(cache.keys().next().value!)
 }
@@ -18,6 +18,19 @@ export const setArtworkMemoryLimit = (entries: number) => {
   trimMemory()
 }
 onArtworkCacheCleared(() => { cache.clear() })
+
+// The fallback and the outgoing crossfade only show a blurred image at 30%
+// opacity. A 96px preview keeps the DOM side small while the renderer keeps the
+// 256px source.
+export const previewFrom = (image: HTMLCanvasElement) => {
+  const preview = document.createElement('canvas')
+  preview.width = preview.height = 96
+  const context = preview.getContext('2d')
+  if (!context) return image.toDataURL('image/png')
+  context.drawImage(image, 0, 0, 96, 96)
+  return preview.toDataURL('image/png')
+}
+
 export const loadArtwork = async(src: string, signal: AbortSignal): Promise<Artwork | null> => {
   if (signal.aborted) throw new Error('Artwork request cancelled')
   if (!src) return null
@@ -61,7 +74,7 @@ export const loadArtwork = async(src: string, signal: AbortSignal): Promise<Artw
         context.fillRect(0, 0, 256, 256)
         const side = Math.min(image.naturalWidth, image.naturalHeight)
         context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, 0, 0, 256, 256)
-        const artwork = { image: canvas, preview: canvas.toDataURL('image/png') }
+        const artwork = { image: canvas, preview: previewFrom(canvas) }
         cache.set(src, artwork)
         trimMemory()
         finished = true

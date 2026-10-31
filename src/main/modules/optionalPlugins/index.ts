@@ -1,8 +1,10 @@
-import { BrowserWindow, dialog, ipcMain, net } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, net } from 'electron'
+import fs from 'node:fs/promises'
 import path from 'node:path'
-import { OFFICIAL_PLUGIN_ROOT, PLUGIN_CATALOG_FILE, PLUGIN_IPC, pluginText, comparePluginVersions, type PluginPackageFormat, type PluginId, type PluginStoreSnapshot, type PluginTransferLabels, type PluginTransferResult } from '@common/optionalPlugins'
+import { OFFICIAL_PLUGIN_ROOT, PLUGIN_CATALOG_FILE, PLUGIN_IPC, pluginSourceUrls, pluginText, comparePluginVersions, type PluginPackageFormat, type PluginId, type PluginStoreSnapshot, type PluginTransferLabels, type PluginTransferResult } from '@common/optionalPlugins'
 import { getWebContents } from '../winMain/main'
 import { PluginManager, PluginTransferError } from './manager'
+import { importDropInPlugins } from './dropIn'
 import { compilePluginSource } from './compiler'
 import { errorForTransport } from '@common/utils/errorMessage'
 import { assertIpcRequest } from '@main/utils/ipcPolicy'
@@ -20,50 +22,105 @@ export const notifyPluginBackupRestored = async() => {
   for (const window of BrowserWindow.getAllWindows()) if (!window.webContents.isDestroyed()) window.webContents.send(PLUGIN_IPC.changed, snapshot)
 }
 
-export default () => {
-  manager = new PluginManager(path.join(global.lxDataPath, 'plugins'), async(url, maxBytes) => {
-    if (!url.startsWith(OFFICIAL_PLUGIN_ROOT)) throw new Error('Invalid official plugin URL')
-    // net.request also supports the Electron 22 Windows 7 build and the app's proxy.
-    return new Promise<Buffer>((resolve, reject) => {
-      const request = net.request({ url, partition: 'persist:win-main', redirect: 'error' })
-      if (url.endsWith('/' + PLUGIN_CATALOG_FILE)) request.setHeader('Cache-Control', 'no-cache')
-      let completed = false
-      const fail = (error: Error) => {
-        if (completed) return
-        completed = true
-        clearTimeout(timer)
-        reject(error)
-        request.abort()
-      }
-      const timer = setTimeout(() => { fail(new Error('Plugin download timed out')) }, 30_000)
-      request.on('error', fail)
-      request.on('response', response => {
-        if (response.statusCode < 200 || response.statusCode >= 300) { fail(new Error(`GitHub HTTP ${response.statusCode}`)); return }
-        if (Number(response.headers['content-length']) > maxBytes) { fail(new Error('Plugin download is too large')); return }
-        const chunks: Buffer[] = []
-        let length = 0
-        response.on('error', fail)
-        response.on('aborted', () => { fail(new Error('Plugin download interrupted')) })
-        response.on('data', (chunk: Buffer) => {
-          if (completed) return
-          length += chunk.length
-          if (length > maxBytes) { fail(new Error('Plugin download is too large')); return }
-          chunks.push(chunk)
-        })
-        response.on('end', () => {
-          if (completed) return
-          completed = true
-          clearTimeout(timer)
-          resolve(Buffer.concat(chunks))
-        })
-      })
-      request.end()
+const OFFICIAL_FETCH_TIMEOUT = 30_000
+const MIRROR_CATALOG_TIMEOUT = 8_000
+const MIRROR_PACKAGE_TIMEOUT = 20_000
+let activePluginMirrorPrefix = ''
+let pluginMirrorUnavailable = false
+let lastPluginMirrorSetting = false
+
+const requestPluginBytes = async(url: string, maxBytes: number, timeoutMs: number) => new Promise<Buffer>((resolve, reject) => {
+  // net.request also supports the Electron 22 Windows 7 build and the app's proxy.
+  const request = net.request({ url, partition: 'persist:win-main', redirect: 'error' })
+  if (url.endsWith('/' + PLUGIN_CATALOG_FILE)) request.setHeader('Cache-Control', 'no-cache')
+  let completed = false
+  const fail = (error: Error) => {
+    if (completed) return
+    completed = true
+    clearTimeout(timer)
+    reject(error)
+    request.abort()
+  }
+  const timer = setTimeout(() => { fail(new Error('Plugin download timed out')) }, timeoutMs)
+  request.on('error', fail)
+  request.on('response', response => {
+    if (response.statusCode < 200 || response.statusCode >= 300) { fail(new Error(`GitHub HTTP ${response.statusCode}`)); return }
+    if (Number(response.headers['content-length']) > maxBytes) { fail(new Error('Plugin download is too large')); return }
+    const chunks: Buffer[] = []
+    let length = 0
+    response.on('error', fail)
+    response.on('aborted', () => { fail(new Error('Plugin download interrupted')) })
+    response.on('data', (chunk: Buffer) => {
+      if (completed) return
+      length += chunk.length
+      if (length > maxBytes) { fail(new Error('Plugin download is too large')); return }
+      chunks.push(chunk)
     })
-  }, {
+    response.on('end', () => {
+      if (completed) return
+      completed = true
+      clearTimeout(timer)
+      resolve(Buffer.concat(chunks))
+    })
+  })
+  request.end()
+})
+
+// Mirrors are tried first and the official source always remains the fallback.
+// A mirror that worked for the catalog is preferred for package downloads, while a
+// session-wide outage skips repeated timeouts until the option is toggled again.
+const fetchPluginBytes = async(url: string, maxBytes: number) => {
+  if (!url.startsWith(OFFICIAL_PLUGIN_ROOT)) throw new Error('Invalid official plugin URL')
+  const useMirror = global.lx.appSetting['plugin.useMirror']
+  if (useMirror !== lastPluginMirrorSetting) {
+    lastPluginMirrorSetting = useMirror
+    activePluginMirrorPrefix = ''
+    pluginMirrorUnavailable = false
+  }
+  if (!useMirror || pluginMirrorUnavailable) return requestPluginBytes(url, maxBytes, OFFICIAL_FETCH_TIMEOUT)
+
+  const sources = pluginSourceUrls(url, true)
+  const candidates = activePluginMirrorPrefix
+    ? [...sources.filter(source => source.startsWith(activePluginMirrorPrefix)), ...sources.filter(source => !source.startsWith(activePluginMirrorPrefix))]
+    : sources
+  const catalog = url.endsWith('/' + PLUGIN_CATALOG_FILE)
+  let mirrorFailed = false
+  let lastError: Error | undefined
+  for (const candidate of candidates) {
+    const official = candidate === url
+    const timeout = official ? OFFICIAL_FETCH_TIMEOUT : catalog ? MIRROR_CATALOG_TIMEOUT : MIRROR_PACKAGE_TIMEOUT
+    try {
+      const data = await requestPluginBytes(candidate, maxBytes, timeout)
+      activePluginMirrorPrefix = official ? '' : candidate.slice(0, candidate.length - url.length)
+      if (official && mirrorFailed) pluginMirrorUnavailable = true
+      return data
+    } catch (error: any) {
+      if (!official) mirrorFailed = true
+      lastError = error
+    }
+  }
+  if (mirrorFailed) pluginMirrorUnavailable = true
+  throw lastError ?? new Error('Plugin download failed')
+}
+
+const resolveDropInDirectory = () => {
+  if (process.env.LX_PLUGIN_DROPIN_DIR) return path.resolve(process.env.LX_PLUGIN_DROPIN_DIR)
+  // Unpackaged runs (development and tests) keep the folder with the isolated app
+  // data, because their executable directory is shared by Electron itself.
+  if (!app.isPackaged) return path.join(app.getPath('userData'), 'Plugins')
+  return path.join(process.env.PORTABLE_EXECUTABLE_DIR ?? path.dirname(app.getPath('exe')), 'Plugins')
+}
+
+export default () => {
+  manager = new PluginManager(path.join(global.lxDataPath, 'plugins'), fetchPluginBytes, {
     compileSource: compilePluginSource,
     onCompile: id => {
-      const contents = getWebContents()
-      if (!contents.isDestroyed()) contents.send(PLUGIN_IPC.progress, { phase: 'compiling', id })
+      try {
+        const contents = getWebContents()
+        if (!contents.isDestroyed()) contents.send(PLUGIN_IPC.progress, { phase: 'compiling', id })
+      } catch {
+        // The main window may not exist yet while drop-in plugins compile during startup.
+      }
     },
   })
   const broadcast = (snapshot: PluginStoreSnapshot) => {
@@ -72,8 +129,26 @@ export default () => {
     }
     return snapshot
   }
+  let dropInScan: Promise<Awaited<ReturnType<typeof importDropInPlugins>>> | null = null
+  const scanDropInDirectory = async() => {
+    if (dropInScan) return dropInScan
+    dropInScan = (async() => {
+      const directory = resolveDropInDirectory()
+      await fs.mkdir(directory, { recursive: true }).catch(() => {})
+      return importDropInPlugins({ manager, directory, statePath: path.join(global.lxDataPath, 'plugins', 'drop-in.json') })
+    })().finally(() => { dropInScan = null })
+    return dropInScan
+  }
+  void (async() => {
+    const result = await scanDropInDirectory()
+    if (result.snapshot) broadcast(result.snapshot)
+  })().catch(error => { console.error('Drop-in plugin scan failed:', error) })
   handle(PLUGIN_IPC.list, async() => manager.snapshot())
   handle(PLUGIN_IPC.refresh, async() => broadcast(await manager.refresh()))
+  handle(PLUGIN_IPC.scanDropIn, async() => {
+    const result = await scanDropInDirectory()
+    return { imported: result.imported, failed: result.failed, snapshot: result.snapshot ? broadcast(result.snapshot) : await manager.snapshot() }
+  })
   handle(PLUGIN_IPC.install, async(_event, id: PluginId, format?: PluginPackageFormat) => broadcast(await manager.install(id, format)))
   handle(PLUGIN_IPC.uninstall, async(_event, id: PluginId) => broadcast(await manager.uninstall(id)))
   handle(PLUGIN_IPC.setEnabled, async(event, id: PluginId, enabled: boolean) => {

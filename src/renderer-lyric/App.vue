@@ -1,5 +1,5 @@
 <template>
-  <div id="container" :class="[{ lock: setting['desktopLyric.isLock'] }, { hide: isHide || isHoverHide }]">
+  <div id="container" :class="[{ lock: setting['desktopLyric.isLock'] }, { hide: isHide || isHoverHide }]" :style="{ '--desktop-lyric-background-opacity': backgroundOpacity }">
     <div id="main">
       <transition enter-active-class="animated-fast fadeIn" leave-active-class="animated-fast fadeOut">
         <div v-show="!setting['desktopLyric.isLock']" class="control-bar">
@@ -30,7 +30,7 @@
 <script setup>
 import useWindowSize from '@lyric/useApp/useWindowSize'
 import useHoverHide from '@lyric/useApp/useHoverHide'
-import { onMounted, onBeforeUnmount } from '@common/utils/vueTools'
+import { computed, onMounted, onBeforeUnmount } from '@common/utils/vueTools'
 import { setting } from '@lyric/store/state'
 import { sendConnectMainWindowEvent } from '@lyric/utils/ipc'
 import useCommon from '@lyric/useApp/useCommon'
@@ -44,6 +44,10 @@ import { initOptionalPlugins } from '@lyric/store/optionalPlugins'
 onBeforeUnmount(initOptionalPlugins())
 
 const isShowResize = window.os != 'windows'
+const backgroundOpacity = computed(() => {
+  const opacity = Number(setting['desktopLyric.backgroundOpacity'])
+  return (Number.isFinite(opacity) ? Math.min(100, Math.max(0, opacity)) : 20) / 100
+})
 useCommon()
 const { handleMouseDown, handleTouchDown } = useWindowSize()
 const isHoverHide = useHoverHide()
@@ -85,11 +89,6 @@ body {
   height: 100%;
   transition: opacity .3s ease;
   opacity: 1;
-  &.lock {
-    #main {
-      background-color: transparent;
-    }
-  }
   &.hide {
     opacity: .05;
 
@@ -181,7 +180,7 @@ body {
   min-height: 0;
   border-radius: @radius-border;
   overflow: hidden;
-  background-color: rgba(0, 0, 0, .2);
+  background-color: rgba(0, 0, 0, var(--desktop-lyric-background-opacity, .2));
 
   &:hover {
     .control-bar {

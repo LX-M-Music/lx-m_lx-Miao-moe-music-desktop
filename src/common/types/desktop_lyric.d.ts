@@ -18,6 +18,7 @@ declare namespace LX {
       'desktopLyric.isHoverHide': LX.AppSetting['desktopLyric.isHoverHide']
       'desktopLyric.direction': LX.AppSetting['desktopLyric.direction']
       'desktopLyric.isSingleLine': LX.AppSetting['desktopLyric.isSingleLine']
+      'desktopLyric.backgroundOpacity': LX.AppSetting['desktopLyric.backgroundOpacity']
       'desktopLyric.style.align': LX.AppSetting['desktopLyric.style.align']
       'desktopLyric.style.font': LX.AppSetting['desktopLyric.style.font']
       'desktopLyric.style.fontSize': LX.AppSetting['desktopLyric.style.fontSize']

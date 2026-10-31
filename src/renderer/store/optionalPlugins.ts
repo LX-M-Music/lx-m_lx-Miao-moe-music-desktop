@@ -46,6 +46,17 @@ export const refreshPlugins = async() => {
   pluginStoreError.value = null
   try { await applySnapshot(await ipcRenderer.invoke(PLUGIN_IPC.refresh)) } catch (error: any) { pluginStoreError.value = error.message }
 }
+export const scanDropInPlugins = async() => {
+  pluginStoreError.value = null
+  try {
+    const result = await ipcRenderer.invoke(PLUGIN_IPC.scanDropIn) as { imported: number, failed: number, snapshot: PluginStoreSnapshot }
+    await applySnapshot(result.snapshot)
+    return result
+  } catch (error: any) {
+    pluginStoreError.value = error.message
+    return null
+  }
+}
 export const changePluginInstallation = async(id: PluginId, install: boolean, format: PluginPackageFormat = 'lxplugin') => {
   if (isBuiltinPlugin(id) || Boolean(pluginBusy[id]) || pluginTransferBusy.value) return
   pluginBusy[id] = true

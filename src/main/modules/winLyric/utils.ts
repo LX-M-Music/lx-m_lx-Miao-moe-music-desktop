@@ -63,6 +63,7 @@ export const watchConfigKeys = [
   'desktopLyric.isHoverHide',
   'desktopLyric.direction',
   'desktopLyric.isSingleLine',
+  'desktopLyric.backgroundOpacity',
   'desktopLyric.style.align',
   'desktopLyric.style.lyricUnplayColor',
   'desktopLyric.style.lyricPlayedColor',

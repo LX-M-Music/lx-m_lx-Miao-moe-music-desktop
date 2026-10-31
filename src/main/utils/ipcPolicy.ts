@@ -144,7 +144,7 @@ export const assertIpcRequest = (event: SenderEvent, channel: string, params?: u
   let valid: boolean
   if (['common_set_app_setting', 'winMain_set_config', 'winLyric_set_config', 'winMiniPlayer_set_config'].includes(channel)) valid = settingCheck(params, owner.role)
   else if (channel.startsWith('optional_plugins:')) {
-    if ([PLUGIN_IPC.list, PLUGIN_IPC.refresh].includes(channel as any)) valid = empty(params) && rest.length === 0
+    if ([PLUGIN_IPC.list, PLUGIN_IPC.refresh, PLUGIN_IPC.scanDropIn].includes(channel as any)) valid = empty(params) && rest.length === 0
     else if (channel === PLUGIN_IPC.import) valid = obj(params) && rest.length === 0
     else valid = isPluginId(params) && (channel === PLUGIN_IPC.setEnabled ? rest.length === 1 && bool(rest[0]) : channel === PLUGIN_IPC.runtimeResult ? str(rest[0]) && optional(str)(rest[1]) && rest.length <= 2 : channel === PLUGIN_IPC.install ? optional(oneOf('zip', 'lxplugin'))(rest[0]) && rest.length <= 1 : channel === PLUGIN_IPC.export ? rest.length === 1 && obj(rest[0]) : rest.length === 0)
   } else valid = rest.length === 0 && (checks.get(channel) ?? obj)(params)

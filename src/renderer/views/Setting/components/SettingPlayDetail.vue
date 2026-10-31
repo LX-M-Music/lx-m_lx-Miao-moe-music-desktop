@@ -18,6 +18,7 @@ dd(data-setting-search="setting__play_detail_font_weight")
       id="setting_play_detail_font_weight"
       :value="appSetting['playDetail.style.fontWeight']"
       :min="100" :max="900" :step="100"
+      wheel
       :aria-label="$t('setting__play_detail_font_weight')"
       @change="updateSetting({ 'playDetail.style.fontWeight': $event })"
     )

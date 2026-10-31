@@ -101,7 +101,7 @@ const step = (now: number) => {
   const requestedSpeed = Number(appSetting['ui.animationSpeed'])
   const speed = Number.isFinite(requestedSpeed) ? Math.max(0.5, Math.min(1.5, requestedSpeed)) : 1
   time += dt * velocity * speed
-  const size = lowPower.value ? lowPowerSurfaceSize(width, height) : surfaceSize(width, height, quality.value, window.devicePixelRatio)
+  const size = lowPower.value ? lowPowerSurfaceSize(width, height) : surfaceSize(width, height, quality.value)
   if (preview.value) renderer?.draw(size.width, size.height, time, !current.done, quality.value == 'gentle')
   paintOpacity(current)
   // Always sample the final frame before pausing, including static-quality covers.

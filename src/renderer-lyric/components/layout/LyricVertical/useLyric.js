@@ -26,6 +26,19 @@ export default (isComputeWidth) => {
   let prevActiveLine = 0
 
 
+  const getScrollLeft = () => {
+    if (!dom_lines?.length || !dom_lyric.value) return null
+    let dom_p = dom_lines[lyric.line]
+    if (!dom_p) return 0
+    let offset = 0
+    if (isComputeWidth.value) {
+      let prevLineWidth = line_widths[prevActiveLine] ?? 0
+      offset = prevActiveLine < lyric.line ? ((dom_lines[prevActiveLine]?.clientWidth ?? 0) - prevLineWidth) : 0
+      // console.log(prevActiveLine, dom_lines[prevActiveLine]?.clientHeight ?? 0, prevLineWidth, offset)
+    }
+    return dom_p.offsetLeft + offset - getOffsetTop(dom_lyric.value.clientWidth, dom_p.clientWidth)
+  }
+
   const handleScrollLrc = (duration = 300) => {
     if (!dom_lines?.length || !dom_lyric.value) return
     if (setting['desktopLyric.isSingleLine']) {
@@ -33,19 +46,7 @@ export default (isComputeWidth) => {
       return
     }
     if (isStopScroll) return
-    let dom_p = dom_lines[lyric.line]
-
-    if (dom_p) {
-      let offset = 0
-      if (isComputeWidth.value) {
-        let prevLineWidth = line_widths[prevActiveLine] ?? 0
-        offset = prevActiveLine < lyric.line ? ((dom_lines[prevActiveLine]?.clientWidth ?? 0) - prevLineWidth) : 0
-        // console.log(prevActiveLine, dom_lines[prevActiveLine]?.clientHeight ?? 0, prevLineWidth, offset)
-      }
-      cancelScrollFn = scrollXRTo(dom_lyric.value, dom_p ? (dom_p.offsetLeft + offset - getOffsetTop(dom_lyric.value.clientWidth, dom_p.clientWidth)) : 0, duration)
-    } else {
-      cancelScrollFn = scrollXRTo(dom_lyric.value, 0, duration)
-    }
+    cancelScrollFn = scrollXRTo(dom_lyric.value, getScrollLeft() ?? 0, duration)
   }
   const clearLyricScrollTimeout = () => {
     if (!timeout) return
@@ -94,7 +95,7 @@ export default (isComputeWidth) => {
     startLyricScrollTimeout()
   }
 
-  const setLyric = (lines) => {
+  const setLyric = (lines, scrollImmediately = false) => {
     const dom_line_content = document.createDocumentFragment()
     // Move the engine's original node, keeping per-word progress and extended rows.
     const current = Math.max(0, Math.min(lyric.line, lines.length - 1))
@@ -108,7 +109,11 @@ export default (isComputeWidth) => {
       if (!dom_lyric.value) return
       dom_lines = dom_lyric.value.querySelectorAll('.line-content')
       line_widths = Array.from(dom_lines).map(l => l.clientWidth)
-      handleScrollLrc()
+      if (scrollImmediately) {
+        dom_lyric.value.scrollLeft = setting['desktopLyric.isSingleLine'] ? 0 : (getScrollLeft() ?? 0)
+      } else {
+        handleScrollLrc()
+      }
     })
   }
 
@@ -166,7 +171,7 @@ export default (isComputeWidth) => {
       cancelScrollFn = null
     }
     isStopScroll = false
-    setLyric(lyric.lines)
+    setLyric(lyric.lines, true)
   })
 
   onMounted(() => {

@@ -180,6 +180,60 @@ test('desktop toolbar translation, romanization and single-line lyrics match the
       await update({ 'desktopLyric.direction': 'horizontal' })
     })
 
+    await t.test('leaving single-line mode jumps straight to the active line instead of scrolling from the top', async() => {
+      const longTexts = Array.from({ length: 30 }, (_, i) => `第${i + 1}行`)
+      const longLrc = longTexts.map((text, i) => {
+        const ms = i * 300
+        return `[00:${String(Math.floor(ms / 1000)).padStart(2, '0')}.${String(Math.floor(ms % 1000 / 10)).padStart(2, '0')}]${text}`
+      }).join('\n')
+      await setLyrics({ lrc: longLrc, tlrc: '', rlrc: '', lxlrc: '' })
+      await page.evaluate(() => window.app_event.setProgress(6.1))
+      await desktop.waitForFunction(() => document.querySelector('.line-content.active')?.textContent.includes('第21行'))
+      assert.equal(await desktop.locator('[data-desktop-lyric-single-line]').count(), 1)
+      const readScroll = () => desktop.evaluate(() => {
+        const text = document.querySelector('.line-content').parentElement
+        const view = text.parentElement
+        return { top: view.scrollTop, max: view.scrollHeight - view.clientHeight }
+      })
+      await desktop.evaluate(() => {
+        const text = document.querySelector('.line-content').parentElement
+        const view = text.parentElement
+        window.__scrollLog = []
+        let proto = Object.getPrototypeOf(document.documentElement)
+        while (proto && !Object.getOwnPropertyDescriptor(proto, 'scrollTop')) proto = Object.getPrototypeOf(proto)
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'scrollTop')
+        Object.defineProperty(view, 'scrollTop', {
+          configurable: true,
+          get() { return descriptor.get.call(view) },
+          set(value) {
+            window.__scrollLog.push(['set', Math.round(performance.now()), value])
+            descriptor.set.call(view, value)
+          },
+        })
+        const originalScrollTo = view.scrollTo.bind(view)
+        view.scrollTo = (x, y) => {
+          window.__scrollLog.push(['scrollTo', Math.round(performance.now()), x, y])
+          originalScrollTo(x, y)
+        }
+      })
+      await button('single-line').click()
+      await desktop.waitForFunction(count => document.querySelectorAll('.line-content').length === count, longTexts.length)
+      await desktop.waitForTimeout(800)
+      const log = await desktop.evaluate(() => window.__scrollLog)
+      const scrollCalls = log.filter(([kind]) => kind === 'scrollTo')
+      assert(scrollCalls.length <= 1, JSON.stringify(log.slice(0, 12)))
+      const early = await readScroll()
+      await desktop.waitForTimeout(500)
+      const late = await readScroll()
+      assert(late.top > 200, JSON.stringify(late))
+      assert(Math.abs(early.top - late.top) < 5, JSON.stringify({ early, late }))
+
+      await button('single-line').click()
+      await desktop.waitForFunction(() => document.querySelectorAll('.line-content').length === 1)
+      await setLyrics({ lrc: timed(texts), tlrc: timed(translations), rlrc: timed(romanizations), lxlrc: wordTimed })
+      await seek(2)
+    })
+
     await t.test('a song without extended lyrics disables the buttons while preserving preferences and single-line mode', async() => {
       await setLyrics({ tlrc: '', rlrc: '' })
       await desktop.waitForFunction(() => document.querySelector('[data-desktop-lyric-action="translation"]').disabled && document.querySelector('[data-desktop-lyric-action="romanization"]').disabled)

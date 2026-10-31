@@ -1,9 +1,12 @@
 <template>
   <div :class="$style.controlBtn">
     <!-- <common-volume-bar /> -->
-    <button :class="$style.titleBtn" :aria-label="$t('player__add_music_to')" @click="addMusicTo">
+    <button :class="[$style.titleBtn, { [$style.added]: isExistInList }]" :aria-label="$t('player__add_music_to')" :aria-pressed="isExistInList" @click="addMusicTo">
       <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" width="90%" viewBox="0 0 512 512" space="preserve">
         <use xlink:href="#icon-add-2" />
+      </svg>
+      <svg v-if="isExistInList" :class="$style.addedBadge" viewBox="0 0 24 24" aria-hidden="true">
+        <use xlink:href="#icon-check" />
       </svg>
     </button>
     <button :class="$style.titleBtn" :aria-label="toggleDesktopLyricBtnTitle" @click="toggleDesktopLyric" @contextmenu="toggleLockDesktopLyric">
@@ -22,12 +25,14 @@
 <script>
 import { ref } from '@common/utils/vueTools'
 import useToggleDesktopLyric from '@renderer/utils/compositions/useToggleDesktopLyric'
+import useMusicExistInList from '@renderer/utils/compositions/useMusicExistInList'
 import { musicInfo, playMusicInfo } from '@renderer/store/player/state'
 import { appSetting } from '@renderer/store/setting'
 
 export default {
   setup() {
     const isShowAddMusicTo = ref(false)
+    const isExistInList = useMusicExistInList()
     const {
       toggleDesktopLyricBtnTitle,
       toggleDesktopLyric,
@@ -40,6 +45,7 @@ export default {
     return {
       appSetting,
       isShowAddMusicTo,
+      isExistInList,
       toggleDesktopLyricBtnTitle,
       toggleDesktopLyric,
       toggleLockDesktopLyric,
@@ -70,6 +76,7 @@ export default {
   flex: none;
   height: 100%;
   width: 24px;
+  position: relative;
   border-radius: var(--radius-sm);
   transition: var(--duration-fast) var(--ease-standard);
   transition-property: color, opacity, background-color, box-shadow, transform;
@@ -101,6 +108,24 @@ export default {
     opacity: 1;
     box-shadow: var(--focus-ring);
   }
+  &.added {
+    color: var(--color-primary);
+  }
+}
+
+.addedBadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  padding: 1px;
+  box-sizing: content-box;
+  border-radius: 50%;
+  color: var(--color-main-background);
+  background-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-main-background);
+  filter: none;
 }
 
 

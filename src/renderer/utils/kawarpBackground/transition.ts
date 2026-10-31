@@ -1,4 +1,4 @@
-import { type Artwork } from './artwork'
+import { type Artwork, previewFrom } from './artwork'
 
 const blendArtwork = (from: Artwork, to: Artwork, amount: number): Artwork => {
   if (amount <= 0 || from === to) return from
@@ -9,7 +9,7 @@ const blendArtwork = (from: Artwork, to: Artwork, amount: number): Artwork => {
   context.drawImage(from.image, 0, 0, 256, 256)
   context.globalAlpha = amount
   context.drawImage(to.image, 0, 0, 256, 256)
-  return { image, preview: image.toDataURL('image/png') }
+  return { image, preview: previewFrom(image) }
 }
 
 // Snapshot the current blend only when a new cover interrupts it. Both renderers

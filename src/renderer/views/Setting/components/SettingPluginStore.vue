@@ -1,10 +1,15 @@
 <template>
   <dt id="plugin_store">{{ $t('setting__plugins') }}<svg-icon class="help-icon" name="help-circle-outline" :aria-label="$t('setting__plugins_intro') + '\n' + $t('setting__plugins_preserve_settings')" /></dt>
-  <dd>
+  <dd :data-plugin-store-revision="pluginStore.revision">
     <div :class="$style.header">
       <div :class="$style.headerActions">
         <base-btn min :disabled="storeBusy" @click="transferPlugin()">{{ $t(pluginTransferBusy ? 'setting__plugins_working' : 'setting__plugins_import') }}</base-btn>
+        <base-btn min :disabled="refreshing || scanning || storeBusy" @click="scanDropIn">{{ $t(scanning ? 'setting__plugins_dropin_working' : 'setting__plugins_dropin_check') }}</base-btn>
         <base-btn min :disabled="refreshing" @click="refresh">{{ $t(refreshing ? 'setting__plugins_refreshing' : 'setting__plugins_refresh') }}</base-btn>
+      </div>
+      <div :class="$style.mirrorOption">
+        <base-checkbox id="setting_plugin_store_mirror" :model-value="appSetting['plugin.useMirror']" :label="$t('setting__plugins_mirror')" :disabled="refreshing" @update:model-value="changeMirror" />
+        <svg-icon class="help-icon" name="help-circle-outline" :aria-label="$t('setting__plugins_mirror_tip')" />
       </div>
     </div>
     <p v-if="pluginTransferNotice" :class="$style.notice" :role="pluginTransferNotice.error ? 'alert' : 'status'" data-plugin-transfer-status>{{ pluginTransferNotice.message }}</p>
@@ -51,14 +56,17 @@ import { formatError } from '@common/utils/errorMessage'
 import { computed, nextTick, onMounted, ref, watch } from '@common/utils/vueTools'
 import { isPluginApiSupported, pluginPackages, pluginText, comparePluginVersions } from '@common/optionalPlugins'
 import { builtinPlugins, getBuiltinPlugin } from '@common/builtinPlugins'
-import { pluginStore, pluginRuntime, pluginBusy, pluginOperationErrors, pluginStoreError, pluginTransferBusy, pluginTransferNotice, refreshPlugins, changePluginInstallation, changePluginEnabled, transferPlugin } from '@renderer/store/optionalPlugins'
-import { appSetting } from '@renderer/store/setting'
+import { pluginStore, pluginRuntime, pluginBusy, pluginOperationErrors, pluginStoreError, pluginTransferBusy, pluginTransferNotice, refreshPlugins, scanDropInPlugins, changePluginInstallation, changePluginEnabled, transferPlugin } from '@renderer/store/optionalPlugins'
+import { appSetting, updateSetting } from '@renderer/store/setting'
+import { useI18n } from '@renderer/plugins/i18n'
 
 const props = defineProps({ pluginId: { type: String, default: '' } })
 const grid = ref(null)
 const expanded = ref(null)
 let pendingRevealId = ''
 const refreshing = ref(false)
+const scanning = ref(false)
+const t = useI18n()
 const storeBusy = computed(() => pluginTransferBusy.value || Object.values(pluginBusy).some(Boolean))
 const items = computed(() => {
   const snapshot = pluginStore.value
@@ -114,6 +122,23 @@ const refresh = async() => {
   refreshing.value = true
   try { await refreshPlugins() } finally { refreshing.value = false }
 }
+const changeMirror = async value => {
+  await updateSetting({ 'plugin.useMirror': value })
+  await refresh()
+}
+const scanDropIn = async() => {
+  if (scanning.value) return
+  scanning.value = true
+  try {
+    const result = await scanDropInPlugins()
+    if (!result) return
+    let message = result.imported > 0 ? t('setting__plugins_dropin_loaded', { num: result.imported }) : t('setting__plugins_dropin_empty')
+    if (result.failed > 0) message += ' ' + t('setting__plugins_dropin_failed', { num: result.failed })
+    pluginTransferNotice.value = { message, error: false }
+  } finally {
+    scanning.value = false
+  }
+}
 const uninstall = async(id) => {
   if (expanded.value === id) expanded.value = null
   await changePluginInstallation(id, false)
@@ -127,6 +152,7 @@ onMounted(async() => {
 <style lang="less" module>
 .header { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
 .headerActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mirrorOption { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .header button { flex: none; }
 .description { color: var(--color-font); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; max-width: 1000px; }

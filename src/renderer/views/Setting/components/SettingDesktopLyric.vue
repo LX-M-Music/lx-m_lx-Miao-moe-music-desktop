@@ -30,6 +30,8 @@ dd
     base-checkbox(id="setting_desktop_lyric_ellipsis" :model-value="appSetting['desktopLyric.style.ellipsis']" :label="$t('setting__desktop_lyric_ellipsis')" @update:model-value="updateSetting({ 'desktopLyric.style.ellipsis': $event })")
   .gap-top
     base-checkbox(id="setting_desktop_lyric_zoom" :model-value="appSetting['desktopLyric.style.isZoomActiveLrc']" :label="$t('desktop_lyric__lrc_active_zoom_on')" @update:model-value="updateSetting({ 'desktopLyric.style.isZoomActiveLrc': $event })")
+  .gap-top
+    base-checkbox(id="setting_desktop_lyric_single_line" :model-value="appSetting['desktopLyric.isSingleLine']" :label="$t('setting__desktop_lyric_single_line')" @update:model-value="updateSetting({ 'desktopLyric.isSingleLine': $event })")
   //- .gap-top
     base-checkbox(id="setting_desktop_lyric_fontWeight" :model-value="appSetting['desktopLyric.style.fontWeight']" @update:model-value="updateSetting({ 'desktopLyric.style.fontWeight': $event })" :label="$t('setting__desktop_lyric_font_weight')")
 
@@ -66,6 +68,18 @@ dd
     .p.setting-actions
       base-btn.btn(min @click="changeLineGap(-1)") {{ $t('setting__desktop_lyric_line_gap_dec') }}
       base-btn.btn(min @click="changeLineGap(1)") {{ $t('setting__desktop_lyric_line_gap_add') }}
+dd
+  h3#desktop_lyric_background_opacity {{ $t('setting__desktop_lyric_background_opacity', { num: appSetting['desktopLyric.backgroundOpacity'] }) }}
+  .p.gap-top.setting-slider-row
+    base-slider-bar.setting-slider(
+      id="setting_desktop_lyric_background_opacity"
+      :value="appSetting['desktopLyric.backgroundOpacity']"
+      :min="0" :max="100" :step="1" :wheel-step="5"
+      wheel
+      aria-labelledby="desktop_lyric_background_opacity"
+      @change="updateSetting({ 'desktopLyric.backgroundOpacity': $event })"
+    )
+    base-btn(min @click="updateSetting({ 'desktopLyric.backgroundOpacity': 20 })") {{ $t('setting__desktop_lyric_background_opacity_reset') }}
 dd
   h3#desktop_lyric_color {{ $t('setting__desktop_lyric_color') }}
   div

@@ -27,24 +27,17 @@ dd
 
 dd
   h3#mini_player_background_opacity {{ $t('setting__mini_player_background_opacity', { num: appSetting['miniPlayer.backgroundOpacity'] }) }}
-  .p(:class="$style.backgroundControl")
-    base-input(v-model="backgroundOpacity" :class="$style.backgroundInput" type="number" :min="0" :max="100" :step="1" aria-labelledby="mini_player_background_opacity" @change="changeBackgroundOpacity" @submit="changeBackgroundOpacity")
-    span %
-    base-btn(min @click="changeBackgroundOpacity(100)") {{ $t('setting__mini_player_background_opaque') }}
+  .p.gap-top.setting-slider-row
+    base-slider-bar.setting-slider(
+      id="setting_mini_player_background_opacity"
+      :value="appSetting['miniPlayer.backgroundOpacity']"
+      :min="0" :max="100" :step="1" :wheel-step="5"
+      wheel
+      aria-labelledby="mini_player_background_opacity"
+      @change="updateSetting({ 'miniPlayer.backgroundOpacity': $event })"
+    )
+    base-btn(min @click="updateSetting({ 'miniPlayer.backgroundOpacity': 100 })") {{ $t('setting__mini_player_background_opaque') }}
 </template>
 <script setup lang="ts">
-import { ref, watch } from '@common/utils/vueTools'
 import { appSetting, updateSetting } from '@renderer/store/setting'
-const backgroundOpacity = ref(appSetting['miniPlayer.backgroundOpacity'])
-watch(() => appSetting['miniPlayer.backgroundOpacity'], value => { backgroundOpacity.value = value })
-const changeBackgroundOpacity = (value: string | number) => {
-  const opacity = value === '' ? NaN : Number(value)
-  const normalized = Number.isFinite(opacity) ? Math.min(100, Math.max(0, Math.round(opacity))) : appSetting['miniPlayer.backgroundOpacity']
-  backgroundOpacity.value = normalized
-  if (normalized !== appSetting['miniPlayer.backgroundOpacity']) void updateSetting({ 'miniPlayer.backgroundOpacity': normalized })
-}
 </script>
-<style lang="less" module>
-.backgroundControl { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.backgroundInput { width: 80px; max-width: 100%; }
-</style>

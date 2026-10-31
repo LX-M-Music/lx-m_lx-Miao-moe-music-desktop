@@ -442,6 +442,11 @@ declare global {
       'desktopLyric.isSingleLine': boolean
 
       /**
+       * 桌面歌词背景不透明度，0-100，0 为完全透明
+       */
+      'desktopLyric.backgroundOpacity': number
+
+      /**
        * 歌词对齐方式
        */
       'desktopLyric.style.align': 'center' | 'left' | 'right'
@@ -510,6 +515,11 @@ declare global {
        * 是否加粗翻译、罗马音字体
        */
       'desktopLyric.style.isFontWeightExtended': boolean
+
+      /**
+       * 是否通过 GitHub 镜像源获取插件目录与安装包
+       */
+      'plugin.useMirror': boolean
 
       /**
        * 是否启用双击列表里的歌曲时自动切换到当前列表播放（仅对歌单、排行榜有效）

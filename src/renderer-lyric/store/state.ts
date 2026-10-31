@@ -19,6 +19,7 @@ export const setting = shallowReactive<LX.DesktopLyric.Config>({
   'desktopLyric.isHoverHide': false,
   'desktopLyric.direction': 'horizontal',
   'desktopLyric.isSingleLine': false,
+  'desktopLyric.backgroundOpacity': 20,
   'desktopLyric.style.align': 'center',
   'desktopLyric.style.lyricUnplayColor': 'rgba(255, 255, 255, 1)',
   'desktopLyric.style.lyricPlayedColor': 'rgba(7, 197, 86, 1)',

@@ -113,6 +113,7 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.isHoverHide': false,
   'desktopLyric.direction': 'horizontal',
   'desktopLyric.isSingleLine': false,
+  'desktopLyric.backgroundOpacity': 20,
   'desktopLyric.style.align': 'center',
   'desktopLyric.style.font': '',
   'desktopLyric.style.fontSize': 20,
@@ -127,6 +128,8 @@ const defaultSetting: LX.AppSetting = {
   'desktopLyric.style.isFontWeightFont': true,
   'desktopLyric.style.isFontWeightLine': true,
   'desktopLyric.style.isFontWeightExtended': true,
+
+  'plugin.useMirror': false,
 
   'list.isClickPlayList': false,
   'list.isShowSource': true,

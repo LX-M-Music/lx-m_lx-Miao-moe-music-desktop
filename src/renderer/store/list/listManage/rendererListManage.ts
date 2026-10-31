@@ -1,4 +1,4 @@
-import { toRaw } from '@common/utils/vueTools'
+import { ref, toRaw } from '@common/utils/vueTools'
 import { rendererInvoke, rendererOff, rendererOn } from '@common/rendererIpc'
 import { PLAYER_EVENT_NAME } from '@common/ipcNames'
 import {
@@ -23,6 +23,8 @@ import { deleteWithUndo } from '../recycleBin'
 
 const pendingLists = new Map<string, Promise<LX.Music.MusicInfo[]>>()
 let listRevision = 0
+// Reactive marker for code outside the list views that depends on playlist contents.
+export const listChangeRevision = ref(0)
 
 /**
  * 获取用户列表
@@ -219,6 +221,7 @@ const noop = () => {}
 export const registerListAction = (appSetting: LX.AppSetting, onListChanged: (listIds: string[], reset?: boolean) => void = noop) => {
   const list_data_overwrite = ({ params: datas }: LX.IpcRendererEventParams<LX.List.ListActionDataOverwrite>) => {
     listRevision++
+    listChangeRevision.value++
     const previousIds = userLists.map(list => list.id)
     const updatedListIds = listDataOverwrite(datas)
     onListChanged([...new Set([...previousIds, ...datas.userList.map(list => list.id), ...updatedListIds])], true)
@@ -230,6 +233,7 @@ export const registerListAction = (appSetting: LX.AppSetting, onListChanged: (li
   }
   const list_remove = ({ params: ids }: LX.IpcRendererEventParams<LX.List.ListActionRemove>) => {
     listRevision++
+    listChangeRevision.value++
     userListsRemove(ids)
     onListChanged(ids, true)
   }
@@ -242,40 +246,47 @@ export const registerListAction = (appSetting: LX.AppSetting, onListChanged: (li
   }
   const list_music_add = ({ params: { id, musicInfos, addMusicLocationType } }: LX.IpcRendererEventParams<LX.List.ListActionMusicAdd>) => {
     listRevision++
+    listChangeRevision.value++
     addMusicLocationType ??= appSetting['list.addMusicLocationType']
     const updatedListIds = listMusicAdd(id, musicInfos, addMusicLocationType)
     if (updatedListIds.length) onListChanged(updatedListIds)
   }
   const list_music_move = ({ params: { fromId, toId, musicInfos, addMusicLocationType } }: LX.IpcRendererEventParams<LX.List.ListActionMusicMove>) => {
     listRevision++
+    listChangeRevision.value++
     addMusicLocationType ??= appSetting['list.addMusicLocationType']
     const updatedListIds = listMusicMove(fromId, toId, musicInfos, addMusicLocationType)
     if (updatedListIds.length) onListChanged(updatedListIds)
   }
   const list_music_remove = ({ params: { listId, ids } }: LX.IpcRendererEventParams<LX.List.ListActionMusicRemove>) => {
     listRevision++
+    listChangeRevision.value++
     // console.log(listId, ids)
     const updatedListIds = listMusicRemove(listId, ids)
     if (updatedListIds.length) onListChanged(updatedListIds)
   }
   const list_music_update = ({ params: musicInfos }: LX.IpcRendererEventParams<LX.List.ListActionMusicUpdate>) => {
     listRevision++
+    listChangeRevision.value++
     const updatedListIds = listMusicUpdateInfo(musicInfos)
     if (updatedListIds.length) onListChanged(updatedListIds)
   }
   const list_music_update_position = ({ params: { listId, position, ids } }: LX.IpcRendererEventParams<LX.List.ListActionMusicUpdatePosition>) => {
     listRevision++
+    listChangeRevision.value++
     void listMusicUpdatePosition(listId, position, ids).then(updatedListIds => {
       if (updatedListIds.length) onListChanged(updatedListIds)
     })
   }
   const list_music_overwrite = ({ params: { listId, musicInfos } }: LX.IpcRendererEventParams<LX.List.ListActionMusicOverwrite>) => {
     listRevision++
+    listChangeRevision.value++
     const updatedListIds = listMusicOverwrite(listId, musicInfos)
     if (updatedListIds.length) onListChanged(updatedListIds)
   }
   const list_music_clear = ({ params: ids }: LX.IpcRendererEventParams<LX.List.ListActionMusicClear>) => {
     listRevision++
+    listChangeRevision.value++
     const updatedListIds = listMusicClear(ids)
     if (updatedListIds.length) onListChanged(updatedListIds)
   }

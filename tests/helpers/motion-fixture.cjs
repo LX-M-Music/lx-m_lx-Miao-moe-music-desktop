@@ -6,7 +6,7 @@ const { _electron } = require('playwright-core')
 
 const project = process.env.LX_TEST_PROJECT ? path.resolve(process.env.LX_TEST_PROJECT) : path.resolve(__dirname, '../..')
 
-async function launch({ record = false, hidden = process.env.LX_TEST_HIDDEN === '1', profilePath, initializeMotion = true, reducedMotion = 'no-preference', rendererPath = process.env.LX_TEST_RENDERER_PATH, mainPath, disableHardwareAcceleration = true, args = [] } = {}) {
+async function launch({ record = false, hidden = process.env.LX_TEST_HIDDEN === '1', profilePath, initializeMotion = true, reducedMotion = 'no-preference', rendererPath = process.env.LX_TEST_RENDERER_PATH, mainPath, disableHardwareAcceleration = true, args = [], env: extraEnv = {} } = {}) {
   if (process.env.LX_TEST_PROJECT) rendererPath = path.join(project, 'dist/index.html')
   const output = profilePath ?? await fs.mkdtemp(path.join(os.tmpdir(), 'lx-motion-check-'))
   await fs.mkdir(path.join(output, 'portable'), { recursive: true })
@@ -27,7 +27,7 @@ ${rendererPath ? `electron.app.on('web-contents-created', (_event, contents) => 
   };
 });` : ''}
 require(${JSON.stringify(mainPath ?? path.join(project, 'dist/main.js'))});`)
-  const env = { ...process.env, PORTABLE_EXECUTABLE_DIR: output }
+  const env = { ...process.env, ...extraEnv, PORTABLE_EXECUTABLE_DIR: output }
   delete env.ELECTRON_RUN_AS_NODE
   const app = await _electron.launch({
     executablePath: process.env.LX_TEST_ELECTRON ?? require(path.join(project, 'node_modules/electron')),

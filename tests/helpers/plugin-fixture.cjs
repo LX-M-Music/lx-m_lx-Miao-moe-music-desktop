@@ -2,20 +2,33 @@ const path = require('node:path')
 const { route, settled } = require('./motion-fixture.cjs')
 
 const catalogRoot = path.resolve(__dirname, '../../plugins/store')
+const pluginMirrors = [
+  'https://gh-proxy.com/',
+  'https://ghfast.top/',
+  'https://ghproxy.net/',
+]
 const mockGitHub = async(app, offline = false) => {
-  await app.evaluate(({ session, net }, { catalogRoot, offline }) => {
+  await app.evaluate(({ session, net }, { catalogRoot, offline, pluginMirrors }) => {
     const fs = process.mainModule.require('node:fs')
     const path = process.mainModule.require('node:path')
     global.__pluginOffline = offline
     global.__pluginRequests = []
+    global.__pluginMirrorRequests = []
+    global.__pluginMirrorOffline = false
     global.__pluginCatalogOverride = null
     global.__pluginPackageOverrides = {}
     const root = 'https://raw.githubusercontent.com/Miao-moe/lx-m_lx-Miao-moe-music-desktop/master/plugins/store/'
     const resolve = url => {
-      if (!url.startsWith(root)) return null
+      const mirror = pluginMirrors.find(prefix => url.startsWith(prefix))
+      const sourceUrl = mirror ? url.slice(mirror.length) : url
+      if (!sourceUrl.startsWith(root)) return null
       global.__pluginRequests.push(url)
+      if (mirror) {
+        global.__pluginMirrorRequests.push(url)
+        if (global.__pluginMirrorOffline) return { data: Buffer.from('Unavailable'), statusCode: 503 }
+      }
       if (global.__pluginOffline) return { data: Buffer.from('Unavailable'), statusCode: 503 }
-      const relative = decodeURIComponent(url.slice(root.length))
+      const relative = decodeURIComponent(sourceUrl.slice(root.length))
       if (relative === 'catalog.json' && global.__pluginCatalogOverride) return { data: Buffer.from(JSON.stringify(global.__pluginCatalogOverride)), mimeType: 'application/json' }
       if (global.__pluginPackageOverrides[relative]) return { data: Buffer.from(global.__pluginPackageOverrides[relative], 'base64'), mimeType: 'application/octet-stream' }
       const filename = path.resolve(catalogRoot, relative)
@@ -45,7 +58,7 @@ const mockGitHub = async(app, offline = false) => {
         upstream.end()
       })
     }
-  }, { catalogRoot, offline })
+  }, { catalogRoot, offline, pluginMirrors })
 }
 const openStore = async page => {
   await route(page, '/setting?name=SettingPluginStore')

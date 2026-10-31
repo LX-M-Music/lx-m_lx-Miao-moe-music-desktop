@@ -1,4 +1,14 @@
 export const OFFICIAL_PLUGIN_ROOT = 'https://raw.githubusercontent.com/Miao-moe/lx-m_lx-Miao-moe-music-desktop/master/plugins/store/'
+// GitHub accelerators that proxy raw.githubusercontent.com. Checked 2026-10-28
+// against the plugin catalog; unavailable nodes are skipped at runtime.
+export const PLUGIN_MIRROR_PREFIXES = [
+  'https://gh-proxy.com/',
+  'https://ghfast.top/',
+  'https://ghproxy.net/',
+]
+export const pluginSourceUrls = (url: string, useMirror: boolean) => {
+  return useMirror ? [...PLUGIN_MIRROR_PREFIXES.map(prefix => prefix + url), url] : [url]
+}
 export const PLUGIN_API_VERSION = 3
 export const PLUGIN_CATALOG_FILE = 'catalog.json'
 export const isPluginApiSupported = (version: number) => version === 1 || version === 2 || version === PLUGIN_API_VERSION
@@ -104,6 +114,7 @@ export const PLUGIN_IPC = {
   runtimeResult: 'optional_plugins:runtime_result',
   import: 'optional_plugins:import',
   export: 'optional_plugins:export',
+  scanDropIn: 'optional_plugins:scan_drop_in',
   progress: 'optional_plugins:progress',
   changed: 'optional_plugins:changed',
 } as const

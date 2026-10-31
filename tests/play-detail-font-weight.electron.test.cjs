@@ -164,6 +164,54 @@ test('play-detail font weight is adjustable, inherited consistently and persiste
       await settled(page)
       assert.equal(await page.locator('[data-player-detail]').evaluate(el => getComputedStyle(el).fontWeight), '600')
     })
+
+    await t.test('the mouse wheel steps the weight without scrolling the settings page', async() => {
+      await showDetail(page, false)
+      await settled(page)
+      await route(page, '/setting?name=SettingPlayDetail')
+      await page.locator('[data-setting-tab="SettingPlayDetail"]').click()
+      await update(page, { 'playDetail.style.fontWeight': 500 })
+      await page.evaluate(() => {
+        window.__wheelPrevented = []
+        window.__wheelListener = event => window.__wheelPrevented.push(event.defaultPrevented)
+        window.addEventListener('wheel', window.__wheelListener)
+      })
+      const content = page.locator('[data-setting-content]')
+      await slider().hover()
+      const scrollTop = await content.evaluate(el => el.scrollTop)
+      await page.mouse.wheel(0, 120)
+      await page.waitForFunction(() => window.lxData.appSetting['playDetail.style.fontWeight'] === 400)
+      assert.equal(await slider().getAttribute('aria-valuenow'), '400')
+      assert.equal(await content.evaluate(el => el.scrollTop), scrollTop)
+      await page.mouse.wheel(0, -120)
+      await page.waitForFunction(() => window.lxData.appSetting['playDetail.style.fontWeight'] === 500)
+      assert.equal(await slider().getAttribute('aria-valuenow'), '500')
+      assert.equal(await content.evaluate(el => el.scrollTop), scrollTop)
+      assert.deepEqual(await page.evaluate(() => window.__wheelPrevented), [true, true])
+    })
+
+    await t.test('the wheel refuses to leave the 100-900 range', async() => {
+      await page.evaluate(() => {
+        if (window.__wheelListener) window.removeEventListener('wheel', window.__wheelListener)
+        window.__wheelPrevented = []
+        window.__wheelListener = event => window.__wheelPrevented.push(event.defaultPrevented)
+        window.addEventListener('wheel', window.__wheelListener)
+      })
+      await setWeight(900)
+      await slider().hover()
+      await page.mouse.wheel(0, -120)
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      assert.equal(await slider().getAttribute('aria-valuenow'), '900')
+
+      await setWeight(100)
+      await slider().hover()
+      await page.mouse.wheel(0, 120)
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      assert.equal(await slider().getAttribute('aria-valuenow'), '100')
+      // At the bounds the wheel is not consumed, so the settings page keeps scrolling.
+      assert.deepEqual(await page.evaluate(() => window.__wheelPrevented), [false, false])
+    })
+
     assert.deepEqual(fixture.errors, [])
     await fs.writeFile(path.join(output, 'result.json'), JSON.stringify({ electron: await app.evaluate(() => process.versions.electron), profilePath, completed: true, errors: fixture.errors }, null, 2))
   } finally {

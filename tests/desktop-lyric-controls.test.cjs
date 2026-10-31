@@ -21,6 +21,13 @@ test('native single-line mode defaults off and persists independently of retired
   assert(!Object.hasOwn(defaults, 'miniPlayer.isSingleLine'))
 })
 
+test('desktop lyric background opacity defaults to 20 and reaches the lyric window', () => {
+  const defaults = load()('src/common/defaultSetting.ts').default
+  const { buildLyricConfig } = load()('src/main/modules/winLyric/utils.ts')
+  assert.equal(defaults['desktopLyric.backgroundOpacity'], 20)
+  assert.equal(buildLyricConfig({ 'desktopLyric.backgroundOpacity': 45 })['desktopLyric.backgroundOpacity'], 45)
+})
+
 test('toolbar availability follows incoming lyrics and unavailable translations cannot change preferences', () => {
   const { lyric, lyrics } = loader({ '@common/utils/vueTools': vue })('src/renderer-lyric/store/lyric.ts')
   const setting = vue.shallowReactive({ 'player.isShowLyricTranslation': false, 'player.isShowLyricRoma': false, 'desktopLyric.isSingleLine': false })

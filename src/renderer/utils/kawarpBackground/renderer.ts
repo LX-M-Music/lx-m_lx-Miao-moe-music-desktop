@@ -1,12 +1,10 @@
 import { quadVertex, blurFragment, flowVertex, flowFragment } from './shaders'
 
-interface Surface { texture: WebGLTexture, framebuffer: WebGLFramebuffer }
+interface Surface { texture: WebGLTexture, framebuffer: WebGLFramebuffer, size: number }
+interface Chain { levels: Surface[], scratch: Surface[] }
 
-// The artwork is already blurred at 128px. Its low-frequency flow only needs a
-// vertex grid, rather than four noise evaluations for every output pixel.
-// Gentle uses a smaller grid for its smaller surface. Both retain the same
-// equations and clock, with no full-size intermediate texture.
-const BLUR_SIZE = 128
+const SOURCE_SIZE = 256
+const LAYER_SIZES = [128, 64, 32]
 
 export const createKawarpRenderer = (canvas: HTMLCanvasElement) => {
   const gl = canvas.getContext('webgl', { alpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true, powerPreference: 'low-power' })
@@ -46,8 +44,11 @@ export const createKawarpRenderer = (canvas: HTMLCanvasElement) => {
       const uniforms = Object.fromEntries(names.map(name => [name, gl.getUniformLocation(result, name)]))
       return { result, uniforms }
     }
-    const blur = program(quadVertex, blurFragment, ['u_texture', 'u_offset'])
-    const flow = program(flowVertex, flowFragment, ['u_from', 'u_to', 'u_mix', 'u_time', 'u_resolution', 'u_shade'])
+    const blur = program(quadVertex, blurFragment, ['u_texture', 'u_offset', 'u_sourceSize'])
+    const flow = program(flowVertex, flowFragment, [
+      'u_to0', 'u_to1', 'u_to2', 'u_from0', 'u_from1', 'u_from2',
+      'u_mix', 'u_time', 'u_resolution', 'u_shade',
+    ])
     const buffer = (data: Float32Array | Uint16Array, target: number = gl.ARRAY_BUFFER) => {
       const result = gl.createBuffer()
       if (!result) throw new Error('Background buffer unavailable')
@@ -74,7 +75,7 @@ export const createKawarpRenderer = (canvas: HTMLCanvasElement) => {
       }
       return { vertices: buffer(vertices), elements: buffer(indices, gl.ELEMENT_ARRAY_BUFFER), count: indices.length }
     }
-    const fullMesh = grid(64)
+    const fullMesh = grid(48)
     const gentleMesh = grid(32)
     const texture = () => {
       const result = gl.createTexture()
@@ -87,28 +88,24 @@ export const createKawarpRenderer = (canvas: HTMLCanvasElement) => {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
       return result
     }
-    const half = gl.getExtension('OES_texture_half_float')
-    const linear = gl.getExtension('OES_texture_half_float_linear')
-    if (half) gl.getExtension('EXT_color_buffer_half_float')
-    const surface = (): Surface => {
+    const surface = (size: number): Surface => {
       const image = texture()
       const framebuffer = gl.createFramebuffer()
       if (!framebuffer) throw new Error('Background framebuffer unavailable')
       framebuffers.push(framebuffer)
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, BLUR_SIZE, BLUR_SIZE, 0, gl.RGBA, half && linear ? half.HALF_FLOAT_OES : gl.UNSIGNED_BYTE, null)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, image, 0)
-      // Some drivers expose half-float sampling without renderable half-floats.
-      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, BLUR_SIZE, BLUR_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
-        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('Background framebuffer incomplete')
-      }
-      return { texture: image, framebuffer }
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('Background framebuffer incomplete')
+      return { texture: image, framebuffer, size }
     }
+    const chain = (): Chain => ({
+      levels: LAYER_SIZES.map(surface),
+      scratch: LAYER_SIZES.map(surface),
+    })
     const source = texture()
-    const scratch = [surface(), surface()]
-    let from = surface()
-    let to = surface()
+    const from = chain()
+    const to = chain()
     let hasImage = false
     let start = 0
     let duration = 1
@@ -122,34 +119,50 @@ export const createKawarpRenderer = (canvas: HTMLCanvasElement) => {
       gl.enableVertexAttribArray(0)
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
     }
-    const upload = (image: HTMLCanvasElement, target: Surface) => {
-      gl.activeTexture(gl.TEXTURE0)
-      gl.bindTexture(gl.TEXTURE_2D, source)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
+    const pass = (input: WebGLTexture, output: Surface, sourceSize: number, offset: number) => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, output.framebuffer)
+      gl.viewport(0, 0, output.size, output.size)
       gl.useProgram(blur.result)
       geometry(quad)
-      gl.viewport(0, 0, BLUR_SIZE, BLUR_SIZE)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, input)
       gl.uniform1i(blur.uniforms.u_texture, 0)
-      const pass = (input: WebGLTexture, output: Surface, offset: number) => {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, output.framebuffer)
-        gl.bindTexture(gl.TEXTURE_2D, input)
-        gl.uniform1f(blur.uniforms.u_offset, offset)
-        gl.drawArrays(gl.TRIANGLES, 0, 6)
+      gl.uniform1f(blur.uniforms.u_offset, offset)
+      gl.uniform2f(blur.uniforms.u_sourceSize, sourceSize, sourceSize)
+      gl.drawArrays(gl.TRIANGLES, 0, 6)
+    }
+    const build = (target: Chain, image: HTMLCanvasElement, upload: boolean) => {
+      if (upload) {
+        gl.activeTexture(gl.TEXTURE0)
+        gl.bindTexture(gl.TEXTURE_2D, source)
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image)
       }
-      // Match Kawarp's downsample, eight blur passes and final copy exactly.
-      pass(source, scratch[0], 0)
-      for (let i = 0; i < 8; i++) pass(scratch[i % 2].texture, scratch[(i + 1) % 2], i + 0.5)
-      pass(scratch[0].texture, target, 0)
+      // 256 -> 128, then two blur passes; 128 -> 64 and 64 -> 32 each drop one
+      // octave. Every pass is a 4-tap box at its input resolution, so the whole
+      // chain costs a handful of tiny draws once per cover.
+      const [base, mid, detail] = target.levels
+      const [scratchBase, scratchMid, scratchDetail] = target.scratch
+      pass(source, base, SOURCE_SIZE, 1)
+      pass(base.texture, scratchBase, base.size, 1)
+      pass(scratchBase.texture, base, base.size, 1)
+      pass(base.texture, mid, base.size, 1)
+      pass(mid.texture, scratchMid, mid.size, 1)
+      pass(scratchMid.texture, mid, mid.size, 1)
+      pass(mid.texture, detail, mid.size, 1)
+      pass(detail.texture, scratchDetail, detail.size, 1)
+      pass(scratchDetail.texture, detail, detail.size, 1)
+    }
+    const renderTexture = (unit: number, value: WebGLTexture) => {
+      gl.activeTexture(gl.TEXTURE0 + unit)
+      gl.bindTexture(gl.TEXTURE_2D, value)
+      gl.uniform1i(flow.uniforms[['u_to0', 'u_to1', 'u_to2', 'u_from0', 'u_from1', 'u_from2'][unit]], unit)
     }
     return {
       setSource(image: HTMLCanvasElement, milliseconds: number, previous?: HTMLCanvasElement) {
         if (disposed || gl.isContextLost()) return
-        const swap = from
-        from = to
-        to = swap
-        if (previous) upload(previous, from)
-        else if (!hasImage) upload(image, from)
-        upload(image, to)
+        build(to, image, true)
+        if (previous) build(from, previous, true)
+        else if (!hasImage) build(from, image, true)
         duration = hasImage || previous ? Math.max(1, milliseconds) : 1
         start = performance.now()
         hasImage = true
@@ -172,12 +185,12 @@ export const createKawarpRenderer = (canvas: HTMLCanvasElement) => {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.elements)
         gl.bindFramebuffer(gl.FRAMEBUFFER, null)
         gl.viewport(0, 0, width, height)
-        gl.activeTexture(gl.TEXTURE0)
-        gl.bindTexture(gl.TEXTURE_2D, from.texture)
-        gl.activeTexture(gl.TEXTURE1)
-        gl.bindTexture(gl.TEXTURE_2D, to.texture)
-        gl.uniform1i(flow.uniforms.u_from, 0)
-        gl.uniform1i(flow.uniforms.u_to, 1)
+        renderTexture(0, to.levels[0].texture)
+        renderTexture(1, to.levels[1].texture)
+        renderTexture(2, to.levels[2].texture)
+        renderTexture(3, from.levels[0].texture)
+        renderTexture(4, from.levels[1].texture)
+        renderTexture(5, from.levels[2].texture)
         const progress = Math.min(1, Math.max(0, (performance.now() - start) / duration))
         gl.uniform1f(flow.uniforms.u_mix, 0.5 - 0.5 * Math.cos(progress * Math.PI))
         gl.uniform1f(flow.uniforms.u_time, time)

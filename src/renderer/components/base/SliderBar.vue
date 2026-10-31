@@ -3,6 +3,7 @@
     :class="[$style.sliderContent, { [$style.disabled]: disabled }, className]" role="slider" :tabindex="disabled ? -1 : 0"
     :aria-valuemin="min" :aria-valuemax="max" :aria-valuenow="value" :aria-disabled="disabled"
     @keydown.left.down.prevent="handleKeyStep(-1)" @keydown.right.up.prevent="handleKeyStep(1)"
+    @wheel="handleWheel"
   >
     <div :class="[$style.slider]">
       <div ref="dom_sliderBar" :class="$style.sliderBar" :style="{ transform: `scaleX(${(value - min) / (max - min) || 0})` }" />
@@ -41,6 +42,14 @@ export default {
       type: Boolean,
       default: false,
     },
+    wheel: {
+      type: Boolean,
+      default: false,
+    },
+    wheelStep: {
+      type: Number,
+      default: 0,
+    },
   },
   emits: ['change'],
   setup(props, { emit }) {
@@ -48,6 +57,11 @@ export default {
       isMsDown: false,
       msDownX: 0,
       msDownRatio: 0,
+    }
+    const wheelEvent = {
+      delta: 0,
+      direction: 0,
+      time: 0,
     }
     const dom_sliderBar = ref(null)
 
@@ -98,6 +112,30 @@ export default {
       emitSteppedValue(props.value + props.step * direction)
     }
 
+    const WHEEL_STEP_DELTA = 50
+    const WHEEL_GESTURE_TIMEOUT = 250
+    const handleWheel = event => {
+      if (!props.wheel || props.disabled) return
+      if (!event.deltaY) return
+
+      const direction = event.deltaY < 0 ? 1 : -1
+      const step = props.wheelStep > 0 ? props.wheelStep : props.step
+      const nextValue = getSteppedValue(props.value + step * direction)
+      // Leave the page scrollable once the slider cannot move any further.
+      if (nextValue === props.value) return
+      event.preventDefault()
+
+      const now = Date.now()
+      if (direction !== wheelEvent.direction || now - wheelEvent.time > WHEEL_GESTURE_TIMEOUT) wheelEvent.delta = 0
+      wheelEvent.direction = direction
+      wheelEvent.time = now
+      wheelEvent.delta += Math.abs(event.deltaY)
+      // High-resolution trackpads send small deltas, so accumulate them into one step.
+      if (wheelEvent.delta < WHEEL_STEP_DELTA) return
+      wheelEvent.delta = 0
+      emit('change', nextValue)
+    }
+
     document.addEventListener('mousemove', handleSliderMsMove)
     document.addEventListener('mouseup', handleSliderMsUp)
     onBeforeUnmount(() => {
@@ -108,6 +146,7 @@ export default {
     return {
       handleSliderMsDown,
       handleKeyStep,
+      handleWheel,
       dom_sliderBar,
     }
   },
