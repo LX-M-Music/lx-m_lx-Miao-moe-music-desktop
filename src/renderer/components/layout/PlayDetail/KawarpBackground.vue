@@ -83,6 +83,12 @@ const updateSources = () => {
   preview.value = (current.done ? current.to : current.to ?? current.from)?.preview ?? ''
   previousPreview.value = !current.done && current.from && current.to && current.from !== current.to ? current.from.preview : ''
 }
+// Keep the detail palette fixed while the page is flying out. Sampling the
+// moving overlay would otherwise recolor icons that are still visible.
+const updateAdaptive = (current: ReturnType<typeof transition.frame>, canvas: HTMLCanvasElement | null, moving = false) => {
+  if (props.detailVisible && !props.detail) return
+  adaptiveColors?.update(current, canvas, moving)
+}
 const paintOpacity = (current: ReturnType<typeof transition.frame>) => {
   const opacity = String(current.opacity)
   const previousOpacity = String(1 - current.mix)
@@ -106,7 +112,7 @@ const step = (now: number) => {
   paintOpacity(current)
   // Always sample the final frame before pausing, including static-quality covers.
   if (!playing && velocity <= 0.005 && current.done) adaptiveColors?.invalidate()
-  adaptiveColors?.update(current, backend.value != 'fallback' ? canvas.value : null, playing || velocity > 0.005 || !current.done)
+  updateAdaptive(current, backend.value != 'fallback' ? canvas.value : null, playing || velocity > 0.005 || !current.done)
   if (current.done) {
     transition.finish()
     updateSources()
@@ -152,7 +158,7 @@ function refresh() {
     velocity = 0
     transition.finish()
     paintOpacity(transition.frame())
-    adaptiveColors?.update(transition.frame(), null)
+    updateAdaptive(transition.frame(), null)
     state.value = 'static'
     return
   }

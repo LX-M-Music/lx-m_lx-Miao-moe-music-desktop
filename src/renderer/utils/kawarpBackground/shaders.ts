@@ -90,9 +90,9 @@ export const flowVertex = `
     gl_Position = vec4(a_uv * 2.0 - 1.0, 0.0, 1.0);
     v_uv = a_uv;
     // Large blobs move least, the detail layer flows a little faster.
-    v_warp0 = warp(a_uv, 0.85, 0.045, 0.0, 0.020);
-    v_warp1 = warp(a_uv, 1.45, 0.070, 17.0, 0.014);
-    v_warp2 = warp(a_uv, 2.35, 0.100, 41.0, 0.007);
+    v_warp0 = warp(a_uv, 0.85, 0.070, 0.0, 0.024);
+    v_warp1 = warp(a_uv, 1.45, 0.105, 17.0, 0.017);
+    v_warp2 = warp(a_uv, 2.35, 0.150, 41.0, 0.009);
   }
 `
 
