@@ -267,23 +267,22 @@ export default {
 // covers the detail that survives the blur.
 .lyric {
   position: relative;
+  // Keep a local stacking context for the scrim, but never position the lyric
+  // rows themselves: their offsetTop must stay relative to this scroll
+  // container or the centered scroll target loses the leading spacer.
+  isolation: isolate;
 
   &::before {
     content: '';
     position: absolute;
     inset: 10% 2%;
-    z-index: 0;
+    z-index: -1;
     border-radius: 32px;
     background-color: var(--color-content-background);
     opacity: .78;
     -webkit-mask-image: radial-gradient(ellipse closest-side at center, #000 70%, transparent 100%);
     mask-image: radial-gradient(ellipse closest-side at center, #000 70%, transparent 100%);
     pointer-events: none;
-  }
-
-  > * {
-    position: relative;
-    z-index: 1;
   }
 }
 .lyric {
