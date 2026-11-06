@@ -9,6 +9,7 @@ import {
 import { overwriteListPosition, overwriteListUpdateInfo, removeListPosition, removeListUpdateInfo } from '@renderer/utils/data'
 import { LIST_IDS } from '@common/constants'
 import { arrPush, arrUnshift } from '@common/utils/common'
+import { pruneSmartPlaylistState, removeSmartPlaylistState } from '@renderer/store/list/smartPlaylist'
 
 export const setUserLists = (lists: LX.List.UserListInfo[]) => {
   userLists.splice(0, userLists.length, ...lists)
@@ -124,6 +125,7 @@ export const listDataOverwrite = ({ defaultList, loveList, userList, tempList }:
     updatedListIds.push(list.id)
   }
   overwriteUserList(newUserListInfos)
+  pruneSmartPlaylistState(newUserListInfos.map(list => list.id))
 
   if (allMusicList.has(LIST_IDS.DEFAULT)) {
     overwriteMusicList(LIST_IDS.DEFAULT, defaultList)
@@ -173,6 +175,7 @@ export const userListsRemove = (ids: string[]) => {
     removeMusicList(id)
     changedIds.push(id)
   }
+  removeSmartPlaylistState(ids)
 
   return changedIds
 }

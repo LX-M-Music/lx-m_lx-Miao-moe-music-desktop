@@ -1,5 +1,6 @@
 import { mainHandle } from '@common/mainIpc'
 import { PLAYER_EVENT_NAME } from '@common/ipcNames'
+import type { SmartPlaylistRule } from '@common/smartPlaylist'
 
 // 列表操作事件（公共，只注册一次）
 export default () => {
@@ -56,5 +57,26 @@ export default () => {
   })
   mainHandle<string, string[]>(PLAYER_EVENT_NAME.list_music_get_list_ids, async({ params: musicInfoId }) => {
     return global.lx.worker.dbService.getMusicExistListIds(musicInfoId)
+  })
+  // Smart playlist rules are validated/normalized again in the worker; the IPC
+  // policy only guarantees the transport shape.
+  mainHandle<Record<string, SmartPlaylistRule>>(PLAYER_EVENT_NAME.list_smart_get, async() => {
+    return global.lx.worker.dbService.getSmartPlaylistRules()
+  })
+  mainHandle<{ listId: string, rule: SmartPlaylistRule }, SmartPlaylistRule>(PLAYER_EVENT_NAME.list_smart_save, async({ params }) => {
+    return global.lx.worker.dbService.saveSmartPlaylistRule(params.listId, params.rule)
+  })
+  // The editor only shows a match count; returning the songs themselves would
+  // serialize the whole library across IPC on every keystroke.
+  mainHandle<{ rule: SmartPlaylistRule, listId?: string }, { count: number }>(PLAYER_EVENT_NAME.list_smart_evaluate, async({ params }) => {
+    const songs = await global.lx.worker.dbService.getSmartPlaylistPreview(params.rule, params.listId)
+    return { count: songs.length }
+  })
+  mainHandle<{ listId: string }, { count: number }>(PLAYER_EVENT_NAME.list_smart_refresh, async({ params }) => {
+    const songs = await global.lx.worker.dbService.getSmartPlaylistSongs(params.listId)
+    // Reuse the normal overwrite event so worker cache, renderer caches and sync
+    // observers all see the refreshed playlist through the existing channel.
+    await global.lx.event_list.list_music_overwrite(params.listId, songs, false)
+    return { count: songs.length }
   })
 }

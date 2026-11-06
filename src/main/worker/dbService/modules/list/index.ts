@@ -2,6 +2,7 @@ import { LIST_IDS } from '@common/constants'
 import { BoundedMap } from '@common/utils/boundedMap'
 import { arrPush, arrPushByPosition, arrUnshift } from '@common/utils/common'
 import { archiveListDeletion, restoreListTrashData } from './recycleBin'
+import { applySmartPlaylistRuleRows, readSmartPlaylistRuleRows } from './smartPlaylist'
 import {
   deleteUserLists,
   insertUserLists,
@@ -377,6 +378,9 @@ export const listDataOverwrite = (myListData: MakeOptional<LX.List.ListDataFull,
     ...myListData,
     tempList: myListData.tempList ?? getListMusics(LIST_IDS.TEMP),
   }
+  // A full overwrite (backup restore, sync) clears my_list. Keep local smart
+  // playlist rules for lists that still exist so they are not silently lost.
+  const smartRules = readSmartPlaylistRuleRows()
 
   const dbMusicInfos: LX.DBService.MusicInfo[] = [
     ...toDBMusicInfo(listData.defaultList, LIST_IDS.DEFAULT),
@@ -388,6 +392,7 @@ export const listDataOverwrite = (myListData: MakeOptional<LX.List.ListDataFull,
     arrPush(dbMusicInfos, toDBMusicInfo(list, listInfo.id))
   })
   overwriteListData(dbLists, dbMusicInfos)
+  applySmartPlaylistRuleRows(smartRules, new Set(dbLists.map(list => list.id)))
 
   if (userLists) userLists.splice(0, userLists.length, ...dbLists)
   else userLists = dbLists
@@ -421,3 +426,11 @@ export const getMusicExistListIds = (musicInfoId: string): string[] => {
   const musicInfos = queryMusicInfoByMusicInfoId(musicInfoId)
   return musicInfos.map(m => m.listId)
 }
+
+export {
+  getSmartPlaylistRules,
+  getSmartPlaylistRule,
+  saveSmartPlaylistRule,
+  getSmartPlaylistPreview,
+  getSmartPlaylistSongs,
+} from './smartPlaylist'

@@ -20,7 +20,7 @@ try {
     assert.equal(db.prepare('SELECT text FROM lyric').get().text, 'keep')
     assert.equal(JSON.parse(db.prepare('SELECT summary FROM list_trash').get().summary).count, 1)
     load('src/main/worker/dbService/migrate.ts').default(db)
-    assert.equal(db.prepare('SELECT field_value FROM db_info').get().field_value, '7')
+    assert.equal(db.prepare('SELECT field_value FROM db_info').get().field_value, '8')
   } else {
     db.exec([...tables.default.values()].join('\n'))
     const library = load('src/main/worker/dbService/library.ts')

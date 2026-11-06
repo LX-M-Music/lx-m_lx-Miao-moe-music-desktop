@@ -31,7 +31,7 @@ test('same singer, same duration or a shared feature artist cannot make a differ
 })
 
 test('normalization allows punctuation, fullwidth characters and featured singers without losing version labels', () => {
-  const target = song('one', 'wy', 'Ａ Song!', 'Artist A、Artist B', '03:20')
+  const target = song('one', 'wy', '�?Song!', 'Artist A、Artist B', '03:20')
   assert(musicMatchScore(target, song('two', 'kg', 'a song (feat. Artist B)', 'Artist A', '03:24')) > 0)
   assert(musicMatchScore(target, song('three', 'tx', 'A SONG', 'Artist B & Artist A', '03:20')) > 0)
   assert.equal(musicMatchScore(target, song('four', 'kg', 'A song (Instrumental)', 'Artist A', '03:20')), 0)
@@ -213,7 +213,7 @@ function replacementFixture(initial, fail = false) {
   const calls = []
   const load = require('./helpers/load-typescript.cjs')({
     '../recycleBin': { deleteWithUndo: task => task() },
-    '@common/utils/vueTools': { toRaw: require('vue').toRaw },
+    '@common/utils/vueTools': { toRaw: require('vue').toRaw, ref: require('vue').ref },
     '@common/rendererIpc': {
       rendererInvoke: async(channel, data) => {
         calls.push(channel)

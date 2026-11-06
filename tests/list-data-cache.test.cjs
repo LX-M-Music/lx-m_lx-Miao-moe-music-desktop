@@ -23,7 +23,7 @@ function fixture(read) {
     listMusicAdd: (id, songs) => { if (cache.has(id)) cache.get(id).push(...songs); return [id] },
   }
   const modules = {
-    '@common/utils/vueTools': { toRaw: value => value },
+    '@common/utils/vueTools': { toRaw: value => value, ref: value => ({ value }) },
     '@common/rendererIpc': { rendererInvoke: (_channel, id) => read(id), rendererOn: (name, fn) => listeners.set(name, fn), rendererOff: () => {} },
     '@common/ipcNames': { PLAYER_EVENT_NAME: new Proxy({}, { get: (_target, key) => key }) },
     './action': actions,

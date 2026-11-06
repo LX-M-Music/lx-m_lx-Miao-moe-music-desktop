@@ -64,6 +64,18 @@ const ensureQueryIndexes = (db: Database.Database) => {
   }
 }
 
+// v8 adds smart playlist rules to user playlists. Rebuild the table from the
+// canonical schema so verifyDB compares equal to a freshly created database.
+const migrateSmartRule = (db: Database.Database) => {
+  const columns = db.prepare('PRAGMA main.table_info(my_list)').all() as Array<{ name: string }>
+  if (columns.some(column => column.name === 'smart_rule')) return
+  db.exec('DROP INDEX IF EXISTS "main"."index_my_list_position"')
+  db.exec('ALTER TABLE "main"."my_list" RENAME TO "my_list_v7"')
+  db.exec(tables.get('my_list')!)
+  db.exec('INSERT INTO "main"."my_list" ("id", "name", "source", "sourceListId", "position", "locationUpdateTime") SELECT "id", "name", "source", "sourceListId", "position", "locationUpdateTime" FROM "main"."my_list_v7"')
+  db.exec('DROP TABLE "main"."my_list_v7"')
+}
+
 export default (db: Database.Database) => {
   // PRAGMA user_version = x
   // console.log(db.prepare('PRAGMA user_version').get().user_version)
@@ -75,7 +87,7 @@ export default (db: Database.Database) => {
     ensureQueryIndexes(db)
     return
   }
-  if (!['1', '2', '3', '4', '5', '6'].includes(version ?? '')) return
+  if (!['1', '2', '3', '4', '5', '6', '7'].includes(version ?? '')) return
 
   db.transaction(() => {
     if (version == '1') migrateV1(db)
@@ -112,6 +124,7 @@ export default (db: Database.Database) => {
         } catch { updateSummary.run(JSON.stringify({ kind: 'songs', listId: '', listName: '损坏的快照', songName: '', count: 0 }), row.id) }
       }
     }
+    if (Number(version) < 8) migrateSmartRule(db)
     ensureQueryIndexes(db)
     for (const [name, sql] of libraryTables) if (!db.prepare('SELECT 1 FROM sqlite_master WHERE name=?').get(name)) db.exec(sql)
     // Older imports have no trustworthy addition date. Zero means unknown.

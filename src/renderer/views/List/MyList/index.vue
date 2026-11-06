@@ -8,6 +8,11 @@
             <path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 10v7m4-7v7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </button>
+        <button :class="$style.listsAdd" :aria-label="$t('smart_playlist__create')" :title="$t('smart_playlist__create')" data-smart-playlist-create @click="isShowSmartPlaylistModal = true">
+          <svg height="70%" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 5h18l-7 8v6l-4 2v-8L3 5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+          </svg>
+        </button>
         <button :class="$style.listsAdd" :aria-label="$t('lists__new_list_btn')" @click="isShowNewList = true">
           <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink" height="70%" viewBox="0 0 24 24" space="preserve">
             <use xlink:href="#icon-list-add" />
@@ -87,6 +92,7 @@
       </template>
     </ul>
     <base-menu v-model="isShowMenu" :menus="menus" :xy="menuLocation" item-name="name" @menu-click="handleMenuClick" />
+    <SmartPlaylistModal v-model:visible="isShowSmartPlaylistModal" @saved="handleSmartPlaylistSaved" />
     <DuplicateMusicModal v-model:visible="isShowDuplicateMusicModal" :list-info="duplicateListInfo" />
     <ListSortModal v-model:visible="isShowListSortModal" :list-info="sortListInfo" />
     <ListUpdateModal v-model:visible="isShowListUpdateModal" />
@@ -104,6 +110,7 @@ import ListSortModal from './components/ListSortModal.vue'
 import ListUpdateModal from './components/ListUpdateModal.vue'
 import RecycleBinModal from './components/RecycleBinModal.vue'
 import PlaylistTagsModal from './components/PlaylistTagsModal.vue'
+import SmartPlaylistModal from './components/SmartPlaylistModal.vue'
 
 import { defaultList, loveList, userLists, fetchingListStatus } from '@renderer/store/list/state'
 import { removeUserList } from '@renderer/store/list/action'
@@ -137,6 +144,7 @@ export default {
     DuplicateMusicModal,
     ListSortModal,
     ListUpdateModal,
+    SmartPlaylistModal,
   },
   props: {
     listId: {
@@ -234,6 +242,10 @@ export default {
       }).catch(_ => _)
     }
 
+    const handleSmartPlaylistSaved = (id) => {
+      handleListToggle(id)
+    }
+
     const handleMenuClick = (action) => {
       if (rightClickItemIndex.value < -2) return
       let index = rightClickItemIndex.value
@@ -261,6 +273,7 @@ export default {
 
     return {
       isShowRecycleBin: ref(false),
+      isShowSmartPlaylistModal: ref(false),
       isShowTagsModal,
       tagsListInfo,
       rightClickItemIndex,
@@ -288,6 +301,7 @@ export default {
       menus,
       menuLocation,
       handleListToggle,
+      handleSmartPlaylistSaved,
       isModDown,
       isDragging,
       hideMenu: handleMenuClick,

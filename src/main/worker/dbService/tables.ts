@@ -145,6 +145,7 @@ tables.set('my_list', `
     "sourceListId" TEXT,
     "position" INTEGER NOT NULL,
     "locationUpdateTime" INTEGER,
+    "smart_rule" TEXT,
     PRIMARY KEY("id")
   );
 `)
@@ -276,4 +277,4 @@ export const QUERY_INDEXES = {
 for (const [name, columns] of Object.entries(QUERY_INDEXES)) tables.set(name as Tables, `CREATE INDEX "${name}" ON ${columns};`)
 
 for (const [name, sql] of libraryTables) tables.set(name, sql)
-export const DB_VERSION = '7'
+export const DB_VERSION = '8'

@@ -38,7 +38,7 @@ test('playlist recycle bin persists, restores safely, expires and supports undo 
       fixture = await launch({ profilePath, rendererPath: path.resolve('dist/index.html') })
       fixture.page.setDefaultTimeout(7000)
       assert.deepEqual(ids(await readSongs(fixture.page)), ids(songs))
-      assert.equal((await db(fixture.app, "SELECT field_value FROM db_info WHERE field_name = 'version'", [], true))[0].field_value, '7')
+      assert.equal((await db(fixture.app, "SELECT field_value FROM db_info WHERE field_name = 'version'", [], true))[0].field_value, '8')
       assert.equal((await db(fixture.app, 'SELECT id FROM music_url WHERE id = ?', ['migration-song'], true)).length, 1)
       assert.deepEqual(await invoke(fixture.page, 'list_trash_get'), [])
     })

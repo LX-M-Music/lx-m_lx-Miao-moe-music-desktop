@@ -1,5 +1,13 @@
 <template>
   <common-list-loading :load-key="list" :loading="isLoading" :class="$style.list" :style="columnLayout.style" :data-list-filtered="isSearching || undefined">
+    <div v-if="smartRule" :class="$style.smartBar" data-smart-playlist-bar>
+      <span :class="$style.smartHint">{{ $t('smart_playlist__bar_hint', { count: list.length }) }}</span>
+      <button type="button" :class="$style.smartBtn" :disabled="isSmartRefreshing" data-smart-playlist-refresh @click="handleSmartRefresh">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use xlink:href="#icon-refresh" /></svg>
+        {{ $t('smart_playlist__refresh') }}
+      </button>
+      <button type="button" :class="$style.smartBtn" data-smart-playlist-edit @click="isShowSmartPlaylistModal = true">{{ $t('smart_playlist__edit') }}</button>
+    </div>
     <SearchBar v-if="appSetting['list.isShowSearchBar']" ref="searchRef" v-model="searchQuery" v-model:field="searchField" />
     <common-music-list-header :layout="columnLayout" />
     <div v-show="visibleList.length" ref="dom_listContent" :class="$style.content">
@@ -131,12 +139,13 @@
     <common-download-multiple-modal v-model:show="isShowDownloadMultiple" :list="selectedList" teleport="#view" :list-id="listId" @confirm="removeAllSelect" />
     <music-toggle-modal v-model:show="isShowMusicToggleModal" :music-info="selectedToggleMusicInfo" :preferred-source="selectedToggleSource" @toggle="toggleSource" />
     <AudioTagEditorModal :after-save="handleTagsSaved" />
+    <SmartPlaylistModal v-model:visible="isShowSmartPlaylistModal" :list-info="smartPlaylistInfo" />
     <base-menu v-model="isShowItemMenu" :menus="menus" :xy="menuLocation" item-name="name" @menu-click="handleMenuClick" />
   </common-list-loading>
 </template>
 
 <script>
-import { computed, reactive, watch, nextTick } from '@common/utils/vueTools'
+import { computed, reactive, ref, watch, nextTick } from '@common/utils/vueTools'
 import { clipboardWriteText } from '@common/utils/electron'
 import { assertApiSupport } from '@renderer/store/utils'
 import { getCoverKey } from '@renderer/utils/musicCover'
@@ -152,10 +161,13 @@ import useSongDrag from './useSongDrag'
 import useMusicActions from './useMusicActions'
 import useMusicTagEditor from './useMusicTagEditor'
 import AudioTagEditorModal from '@renderer/components/common/AudioTagEditorModal.vue'
+import SmartPlaylistModal from '../MyList/components/SmartPlaylistModal.vue'
 import useSearch from './useSearch'
 import useListScroll from './useListScroll'
 import useMusicToggle from './useMusicToggle'
 import { appSetting } from '@renderer/store/setting'
+import { userLists } from '@renderer/store/list/state'
+import { getSmartPlaylistRule, refreshSmartPlaylist, removeSmartPlaylistState } from '@renderer/store/list/smartPlaylist'
 import useMusicListColumns from '@renderer/utils/compositions/useMusicListColumns'
 import useEntityDetailNavigation from '@renderer/utils/compositions/useEntityDetailNavigation'
 export default {
@@ -164,6 +176,7 @@ export default {
     SearchBar,
     MusicToggleModal,
     AudioTagEditorModal,
+    SmartPlaylistModal,
   },
   props: {
     listId: {
@@ -176,6 +189,43 @@ export default {
     const actionButtonsVisible = computed(() => appSetting['list.actionButtonsVisible'])
     const columnLayout = useMusicListColumns('music', actionButtonsVisible)
     const { canOpenEntity, getSingerNames, openEntityDetail } = useEntityDetailNavigation()
+
+    const smartRule = computed(() => getSmartPlaylistRule(props.listId))
+    const smartPlaylistInfo = computed(() => smartRule.value
+      ? { id: props.listId, name: userLists.find(list => list.id === props.listId)?.name ?? smartRule.value.name }
+      : null)
+    const isShowSmartPlaylistModal = ref(false)
+    const isSmartRefreshing = ref(false)
+    let smartRefreshedListId = ''
+    const refreshSmart = async(id) => {
+      isSmartRefreshing.value = true
+      try {
+        await refreshSmartPlaylist(id)
+      } catch (error) {
+        if (error?.code === 'SMART_PLAYLIST_NOT_FOUND') removeSmartPlaylistState([id])
+        console.warn('[smartPlaylist] refresh failed', error)
+      } finally {
+        isSmartRefreshing.value = false
+      }
+    }
+    const handleSmartRefresh = async() => {
+      if (isSmartRefreshing.value) return
+      await refreshSmart(props.listId)
+    }
+    // Refresh once when a smart playlist is opened, including the case where the
+    // local rule map finishes loading after this view mounted. Saving a rule from
+    // the editor already refreshes explicitly, so that does not refresh twice.
+    watch(() => props.listId, id => {
+      smartRefreshedListId = ''
+      if (!smartRule.value) return
+      smartRefreshedListId = id
+      void refreshSmart(id)
+    }, { immediate: true })
+    watch(smartRule, rule => {
+      if (!rule || smartRefreshedListId === props.listId) return
+      smartRefreshedListId = props.listId
+      void refreshSmart(props.listId)
+    })
 
     let scrollIndex = null
     let isAnimation = false
@@ -437,6 +487,12 @@ export default {
       canOpenEntity,
       getSingerNames,
       openEntityDetail,
+
+      smartRule,
+      smartPlaylistInfo,
+      isShowSmartPlaylistModal,
+      isSmartRefreshing,
+      handleSmartRefresh,
     }
   },
 }
@@ -468,6 +524,41 @@ export default {
       display: inline-block;
     }
   }
+}
+.smartBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+}
+.smartHint {
+  flex: auto;
+  min-width: 0;
+  color: var(--color-font-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.smartBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-button-background);
+  color: var(--color-button-font);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+  svg { width: 14px; height: 14px; }
+  &:hover { background-color: var(--color-button-background-hover); }
+  &:disabled { opacity: .5; cursor: default; }
+  &:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 }
 .num {
   cursor: grab;

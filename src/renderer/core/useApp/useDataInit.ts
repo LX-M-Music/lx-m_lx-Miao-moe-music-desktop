@@ -3,6 +3,7 @@ import { getPlayInfo } from '@renderer/utils/ipc'
 import music from '@renderer/utils/musicSdk'
 import { log } from '@common/utils'
 import { getListMusics, getUserLists, registerAction } from '@renderer/store/list/action'
+import { loadSmartPlaylists } from '@renderer/store/list/smartPlaylist'
 
 
 import useInitUserApi from './useInitUserApi'
@@ -60,6 +61,8 @@ export default () => {
     // Local playlists can render while custom APIs are still initializing.
     const initLocalLists = async() => {
       window.lxData.userLists = await getUserLists()
+      // Smart-playlist rules are local-only metadata; a failure must not block startup.
+      try { await loadSmartPlaylists() } catch (error) { log.error(error) }
       await initPlaylistWriteback()
       const previousId = await getListPrevSelectId()
       await getListMusics(previousId)

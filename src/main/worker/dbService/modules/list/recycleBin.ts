@@ -14,6 +14,8 @@ interface Snapshot {
   list: LX.List.MyListInfo
   location: Position
   songs: Array<Position & { musicInfo: LX.Music.MusicInfo }>
+  // 智能歌单的规则随列表一起归档，撤销删除时恢复。
+  smartRule?: string | null
 }
 interface Row {
   id: string
@@ -79,11 +81,13 @@ export const archiveListDeletion = (kind: Snapshot['kind'], listIds: string[], s
       const songs = getSongs(listId)
       const selected = new Set(songIds ?? songs.map(song => song.id))
       const songPositions = positions(songs, selected)
+      const smartRule = (db.prepare('SELECT "smart_rule" FROM "main"."my_list" WHERE "id" = ?').get(listId) as { smart_rule: string | null } | undefined)?.smart_rule ?? null
       const data: Snapshot = {
         kind,
         list: list as LX.List.MyListInfo,
         location: listPositions[listIndex] ?? { position: 0 },
         songs: songs.flatMap((musicInfo, index) => selected.has(musicInfo.id) ? [{ musicInfo, ...songPositions[index] }] : []),
+        smartRule,
       }
       if (kind === 'songs' && !data.songs.length) continue
       const now = Date.now()
@@ -157,6 +161,7 @@ export const restoreListTrashData = (ids: string[]): LX.List.TrashRestoreResult 
           const listInfo: LX.List.UserListInfo = { ...data.list, locationUpdateTime: Date.now() }
           const position = insertAtOriginalPosition(lists, { ...listInfo, position: 0 }, data.location)
           insertUserLists(lists.map((list, position) => ({ ...list, position })), true)
+          if (data.smartRule) db.prepare('UPDATE "main"."my_list" SET "smart_rule" = ? WHERE "id" = ?').run(data.smartRule, listId)
           result.createdLists.push({ position, listInfo })
           createdList = true
         }
