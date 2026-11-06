@@ -262,6 +262,30 @@ export default {
     opacity: 1;
   }
 }
+// The lyric column sits directly on artwork (ambient canvas or blurred cover).
+// A theme-colored scrim keeps the reading surface stable, and the text shadow
+// covers the detail that survives the blur.
+.lyric {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 10% 2%;
+    z-index: 0;
+    border-radius: 32px;
+    background-color: var(--color-content-background);
+    opacity: .78;
+    -webkit-mask-image: radial-gradient(ellipse closest-side at center, #000 70%, transparent 100%);
+    mask-image: radial-gradient(ellipse closest-side at center, #000 70%, transparent 100%);
+    pointer-events: none;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
 .lyric {
   text-align: center;
   height: 100%;
@@ -274,7 +298,8 @@ export default {
   }
   :global {
     .font-lrc {
-      color: var(--lyric-idle-color, var(--color-450));
+      color: var(--lyric-idle-color, var(--color-font));
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
       transition: var(--duration-normal) var(--ease-standard);
       transition-property: color, opacity;
     }
@@ -282,8 +307,9 @@ export default {
       line-height: 1.2;
       padding: calc(var(--playDetail-lrc-font-size, 16px) / 2) 1px;
       overflow-wrap: break-word;
-      color: var(--lyric-idle-color, var(--color-450));
-      opacity: var(--lyric-idle-opacity, .64);
+      color: var(--lyric-idle-color, var(--color-font));
+      opacity: var(--lyric-idle-opacity, .85);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
       transition: var(--duration-normal) var(--ease-standard);
       transition-property: color, opacity;
 
@@ -311,7 +337,7 @@ export default {
           transition: opacity var(--duration-normal) var(--ease-standard);
           font-size: 1em;
           background-repeat: no-repeat;
-          background-color: var(--lyric-idle-color, var(--color-450));
+          background-color: var(--lyric-idle-color, var(--color-font));
           background-image: -webkit-linear-gradient(top, var(--lyric-active-color, var(--color-primary-dark-200)), var(--lyric-active-color, var(--color-primary-dark-200)));
           -webkit-text-fill-color: transparent;
           -webkit-background-clip: text;
