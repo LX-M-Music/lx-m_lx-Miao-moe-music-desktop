@@ -129,7 +129,7 @@ import { defaultList, loveList, userLists } from '@renderer/store/list/state'
 import { createUserList } from '@renderer/store/list/action'
 import { getSmartPlaylistRule, loadSmartPlaylists, previewSmartPlaylist, refreshSmartPlaylist, saveSmartPlaylistRule } from '@renderer/store/list/smartPlaylist'
 
-const props = defineProps<{ visible: boolean, listInfo?: { id: string, name: string } | null }>()
+const props = defineProps<{ visible: boolean, listInfo?: { id: string, name: string } }>()
 const emit = defineEmits<{ 'update:visible': [visible: boolean], saved: [listId: string] }>()
 
 interface EditableRule {

@@ -193,7 +193,7 @@ export default {
     const smartRule = computed(() => getSmartPlaylistRule(props.listId))
     const smartPlaylistInfo = computed(() => smartRule.value
       ? { id: props.listId, name: userLists.find(list => list.id === props.listId)?.name ?? smartRule.value.name }
-      : null)
+      : undefined)
     const isShowSmartPlaylistModal = ref(false)
     const isSmartRefreshing = ref(false)
     let smartRefreshedListId = ''
