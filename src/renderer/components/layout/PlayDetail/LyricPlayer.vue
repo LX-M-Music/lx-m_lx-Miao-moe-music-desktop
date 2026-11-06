@@ -220,28 +220,19 @@ export default {
   isolation: isolate;
   transition: flex-basis @transition-normal;
 
-  // A fixed, square reading surface behind the lyrics. It lives on the
-  // viewport-anchored column instead of the scrolling lyric element so the
-  // panel never travels with the rows. All four edges fade out: vertical fade
-  // through the gradient, horizontal fade through the mask, so the square never
-  // shows a hard cut while the centre keeps its contrast.
+  // A fixed reading surface that covers the whole lyric column. It lives on
+  // the viewport-anchored column instead of the scrolling lyric element so the
+  // panel never travels with the rows. Only the left edge fades, blending into
+  // the artwork next to the cover; the other edges meet the window frame.
   &::before {
     content: '';
     position: absolute;
-    inset: 8% 2%;
+    inset: 0;
     z-index: -1;
-    background-image: linear-gradient(
-      to bottom,
-      transparent 0%,
-      var(--color-content-background) 16%,
-      var(--color-content-background) 84%,
-      transparent 100%
-    );
+    background-color: var(--color-content-background);
     opacity: .74;
-    border-left: 1px solid color-mix(in srgb, var(--color-font) 8%, transparent);
-    border-right: 1px solid color-mix(in srgb, var(--color-font) 8%, transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 7%, #000 100%);
+    mask-image: linear-gradient(to right, transparent 0%, #000 7%, #000 100%);
     pointer-events: none;
   }
 }
