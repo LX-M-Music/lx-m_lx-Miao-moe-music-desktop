@@ -30,7 +30,10 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
   const read = () => page.evaluate(() => {
     const right = document.querySelector('.right')
     const lyric = document.querySelector('.lyric')
-    const before = getComputedStyle(lyric, '::before')
+    // The scrim must live on the viewport-anchored column, not on the scroller,
+    // otherwise it travels away with the rows.
+    const before = getComputedStyle(right, '::before')
+    const lyricBefore = getComputedStyle(lyric, '::before')
     const readLine = selector => {
       const element = document.querySelector(selector)
       if (!element) return null
@@ -39,7 +42,8 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
     }
     return {
       ambientLyrics: right.hasAttribute('data-ambient-lyrics'),
-      scrim: { content: before.content, color: before.backgroundColor, opacity: Number(before.opacity) },
+      scrim: { content: before.content, color: before.backgroundColor, opacity: Number(before.opacity), radius: before.borderRadius },
+      lyricScrim: lyricBefore.content,
       inactive: readLine('.line-content:not(.active)'),
       active: readLine('.line-content.active'),
       count: document.querySelectorAll('.line-content').length,
@@ -73,6 +77,8 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
         assert.equal(state.ambientLyrics, false, 'this case covers the non-ambient background path')
         assert(state.count > 3, 'lyrics must be rendered')
         assert.notEqual(state.scrim.content, 'none', 'the lyric column must paint a scrim')
+        assert.equal(state.scrim.radius, '0px', `the scrim must stay square, got ${state.scrim.radius}`)
+        assert.equal(state.lyricScrim, 'none', 'the scroller must not paint its own moving scrim')
         assert(state.scrim.opacity >= 0.7, `scrim opacity ${state.scrim.opacity}`)
         for (const line of [state.inactive, state.active]) {
           assert.ok(line, 'expected both an active and an inactive lyric line')

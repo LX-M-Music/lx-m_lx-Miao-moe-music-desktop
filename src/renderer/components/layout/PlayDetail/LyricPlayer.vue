@@ -217,7 +217,21 @@ export default {
   flex: 0 0 60%;
   // padding: 0 30px;
   position: relative;
+  isolation: isolate;
   transition: flex-basis @transition-normal;
+
+  // A fixed, square reading surface behind the lyrics. It lives on the
+  // viewport-anchored column instead of the scrolling lyric element so the
+  // panel never travels with the rows.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 10% 2%;
+    z-index: -1;
+    background-color: var(--color-content-background);
+    opacity: .78;
+    pointer-events: none;
+  }
 }
 .right[data-ambient-lyrics] {
   isolation: isolate;
@@ -234,19 +248,7 @@ export default {
   }
 
   // A soft local surface keeps the moving artwork from washing out the text.
-  &::before {
-    content: '';
-    position: absolute;
-    inset: -12px;
-    z-index: -1;
-    border-radius: 32px;
-    background: var(--lyric-surface-color);
-    opacity: .26;
-    filter: blur(36px);
-    -webkit-mask-image: radial-gradient(ellipse closest-side at center, #000, transparent 100%);
-    mask-image: radial-gradient(ellipse closest-side at center, #000, transparent 100%);
-    pointer-events: none;
-  }
+  // The square reading surface now comes from the shared .right scrim.
 
   :global {
     .font-lrc {
@@ -263,28 +265,7 @@ export default {
   }
 }
 // The lyric column sits directly on artwork (ambient canvas or blurred cover).
-// A theme-colored scrim keeps the reading surface stable, and the text shadow
-// covers the detail that survives the blur.
-.lyric {
-  position: relative;
-  // Keep a local stacking context for the scrim, but never position the lyric
-  // rows themselves: their offsetTop must stay relative to this scroll
-  // container or the centered scroll target loses the leading spacer.
-  isolation: isolate;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 10% 2%;
-    z-index: -1;
-    border-radius: 32px;
-    background-color: var(--color-content-background);
-    opacity: .78;
-    -webkit-mask-image: radial-gradient(ellipse closest-side at center, #000 70%, transparent 100%);
-    mask-image: radial-gradient(ellipse closest-side at center, #000 70%, transparent 100%);
-    pointer-events: none;
-  }
-}
+// The reading scrim is owned by .right so it stays fixed while these rows scroll.
 .lyric {
   text-align: center;
   height: 100%;
