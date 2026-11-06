@@ -32,12 +32,12 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
     const lyric = document.querySelector('.lyric')
     // The scrim must live on the viewport-anchored column, not on the scroller,
     // otherwise it travels away with the rows.
-    const before = getComputedStyle(right, '::before')
-    const lyricBefore = getComputedStyle(lyric, '::before')
+    const before = window.getComputedStyle(right, '::before')
+    const lyricBefore = window.getComputedStyle(lyric, '::before')
     const readLine = selector => {
       const element = document.querySelector(selector)
       if (!element) return null
-      const style = getComputedStyle(element)
+      const style = window.getComputedStyle(element)
       return { color: style.color, opacity: Number(style.opacity), shadow: style.textShadow }
     }
     return {

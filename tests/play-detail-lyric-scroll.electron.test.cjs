@@ -36,8 +36,8 @@ test('play detail lyrics scroll the active line to the visual center', { timeout
 
     // The scrim must be anchored to the column, not to the scrolling rows.
     const scrim = await page.evaluate(() => ({
-      column: getComputedStyle(document.querySelector('.right'), '::before').content,
-      scroller: getComputedStyle(document.querySelector('.lyric'), '::before').content,
+      column: window.getComputedStyle(document.querySelector('.right'), '::before').content,
+      scroller: window.getComputedStyle(document.querySelector('.lyric'), '::before').content,
     }))
     assert.notEqual(scrim.column, 'none', 'the column must paint the reading scrim')
     assert.equal(scrim.scroller, 'none', 'the scrolling lyric element must not paint a scrim')
