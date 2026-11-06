@@ -22,6 +22,14 @@ const worstCaseContrast = (color, opacity, surface, surfaceOpacity) => {
   return worst
 }
 
+// The softened panel paints a vertical gradient; the fully opaque stop is the
+// colour the reading area actually uses.
+const scrimFill = backgroundImage => {
+  const tokens = backgroundImage.match(/rgba?\([^)]*\)/g) ?? []
+  const opaque = tokens.find(token => parseColor(token)[3] === 1)
+  return opaque ?? tokens[0] ?? 'rgba(0, 0, 0, 0)'
+}
+
 test('play detail lyrics keep a readable surface over bright and dark artwork', { timeout: 180000 }, async t => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture
@@ -42,7 +50,7 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
     }
     return {
       ambientLyrics: right.hasAttribute('data-ambient-lyrics'),
-      scrim: { content: before.content, color: before.backgroundColor, opacity: Number(before.opacity), radius: before.borderRadius },
+      scrim: { content: before.content, backgroundImage: before.backgroundImage, opacity: Number(before.opacity), radius: before.borderRadius },
       lyricScrim: lyricBefore.content,
       inactive: readLine('.line-content:not(.active)'),
       active: readLine('.line-content.active'),
@@ -80,10 +88,11 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
         assert.equal(state.scrim.radius, '0px', `the scrim must stay square, got ${state.scrim.radius}`)
         assert.equal(state.lyricScrim, 'none', 'the scroller must not paint its own moving scrim')
         assert(state.scrim.opacity >= 0.7, `scrim opacity ${state.scrim.opacity}`)
+        assert(state.scrim.backgroundImage.includes('linear-gradient'), 'the scrim must fade its edges')
         for (const line of [state.inactive, state.active]) {
           assert.ok(line, 'expected both an active and an inactive lyric line')
           assert.notEqual(line.shadow, 'none', 'lyrics must keep a text shadow')
-          const contrast = worstCaseContrast(line.color, line.opacity, state.scrim.color, state.scrim.opacity)
+          const contrast = worstCaseContrast(line.color, line.opacity, scrimFill(state.scrim.backgroundImage), state.scrim.opacity)
           assert(contrast >= 3, `contrast ${contrast.toFixed(2)} for ${line.color} @ ${line.opacity}`)
         }
         await page.screenshot({ path: path.join(output, `lyrics-${id}.png`) })

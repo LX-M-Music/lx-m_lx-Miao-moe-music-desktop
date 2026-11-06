@@ -222,14 +222,26 @@ export default {
 
   // A fixed, square reading surface behind the lyrics. It lives on the
   // viewport-anchored column instead of the scrolling lyric element so the
-  // panel never travels with the rows.
+  // panel never travels with the rows. All four edges fade out: vertical fade
+  // through the gradient, horizontal fade through the mask, so the square never
+  // shows a hard cut while the centre keeps its contrast.
   &::before {
     content: '';
     position: absolute;
-    inset: 10% 2%;
+    inset: 8% 2%;
     z-index: -1;
-    background-color: var(--color-content-background);
-    opacity: .78;
+    background-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      var(--color-content-background) 16%,
+      var(--color-content-background) 84%,
+      transparent 100%
+    );
+    opacity: .74;
+    border-left: 1px solid color-mix(in srgb, var(--color-font) 8%, transparent);
+    border-right: 1px solid color-mix(in srgb, var(--color-font) 8%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
     pointer-events: none;
   }
 }
