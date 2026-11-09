@@ -225,26 +225,27 @@ export default {
 }
 .right[data-ambient-lyrics] {
   isolation: isolate;
-  --lyric-idle-color: var(--color-font);
+  // One predictable colour for the whole lyric sheet: the adaptive background
+  // publishes pure white or near-black from the reading area, never a tinted accent.
+  --lyric-idle-color: var(--lyric-text, var(--color-450));
   --lyric-idle-opacity: .92;
-  --lyric-active-color: var(--ambient-lyric-accent, var(--color-primary-dark-400));
+  --lyric-active-color: var(--lyric-text, var(--color-450));
 
   :global {
-    .font-lrc {
-      --lyric-active-color: var(--ambient-local-lyric-accent, var(--ambient-lyric-accent, var(--color-primary-dark-400)));
-    }
-    .line-content:not(.active) .font-lrc {
-      --lyric-active-color: var(--lyric-idle-color);
-    }
     // Only the dynamic background needs the halo: it is the mode that paints
     // artwork under the text. Without it the stock theme colours stay untouched.
     .line-content {
       text-shadow:
-        -1px 0 0 @lyric-halo,
-        1px 0 0 @lyric-halo,
-        0 -1px 0 @lyric-halo,
-        0 1px 0 @lyric-halo,
+        -1px 0 0 var(--lyric-halo, @lyric-halo),
+        1px 0 0 var(--lyric-halo, @lyric-halo),
+        0 -1px 0 var(--lyric-halo, @lyric-halo),
+        0 1px 0 var(--lyric-halo, @lyric-halo),
         0 2px 6px rgba(0, 0, 0, .35);
+    }
+    // Karaoke progress keeps the same hue: unplayed characters sit at 55% alpha,
+    // played ones use the full lyric colour.
+    .font-mode > .line > .font-lrc > span {
+      background-color: color-mix(in srgb, var(--lyric-idle-color) 55%, transparent);
     }
   }
 

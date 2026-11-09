@@ -47,6 +47,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       rightScrim: window.getComputedStyle(right, '::before').content,
       lyricScrim: window.getComputedStyle(lyric, '::before').content,
       themeFont: window.getComputedStyle(right).getPropertyValue('--color-font').trim(),
+      lyricText: window.getComputedStyle(right).getPropertyValue('--lyric-text').trim(),
       themeSecondary: window.getComputedStyle(right).getPropertyValue('--color-450').trim(),
       idleVar: window.getComputedStyle(right).getPropertyValue('--lyric-idle-color').trim(),
       idle: readLine(idle?.querySelector('.font-lrc')),
@@ -107,8 +108,11 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert.equal(state.rightScrim, 'none', 'no panel while the dynamic background is on')
       assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
       assert(hasHalo(state.idle.shadow), `expected the subtitle halo, got ${state.idle.shadow}`)
-      assert(sameColor(state.idleVar, state.themeFont), `idle variable ${state.idleVar} should follow ${state.themeFont}`)
-      assert(sameColor(state.idle.color, state.themeFont), 'idle lyrics should use the adaptive primary text')
+      assert(state.lyricText.length > 0, 'the reading area must publish a lyric colour')
+      assert(sameColor(state.idleVar, state.lyricText), `idle variable ${state.idleVar} should follow ${state.lyricText}`)
+      assert(sameColor(state.idle.color, state.lyricText), 'idle lyrics should use the reading-area colour')
+      const channels = parseColor(state.idle.color).slice(0, 3)
+      assert(channels[0] === channels[1] && channels[1] === channels[2], `lyric colour must be neutral, got ${state.idle.color}`)
       assert(sameColor(state.active.color, state.idle.color), 'activating a line must not recolour the sheet')
       assert(sameColor(state.translation.color, state.idle.color), 'translation must match the lyric colour')
       assert(state.lineOpacity >= 0.9, `inactive lyrics are too dim: ${state.lineOpacity}`)

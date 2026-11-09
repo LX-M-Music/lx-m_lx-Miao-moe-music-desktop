@@ -1,5 +1,5 @@
 import { type Artwork } from './artwork'
-import { artworkColor, compositeBackgrounds, controlRegions, createAdaptivePalette, createControlColors, mixColor, parseColor, rgb, stabilizeColor, type RGB } from './contrast'
+import { artworkColor, compositeBackgrounds, controlRegions, createAdaptivePalette, createControlColors, luminance, mixColor, parseColor, rgb, stabilizeColor, type RGB } from './contrast'
 import { createControlRegions } from './controlRegions'
 
 interface BackgroundFrame {
@@ -150,6 +150,17 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       const palette = createAdaptivePalette(compositeBackgrounds(pixels, surface, opacity), currentArtwork, scope.darkText)
       scope.darkText = palette.darkText
       for (const [key, value] of Object.entries(palette.colors)) write(scope, key, value)
+      // Lyrics need one predictable colour for original, translated and romanized
+      // rows. Sample the right-hand reading area only and pick pure white or a
+      // near-black: tinted accents made some covers unreadable.
+      const readingArea: RGB[] = []
+      for (let row = 2; row < 14; row += 1) {
+        for (let column = 12; column < 24; column += 1) readingArea.push(pixels[row * 24 + column])
+      }
+      const readingBackground = compositeBackgrounds(readingArea, surface, opacity)
+      const readingLuminance = readingBackground.reduce((total, color) => total + luminance(color), 0) / readingBackground.length
+      write(scope, '--lyric-text', readingLuminance < 0.18 ? 'rgb(255, 255, 255)' : 'rgb(12, 12, 12)')
+      write(scope, '--lyric-halo', readingLuminance < 0.18 ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.6)')
       regions.forEach((region, index) => {
         const colors = createControlColors(compositeBackgrounds(region, surface, opacity), regionColors[index], palette)
         write(scope, `--ambient-zone-${index}-accent`, rgb(colors.accent))
