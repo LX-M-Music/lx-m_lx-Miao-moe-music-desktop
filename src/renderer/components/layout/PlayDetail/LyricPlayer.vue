@@ -243,9 +243,13 @@ export default {
         0 2px 6px rgba(0, 0, 0, .35);
     }
     // Karaoke progress keeps the same hue: unplayed characters sit at 55% alpha,
-    // played ones use the full lyric colour.
-    .font-mode > .line > .font-lrc > span {
+    // played ones use the full lyric colour. Translation and romanization sit at
+    // that same 55% alpha so the whole group reads as one colour.
+    .line-content.font-mode > .line > .font-lrc > span {
       background-color: color-mix(in srgb, var(--lyric-idle-color) 55%, transparent);
+    }
+    .line-content.font-mode .extended .font-lrc {
+      color: color-mix(in srgb, var(--lyric-idle-color) 55%, transparent);
     }
   }
 

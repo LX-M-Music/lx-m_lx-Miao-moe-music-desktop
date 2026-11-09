@@ -124,3 +124,48 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
     await app.close()
   }
 })
+
+test('word-level lyrics keep the translation at the unplayed lyric colour', { timeout: 180000 }, async() => {
+  const fixture = await launch({ rendererPath })
+  const { app, page } = fixture
+  try {
+    page.setDefaultTimeout(10000)
+    const theme = themes.find(value => value.id === 'black')
+    await page.evaluate(colors => window.setTheme(colors), { ...theme.config.themeColors, ...theme.config.extInfo })
+    await page.evaluate(() => window.lxData.updateSetting({
+      'common.langId': 'zh-cn',
+      'ui.ambientBackground': true,
+      'player.isPlayLxlrc': true,
+      'player.isShowLyricTranslation': true,
+      'playDetail.isZoomActiveLrc': false,
+    }))
+    await seedTrack(page)
+    // Load word-level lyrics before opening the page so the engine builds them once.
+    await page.evaluate(() => Object.assign(window.lxData.musicInfo, {
+      lrc: '[00:00.000]原文第一行\n[00:05.000]原文第二行',
+      lxlrc: '[00:00.000]<0,1500>原文<1500,3000>第一行\n[00:05.000]<0,1500>原文<1500,3000>第二行',
+      tlrc: '[00:00.000]译文第一行\n[00:05.000]译文第二行',
+    }))
+    await page.evaluate(() => window.app_event.emit('lyricUpdated'))
+    await showDetail(page, true)
+    await settled(page)
+    await page.waitForFunction(() => document.querySelectorAll('.font-mode .font-lrc span').length > 1)
+    await page.waitForTimeout(500)
+    const state = await page.evaluate(() => {
+      const spans = [...document.querySelectorAll('.font-mode .font-lrc span')]
+      const translation = document.querySelector('.line-content .extended .font-lrc')
+      const style = element => element ? window.getComputedStyle(element) : null
+      return {
+        unplayed: style(spans[1])?.backgroundColor,
+        played: style(spans[0])?.backgroundImage,
+        translation: style(translation)?.color,
+      }
+    })
+    assert.equal(state.translation, state.unplayed, 'translation must match the unplayed karaoke text')
+    assert(state.unplayed.includes('0.55'), `unplayed text should sit at 55% alpha, got ${state.unplayed}`)
+    assert(state.played.includes('rgb('), 'played text should use the opaque lyric colour')
+    assert.deepEqual(fixture.errors, [])
+  } finally {
+    await app.close()
+  }
+})
