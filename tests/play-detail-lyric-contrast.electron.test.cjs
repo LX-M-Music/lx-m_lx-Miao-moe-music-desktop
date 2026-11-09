@@ -48,6 +48,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       lyricScrim: window.getComputedStyle(lyric, '::before').content,
       themeFont: window.getComputedStyle(right).getPropertyValue('--color-font').trim(),
       lyricText: window.getComputedStyle(right).getPropertyValue('--lyric-text').trim(),
+      controlText: window.getComputedStyle(right).getPropertyValue('--ambient-zone-0-text').trim(),
       themeSecondary: window.getComputedStyle(right).getPropertyValue('--color-450').trim(),
       idleVar: window.getComputedStyle(right).getPropertyValue('--lyric-idle-color').trim(),
       idle: readLine(idle?.querySelector('.font-lrc')),
@@ -109,6 +110,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert.equal(state.idle.shadow, 'none', 'no halo: the chosen colour carries the contrast on its own')
       assert(state.lyricText.length > 0, 'the reading area must publish a lyric colour')
       assert(sameColor(state.idleVar, state.lyricText), `idle variable ${state.idleVar} should follow ${state.lyricText}`)
+      assert(sameColor(state.idleVar, state.controlText), `lyrics ${state.idleVar} must match the control palette ${state.controlText}`)
       assert(sameColor(state.idle.color, state.lyricText), 'idle lyrics should use the reading-area colour')
       const channels = parseColor(state.idle.color).slice(0, 3)
       assert(channels[0] === channels[1] && channels[1] === channels[2], `lyric colour must be neutral, got ${state.idle.color}`)

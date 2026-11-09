@@ -1,5 +1,5 @@
 import { type Artwork } from './artwork'
-import { artworkColor, compositeBackgrounds, controlRegions, createAdaptivePalette, createControlColors, luminance, mixColor, parseColor, rgb, stabilizeColor, type RGB } from './contrast'
+import { CONTROL_COLUMNS, CONTROL_ROWS, artworkColor, compositeBackgrounds, createAdaptivePalette, mixColor, parseColor, stabilizeColor, type RGB } from './contrast'
 import { createControlRegions } from './controlRegions'
 
 interface BackgroundFrame {
@@ -33,7 +33,6 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
   let includeLibrary = true
   let lastSample = -Infinity
   let artwork: RGB | undefined
-  let regionColors: RGB[] = []
   let sampler: HTMLCanvasElement | undefined
   let context: CanvasRenderingContext2D | null = null
   const backgroundColors = () => {
@@ -60,7 +59,6 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
   const clear = () => {
     for (const scope of scopes.values()) clearScope(scope)
     artwork = undefined
-    regionColors = []
     lastSample = -Infinity
   }
   const themeObserver = new MutationObserver(() => {
@@ -138,10 +136,6 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       context.filter = 'none'
     }
     const currentArtwork = artwork = stabilizeColor(artwork, frame.opacity ? artworkColor(pixels) : [125, 125, 125], moving)
-    const regions = controlRegions(pixels, 24, 16)
-    regions.forEach((region, index) => {
-      regionColors[index] = stabilizeColor(regionColors[index], frame.opacity ? artworkColor(region) : currentArtwork, moving)
-    })
     // Both screens can be visible during expansion. Keep their own contrast
     // palettes instead of recoloring the fading screen to match the incoming one.
     const publish = (element: HTMLElement, surface: ReturnType<typeof parseColor>, targetOpacity: number) => {
@@ -150,24 +144,21 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       const palette = createAdaptivePalette(compositeBackgrounds(pixels, surface, opacity), currentArtwork, scope.darkText)
       scope.darkText = palette.darkText
       for (const [key, value] of Object.entries(palette.colors)) write(scope, key, value)
-      // Lyrics need one predictable colour for original, translated and romanized
-      // rows. Sample the right-hand reading area only and pick pure white or a
-      // near-black: tinted accents made some covers unreadable.
-      const readingArea: RGB[] = []
-      for (let row = 2; row < 14; row += 1) {
-        for (let column = 12; column < 24; column += 1) readingArea.push(pixels[row * 24 + column])
+      // Lyrics share the controls' polarity so text and buttons always agree:
+      // pure white on dark covers, near-black on bright ones.
+      write(scope, '--lyric-text', palette.darkText ? 'rgb(12, 12, 12)' : 'rgb(255, 255, 255)')
+      // Controls use a fixed two-tone palette chosen by the cover, not a colour
+      // sampled behind each widget: identical buttons stay identical anywhere.
+      const controls = palette.darkText
+        ? { text: 'rgb(17, 17, 17)', secondary: 'rgba(17, 17, 17, 0.65)', accent: 'rgb(17, 17, 17)', onAccent: 'rgb(255, 255, 255)' }
+        : { text: 'rgb(255, 255, 255)', secondary: 'rgba(255, 255, 255, 0.72)', accent: 'rgb(255, 255, 255)', onAccent: 'rgb(17, 17, 17)' }
+      for (let index = 0; index < CONTROL_COLUMNS * CONTROL_ROWS; index += 1) {
+        write(scope, `--ambient-zone-${index}-accent`, controls.accent)
+        write(scope, `--ambient-zone-${index}-lyric-accent`, controls.text)
+        write(scope, `--ambient-zone-${index}-on-accent`, controls.onAccent)
+        write(scope, `--ambient-zone-${index}-text`, controls.text)
+        write(scope, `--ambient-zone-${index}-secondary`, controls.secondary)
       }
-      const readingBackground = compositeBackgrounds(readingArea, surface, opacity)
-      const readingLuminance = readingBackground.reduce((total, color) => total + luminance(color), 0) / readingBackground.length
-      write(scope, '--lyric-text', readingLuminance < 0.18 ? 'rgb(255, 255, 255)' : 'rgb(12, 12, 12)')
-      regions.forEach((region, index) => {
-        const colors = createControlColors(compositeBackgrounds(region, surface, opacity), regionColors[index], palette)
-        write(scope, `--ambient-zone-${index}-accent`, rgb(colors.accent))
-        write(scope, `--ambient-zone-${index}-lyric-accent`, rgb(colors.lyricAccent))
-        write(scope, `--ambient-zone-${index}-on-accent`, rgb(colors.onAccent))
-        write(scope, `--ambient-zone-${index}-text`, rgb(colors.text))
-        write(scope, `--ambient-zone-${index}-secondary`, rgb(colors.secondary))
-      })
       element.dataset.ambientControls = palette.darkText ? 'light' : 'dark'
     }
     if (includeLibrary) publish(root, base, backgroundColor.libraryOpacity)
