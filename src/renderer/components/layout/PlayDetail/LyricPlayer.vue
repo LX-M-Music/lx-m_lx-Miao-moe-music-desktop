@@ -224,7 +224,9 @@ export default {
   // One predictable colour for the whole lyric sheet: the adaptive background
   // publishes pure white or near-black from the reading area, never a tinted accent.
   --lyric-idle-color: var(--lyric-text, var(--color-450));
-  --lyric-idle-opacity: .92;
+  // Every row keeps full opacity: only the zoom marks the current line, so
+  // switching lines never brightens or dims the sheet.
+  --lyric-idle-opacity: 1;
   --lyric-active-color: var(--lyric-text, var(--color-450));
 
   :global {
