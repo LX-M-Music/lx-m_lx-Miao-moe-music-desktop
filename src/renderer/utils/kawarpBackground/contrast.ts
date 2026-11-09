@@ -113,14 +113,14 @@ const contrastColor = (seed: RGB, range: [number, number], darkText: boolean, ta
   return result
 }
 
-export const createAdaptivePalette = (backgrounds: RGB[], artwork: RGB, previousDarkText?: boolean) => {
+export const createAdaptivePalette = (backgrounds: RGB[], artwork: RGB, previousDarkText?: boolean, forceDarkText?: boolean) => {
   const black: RGB = [0, 0, 0]
   const white: RGB = [255, 255, 255]
   const backgroundRange = bounds(backgrounds)
   const darkScore = contrastScore(black, backgroundRange)
   const lightScore = contrastScore(white, backgroundRange)
   // A small dead band prevents light/dark flicker near the crossover.
-  const darkText = previousDarkText != null && Math.abs(darkScore - lightScore) < 0.6 ? previousDarkText : darkScore >= lightScore
+  const darkText = forceDarkText ?? (previousDarkText != null && Math.abs(darkScore - lightScore) < 0.6 ? previousDarkText : darkScore >= lightScore)
   const [hue, saturation] = toHsl(artwork)
   const tint = fromHsl([hue, saturation, 0.5])
   const surface = mixColor(darkText ? [249, 250, 252] : [19, 22, 27], tint, 0.04)

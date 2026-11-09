@@ -1,5 +1,5 @@
 import { type Artwork } from './artwork'
-import { CONTROL_COLUMNS, CONTROL_ROWS, artworkColor, compositeBackgrounds, createAdaptivePalette, mixColor, parseColor, stabilizeColor, type RGB } from './contrast'
+import { CONTROL_COLUMNS, CONTROL_ROWS, artworkColor, compositeBackgrounds, createAdaptivePalette, luminance, mixColor, parseColor, stabilizeColor, type RGB } from './contrast'
 import { createControlRegions } from './controlRegions'
 
 interface BackgroundFrame {
@@ -141,7 +141,15 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
     const publish = (element: HTMLElement, surface: ReturnType<typeof parseColor>, targetOpacity: number) => {
       const opacity = frame.opacity * targetOpacity
       const scope = scopeFor(element)
-      const palette = createAdaptivePalette(compositeBackgrounds(pixels, surface, opacity), currentArtwork, scope.darkText)
+      // Prefer white over most coloured artwork: sample the reading area and
+      // only switch to dark text on genuinely bright panels.
+      const readingArea: RGB[] = []
+      for (let row = 2; row < 14; row += 1) {
+        for (let column = 12; column < 24; column += 1) readingArea.push(pixels[row * 24 + column])
+      }
+      const readingBackground = compositeBackgrounds(readingArea, surface, opacity)
+      const readingLuminance = readingBackground.reduce((total, color) => total + luminance(color), 0) / readingBackground.length
+      const palette = createAdaptivePalette(compositeBackgrounds(pixels, surface, opacity), currentArtwork, scope.darkText, readingLuminance > 0.5)
       scope.darkText = palette.darkText
       for (const [key, value] of Object.entries(palette.colors)) write(scope, key, value)
       // Lyrics share the controls' polarity so text and buttons always agree:

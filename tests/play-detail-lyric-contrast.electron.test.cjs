@@ -115,7 +115,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert(sameColor(state.idleVar, state.lyricText), `idle variable ${state.idleVar} should follow ${state.lyricText}`)
       assert(sameColor(state.idleVar, state.controlText), `lyrics ${state.idleVar} must match the control palette ${state.controlText}`)
       assert(sameColor(state.colorPrimary, state.idleVar), `the accent ${state.colorPrimary} must match the lyric colour ${state.idleVar}`)
-      assert(state.colorBorder.includes('255, 255, 255'), `dark covers use a white border, got ${state.colorBorder}`)
+      assert(sameColor(state.colorBorder, state.idleVar), `the border should use the same preset tone as the text, got ${state.colorBorder}`)
       assert(sameColor(state.idle.color, state.lyricText), 'idle lyrics should use the reading-area colour')
       const channels = parseColor(state.idle.color).slice(0, 3)
       assert(channels[0] === channels[1] && channels[1] === channels[2], `lyric colour must be neutral, got ${state.idle.color}`)
