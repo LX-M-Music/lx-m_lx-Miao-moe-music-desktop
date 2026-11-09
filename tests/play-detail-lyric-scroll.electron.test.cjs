@@ -34,13 +34,13 @@ test('play detail lyrics scroll the active line to the visual center', { timeout
     assert(metrics.preHeight > 100, `expected a leading spacer, got ${metrics.preHeight}`)
     assert(Math.abs(metrics.firstTop - metrics.preHeight) <= 1, `first row top ${metrics.firstTop} should equal spacer ${metrics.preHeight}`)
 
-    // The scrim must be anchored to the column, not to the scrolling rows.
-    const scrim = await page.evaluate(() => ({
+    // No background panel: readability comes from the text treatment instead.
+    const panels = await page.evaluate(() => ({
       column: window.getComputedStyle(document.querySelector('.right'), '::before').content,
       scroller: window.getComputedStyle(document.querySelector('.lyric'), '::before').content,
     }))
-    assert.notEqual(scrim.column, 'none', 'the column must paint the reading scrim')
-    assert.equal(scrim.scroller, 'none', 'the scrolling lyric element must not paint a scrim')
+    assert.equal(panels.column, 'none', 'the lyric column must not paint a panel')
+    assert.equal(panels.scroller, 'none', 'the scrolling lyric element must not paint a panel')
 
     // Instant scrolling keeps the geometry assertion independent of the spring.
     await page.evaluate(() => { document.documentElement.dataset.motionEnabled = 'false' })

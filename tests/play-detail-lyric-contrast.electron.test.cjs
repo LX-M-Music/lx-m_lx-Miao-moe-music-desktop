@@ -3,52 +3,44 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 const { test } = require('node:test')
 const { launch, seedTrack, seedLyrics, showDetail, settled } = require('./helpers/motion-fixture.cjs')
-const { parseColor, contrastRatio, mixColor } = require('./helpers/load-typescript.cjs')()('src/renderer/utils/kawarpBackground/contrast.ts')
+const { parseColor } = require('./helpers/load-typescript.cjs')()('src/renderer/utils/kawarpBackground/contrast.ts')
 const themes = require('../src/common/theme/index.json')
 
 const rendererPath = path.resolve('dist/index.html')
-
-// Composite a text color (with its opacity) over every possible artwork tone and
-// require a readable result, so the guarantee does not depend on the cover.
-const worstCaseContrast = (color, opacity, surface, surfaceOpacity) => {
-  const text = parseColor(color).slice(0, 3)
-  const scrim = parseColor(surface)
-  let worst = Infinity
-  for (let tone = 0; tone <= 255; tone += 5) {
-    const background = mixColor([tone, tone, tone], scrim.slice(0, 3), surfaceOpacity * scrim[3])
-    const effective = mixColor(background, text, opacity)
-    worst = Math.min(worst, contrastRatio(effective, background))
-  }
-  return worst
+const sameColor = (a, b) => {
+  const left = parseColor(a).slice(0, 3)
+  const right = parseColor(b).slice(0, 3)
+  return left.every((value, index) => Math.abs(value - right[index]) <= 1)
 }
 
-test('play detail lyrics keep a readable surface over bright and dark artwork', { timeout: 180000 }, async t => {
+test('play detail lyrics stay readable without a background panel', { timeout: 180000 }, async t => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture
   const output = path.resolve('output/playwright/play-detail-lyric-contrast')
   const update = values => page.evaluate(values => window.lxData.updateSetting(values), values)
-  const read = () => page.evaluate(() => {
+  const read = ambient => page.evaluate(ambient => {
     const right = document.querySelector('.right')
     const lyric = document.querySelector('.lyric')
-    // The scrim must live on the viewport-anchored column, not on the scroller,
-    // otherwise it travels away with the rows.
-    const before = window.getComputedStyle(right, '::before')
-    const lyricBefore = window.getComputedStyle(lyric, '::before')
-    const readLine = selector => {
-      const element = document.querySelector(selector)
+    const inactive = document.querySelector('.line-content:not(.active)')
+    const active = document.querySelector('.line-content.active')
+    const readLine = element => {
       if (!element) return null
       const style = window.getComputedStyle(element)
       return { color: style.color, opacity: Number(style.opacity), shadow: style.textShadow }
     }
     return {
       ambientLyrics: right.hasAttribute('data-ambient-lyrics'),
-      scrim: { content: before.content, color: before.backgroundColor, mask: before.maskImage, opacity: Number(before.opacity), radius: before.borderRadius },
-      lyricScrim: lyricBefore.content,
-      inactive: readLine('.line-content:not(.active)'),
-      active: readLine('.line-content.active'),
+      rightScrim: window.getComputedStyle(right, '::before').content,
+      lyricScrim: window.getComputedStyle(lyric, '::before').content,
+      themeFont: window.getComputedStyle(right).getPropertyValue('--color-font').trim(),
+      idleVar: window.getComputedStyle(right).getPropertyValue('--lyric-idle-color').trim(),
+      inactive: readLine(inactive),
+      active: readLine(active),
       count: document.querySelectorAll('.line-content').length,
     }
-  })
+  }, ambient)
+  const hasHalo = shadow => ['-1px 0px 0px', '1px 0px 0px', '0px -1px 0px', '0px 1px 0px', '0px 2px 6px'].every(token => shadow.includes(token))
+
   try {
     await fs.mkdir(output, { recursive: true })
     page.setDefaultTimeout(10000)
@@ -57,8 +49,8 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
       'ui.ambientBackground': false,
       'playDetail.isZoomActiveLrc': false,
     })
-    // A bright cover is the case where the old fixed gray text disappeared.
     await seedTrack(page)
+    // Bright cover: the case where the fixed gray text used to disappear.
     await page.evaluate(() => {
       const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600"><rect width="600" height="600" fill="#e8e8e8"/><rect y="380" width="600" height="220" fill="#9a9a9a"/></svg>'
       window.lxData.musicInfo.pic = 'data:image/svg+xml,' + encodeURIComponent(svg)
@@ -69,27 +61,38 @@ test('play detail lyrics keep a readable surface over bright and dark artwork', 
     await page.waitForFunction(() => document.querySelectorAll('.line-content').length > 3)
 
     for (const id of ['green', 'black']) {
-      await t.test(`${id} theme gives the lyric column a scrim and readable text`, async() => {
+      await t.test(`${id} theme keeps text readable with no panel`, async() => {
         const theme = themes.find(value => value.id === id)
         await page.evaluate(colors => window.setTheme(colors), { ...theme.config.themeColors, ...theme.config.extInfo })
         await page.waitForTimeout(300)
-        const state = await read()
-        assert.equal(state.ambientLyrics, false, 'this case covers the non-ambient background path')
-        assert(state.count > 3, 'lyrics must be rendered')
-        assert.notEqual(state.scrim.content, 'none', 'the lyric column must paint a scrim')
-        assert.equal(state.scrim.radius, '0px', `the scrim must stay square, got ${state.scrim.radius}`)
-        assert.equal(state.lyricScrim, 'none', 'the scroller must not paint its own moving scrim')
-        assert(state.scrim.opacity >= 0.7, `scrim opacity ${state.scrim.opacity}`)
-        assert(state.scrim.mask.includes('linear-gradient'), 'the scrim must fade its left edge')
+        const state = await read(false)
+        assert.equal(state.count > 3, true, 'lyrics must be rendered')
+        assert.equal(state.rightScrim, 'none', 'the lyric column must not paint a panel')
+        assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
         for (const line of [state.inactive, state.active]) {
           assert.ok(line, 'expected both an active and an inactive lyric line')
-          assert.notEqual(line.shadow, 'none', 'lyrics must keep a text shadow')
-          const contrast = worstCaseContrast(line.color, line.opacity, state.scrim.color, state.scrim.opacity)
-          assert(contrast >= 3, `contrast ${contrast.toFixed(2)} for ${line.color} @ ${line.opacity}`)
+          assert(hasHalo(line.shadow), `expected a four-side halo, got ${line.shadow}`)
         }
+        assert(sameColor(state.inactive.color, state.themeFont), `line colour ${state.inactive.color} should follow ${state.themeFont}`)
+        assert((state.inactive.opacity) >= 0.9, `inactive lyrics are too dim: ${state.inactive.opacity}`)
         await page.screenshot({ path: path.join(output, `lyrics-${id}.png`) })
       })
     }
+
+    await t.test('dynamic background mode uses the adaptive primary text colour', async() => {
+      await update({ 'ui.ambientBackground': true })
+      await page.waitForFunction(() => document.querySelector('.right')?.hasAttribute('data-ambient-lyrics'))
+      await page.waitForTimeout(600)
+      const state = await read(true)
+      assert.equal(state.ambientLyrics, true, 'expected the ambient lyric mode')
+      assert.equal(state.rightScrim, 'none', 'no panel while the dynamic background is on')
+      assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
+      assert.notEqual(state.inactive.color, 'rgb(155, 155, 155)', 'must not fall back to the fixed secondary gray')
+      assert(sameColor(state.idleVar, state.themeFont), `idle variable ${state.idleVar} should follow the adaptive text ${state.themeFont}`)
+      assert(state.inactive.opacity >= 0.9, `ambient lyrics are too dim: ${state.inactive.opacity}`)
+      await page.screenshot({ path: path.join(output, 'lyrics-ambient.png') })
+    })
+
     assert.deepEqual(fixture.errors, [])
   } finally {
     await app.close()

@@ -213,45 +213,21 @@ export default {
 <style lang="less" module>
 @import '@renderer/assets/styles/layout.less';
 
+// Subtitle-style halo: the theme background colour behind each glyph, so lyrics
+// separate from artwork without painting a panel over it.
+@lyric-halo: color-mix(in srgb, var(--color-content-background) 72%, transparent);
+
 .right {
   flex: 0 0 60%;
   // padding: 0 30px;
   position: relative;
-  isolation: isolate;
   transition: flex-basis @transition-normal;
-
-  // A fixed reading surface that covers the whole lyric column. It lives on
-  // the viewport-anchored column instead of the scrolling lyric element so the
-  // panel never travels with the rows. Only the left edge fades, blending into
-  // the artwork next to the cover; the other edges meet the window frame.
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background-color: var(--color-content-background);
-    opacity: .74;
-    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 7%, #000 100%);
-    mask-image: linear-gradient(to right, transparent 0%, #000 7%, #000 100%);
-    pointer-events: none;
-  }
 }
 .right[data-ambient-lyrics] {
   isolation: isolate;
   --lyric-idle-color: var(--color-font);
-  --lyric-idle-opacity: .68;
-  --lyric-surface-color: var(--ambient-surface-color, var(--color-surface));
+  --lyric-idle-opacity: .92;
   --lyric-active-color: var(--ambient-lyric-accent, var(--color-primary-dark-400));
-
-  :global(#root[data-ambient-controls]) & {
-    // Resolve the shared idle color at the reading panel so original,
-    // translated and romanized lyrics keep the same contrast and opacity.
-    --lyric-idle-color: var(--color-450);
-    --lyric-idle-opacity: .78;
-  }
-
-  // A soft local surface keeps the moving artwork from washing out the text.
-  // The square reading surface now comes from the shared .right scrim.
 
   :global {
     .font-lrc {
@@ -267,8 +243,8 @@ export default {
     opacity: 1;
   }
 }
-// The lyric column sits directly on artwork (ambient canvas or blurred cover).
-// The reading scrim is owned by .right so it stays fixed while these rows scroll.
+// Lyrics sit directly on the artwork; readability comes from the adaptive text
+// colours plus the halo, not from a background layer.
 .lyric {
   text-align: center;
   height: 100%;
@@ -282,7 +258,6 @@ export default {
   :global {
     .font-lrc {
       color: var(--lyric-idle-color, var(--color-font));
-      text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
       transition: var(--duration-normal) var(--ease-standard);
       transition-property: color, opacity;
     }
@@ -291,8 +266,13 @@ export default {
       padding: calc(var(--playDetail-lrc-font-size, 16px) / 2) 1px;
       overflow-wrap: break-word;
       color: var(--lyric-idle-color, var(--color-font));
-      opacity: var(--lyric-idle-opacity, .85);
-      text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+      opacity: var(--lyric-idle-opacity, .92);
+      text-shadow:
+        -1px 0 0 @lyric-halo,
+        1px 0 0 @lyric-halo,
+        0 -1px 0 @lyric-halo,
+        0 1px 0 @lyric-halo,
+        0 2px 6px rgba(0, 0, 0, .35);
       transition: var(--duration-normal) var(--ease-standard);
       transition-property: color, opacity;
 
