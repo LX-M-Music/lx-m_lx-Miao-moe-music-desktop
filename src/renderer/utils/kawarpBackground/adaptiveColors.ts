@@ -149,11 +149,29 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       // opposite tone so the glyphs keep an edge over busy artwork.
       write(scope, '--lyric-text', palette.darkText ? 'rgb(12, 12, 12)' : 'rgb(255, 255, 255)')
       write(scope, '--lyric-halo', palette.darkText ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.45)')
-      // Controls use a fixed two-tone palette chosen by the cover, not a colour
-      // sampled behind each widget: identical buttons stay identical anywhere.
+      // Fixed two-tone palette selected by the cover: identical buttons, borders
+      // and lyrics on every screen, never a colour sampled behind the widget.
       const controls = palette.darkText
-        ? { text: 'rgb(17, 17, 17)', secondary: 'rgba(17, 17, 17, 0.65)', accent: 'rgb(17, 17, 17)', onAccent: 'rgb(255, 255, 255)' }
-        : { text: 'rgb(255, 255, 255)', secondary: 'rgba(255, 255, 255, 0.72)', accent: 'rgb(255, 255, 255)', onAccent: 'rgb(17, 17, 17)' }
+        ? { text: 'rgb(17, 17, 17)', secondary: 'rgba(17, 17, 17, 0.65)', accent: 'rgb(17, 17, 17)', onAccent: 'rgb(255, 255, 255)', border: 'rgba(17, 17, 17, 0.38)', hover: 'rgba(17, 17, 17, 0.08)', active: 'rgba(17, 17, 17, 0.14)' }
+        : { text: 'rgb(255, 255, 255)', secondary: 'rgba(255, 255, 255, 0.72)', accent: 'rgb(255, 255, 255)', onAccent: 'rgb(17, 17, 17)', border: 'rgba(255, 255, 255, 0.38)', hover: 'rgba(255, 255, 255, 0.12)', active: 'rgba(255, 255, 255, 0.18)' }
+      // Replace the sampled accent/text/border tokens with the fixed palette so
+      // every control and lyric matches.
+      const fixedKeys: Record<string, string[]> = {
+        accent: ['color-primary', 'color-accent', 'color-nav-font', 'color-primary-font', 'color-primary-font-hover', 'color-primary-font-active', 'color-button-font', 'color-button-font-selected', 'color-primary-dark-100', 'color-primary-dark-200', 'color-primary-dark-100-alpha-100', 'color-primary-dark-100-alpha-200', 'color-primary-dark-100-alpha-300', 'color-primary-light-100-alpha-300', 'color-primary-dark-500-alpha-500', 'color-badge-primary', 'color-badge-secondary', 'color-badge-tertiary'],
+        text: ['color-font', 'color-text', 'color-850', 'color-primary-light-400-alpha-200'],
+        secondary: ['color-font-label', 'color-text-muted', 'color-text-secondary', 'color-200', 'color-300', 'color-400', 'color-450', 'color-500', 'color-550', 'color-650', 'color-700'],
+        onAccent: ['color-000', 'adaptive-selection-text'],
+        border: ['color-border', 'color-primary-light-100-alpha-700', 'color-primary-light-200-alpha-700', 'color-primary-dark-200-alpha-700'],
+        hover: ['color-hover', 'color-button-background-hover', 'color-primary-background-hover', 'color-primary-light-100-alpha-100', 'color-primary-light-100-alpha-800', 'color-primary-light-300-alpha-700', 'color-primary-light-400-alpha-700', 'color-primary-dark-100-alpha-600', 'color-primary-light-500-alpha-700', 'color-primary-light-200-alpha-900'],
+        active: ['color-active', 'color-selected', 'color-button-background-active', 'color-button-background-selected', 'color-primary-background-active', 'color-primary-dark-100-alpha-700', 'color-primary-dark-200-alpha-600', 'color-primary-light-300-alpha-800', 'color-primary-light-100-alpha-400', 'color-primary-light-100-alpha-600', 'color-btn-hide', 'color-btn-min', 'color-btn-max', 'color-btn-close'],
+      }
+      for (const [kind, names] of Object.entries(fixedKeys)) {
+        for (const name of names) write(scope, `--${name}`, controls[kind as keyof typeof controls])
+      }
+      write(scope, 'adaptive-selection-background', controls.accent)
+      write(scope, '--ambient-lyric-accent', controls.text)
+      write(scope, '--focus-ring', `0 0 0 2px ${controls.accent.replace('rgb(', 'rgba(').replace(')', ', 0.75)')}`)
+      write(scope, '--color-list-header-border-bottom', `1px solid ${controls.border}`)
       for (let index = 0; index < CONTROL_COLUMNS * CONTROL_ROWS; index += 1) {
         write(scope, `--ambient-zone-${index}-accent`, controls.accent)
         write(scope, `--ambient-zone-${index}-lyric-accent`, controls.text)
