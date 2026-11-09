@@ -213,10 +213,6 @@ export default {
 <style lang="less" module>
 @import '@renderer/assets/styles/layout.less';
 
-// Subtitle-style halo: the theme background colour behind each glyph, so lyrics
-// separate from artwork without painting a panel over it.
-@lyric-halo: color-mix(in srgb, var(--color-content-background) 72%, transparent);
-
 .right {
   flex: 0 0 60%;
   // padding: 0 30px;
@@ -232,16 +228,6 @@ export default {
   --lyric-active-color: var(--lyric-text, var(--color-450));
 
   :global {
-    // Only the dynamic background needs the halo: it is the mode that paints
-    // artwork under the text. Without it the stock theme colours stay untouched.
-    .line-content {
-      text-shadow:
-        -1px 0 0 var(--lyric-halo, @lyric-halo),
-        1px 0 0 var(--lyric-halo, @lyric-halo),
-        0 -1px 0 var(--lyric-halo, @lyric-halo),
-        0 1px 0 var(--lyric-halo, @lyric-halo),
-        0 2px 6px rgba(0, 0, 0, .35);
-    }
     // Karaoke progress keeps the same hue: unplayed characters sit at 55% alpha,
     // played ones use the full lyric colour. Translation and romanization sit at
     // that same 55% alpha so the whole group reads as one colour.

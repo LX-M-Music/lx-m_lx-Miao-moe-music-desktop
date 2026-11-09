@@ -57,7 +57,6 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       count: document.querySelectorAll('.line-content').length,
     }
   })
-  const hasHalo = shadow => ['-1px 0px 0px', '1px 0px 0px', '0px -1px 0px', '0px 1px 0px', '0px 2px 6px'].every(token => shadow.includes(token))
 
   try {
     await fs.mkdir(output, { recursive: true })
@@ -107,7 +106,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert.equal(state.ambientLyrics, true, 'expected the ambient lyric mode')
       assert.equal(state.rightScrim, 'none', 'no panel while the dynamic background is on')
       assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
-      assert(hasHalo(state.idle.shadow), `expected the subtitle halo, got ${state.idle.shadow}`)
+      assert.equal(state.idle.shadow, 'none', 'no halo: the chosen colour carries the contrast on its own')
       assert(state.lyricText.length > 0, 'the reading area must publish a lyric colour')
       assert(sameColor(state.idleVar, state.lyricText), `idle variable ${state.idleVar} should follow ${state.lyricText}`)
       assert(sameColor(state.idle.color, state.lyricText), 'idle lyrics should use the reading-area colour')

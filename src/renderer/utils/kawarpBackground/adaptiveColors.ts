@@ -160,7 +160,6 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       const readingBackground = compositeBackgrounds(readingArea, surface, opacity)
       const readingLuminance = readingBackground.reduce((total, color) => total + luminance(color), 0) / readingBackground.length
       write(scope, '--lyric-text', readingLuminance < 0.18 ? 'rgb(255, 255, 255)' : 'rgb(12, 12, 12)')
-      write(scope, '--lyric-halo', readingLuminance < 0.18 ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.6)')
       regions.forEach((region, index) => {
         const colors = createControlColors(compositeBackgrounds(region, surface, opacity), regionColors[index], palette)
         write(scope, `--ambient-zone-${index}-accent`, rgb(colors.accent))
