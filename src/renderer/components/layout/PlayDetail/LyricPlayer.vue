@@ -236,6 +236,16 @@ export default {
     .line-content:not(.active) .font-lrc {
       --lyric-active-color: var(--lyric-idle-color);
     }
+    // Only the dynamic background needs the halo: it is the mode that paints
+    // artwork under the text. Without it the stock theme colours stay untouched.
+    .line-content {
+      text-shadow:
+        -1px 0 0 @lyric-halo,
+        1px 0 0 @lyric-halo,
+        0 -1px 0 @lyric-halo,
+        0 1px 0 @lyric-halo,
+        0 2px 6px rgba(0, 0, 0, .35);
+    }
   }
 
   .lyricSelectline { opacity: var(--lyric-idle-opacity); }
@@ -257,7 +267,7 @@ export default {
   }
   :global {
     .font-lrc {
-      color: var(--lyric-idle-color, var(--color-font));
+      color: var(--lyric-idle-color, var(--color-450));
       transition: var(--duration-normal) var(--ease-standard);
       transition-property: color, opacity;
     }
@@ -265,14 +275,8 @@ export default {
       line-height: 1.2;
       padding: calc(var(--playDetail-lrc-font-size, 16px) / 2) 1px;
       overflow-wrap: break-word;
-      color: var(--lyric-idle-color, var(--color-font));
-      opacity: var(--lyric-idle-opacity, .92);
-      text-shadow:
-        -1px 0 0 @lyric-halo,
-        1px 0 0 @lyric-halo,
-        0 -1px 0 @lyric-halo,
-        0 1px 0 @lyric-halo,
-        0 2px 6px rgba(0, 0, 0, .35);
+      color: var(--lyric-idle-color, var(--color-450));
+      opacity: var(--lyric-idle-opacity, .64);
       transition: var(--duration-normal) var(--ease-standard);
       transition-property: color, opacity;
 
@@ -285,7 +289,7 @@ export default {
           transition: color var(--duration-normal) var(--ease-standard);
         }
       }
-      &.line-mode.active .font-lrc, &.font-mode.played .font-lrc {
+      &.font-mode.played > .line > .font-lrc {
         color: var(--lyric-active-color, var(--color-primary-dark-200));
       }
       &.active {
@@ -300,7 +304,7 @@ export default {
           transition: opacity var(--duration-normal) var(--ease-standard);
           font-size: 1em;
           background-repeat: no-repeat;
-          background-color: var(--lyric-idle-color, var(--color-font));
+          background-color: var(--lyric-idle-color, var(--color-450));
           background-image: -webkit-linear-gradient(top, var(--lyric-active-color, var(--color-primary-dark-200)), var(--lyric-active-color, var(--color-primary-dark-200)));
           -webkit-text-fill-color: transparent;
           -webkit-background-clip: text;

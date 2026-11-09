@@ -8,6 +8,9 @@ const project = process.env.LX_TEST_PROJECT ? path.resolve(process.env.LX_TEST_P
 
 async function launch({ record = false, hidden = process.env.LX_TEST_HIDDEN === '1', profilePath, initializeMotion = true, reducedMotion = 'no-preference', rendererPath = process.env.LX_TEST_RENDERER_PATH, mainPath, disableHardwareAcceleration = true, args = [], env: extraEnv = {} } = {}) {
   if (process.env.LX_TEST_PROJECT) rendererPath = path.join(project, 'dist/index.html')
+  // A dev session rewrites dist/main.js in development mode; tests can point at a
+  // production copy kept in the same directory so __dirname still finds index.html.
+  if (mainPath == null && process.env.LX_TEST_MAIN_PATH) mainPath = path.resolve(process.env.LX_TEST_MAIN_PATH)
   const output = profilePath ?? await fs.mkdtemp(path.join(os.tmpdir(), 'lx-motion-check-'))
   await fs.mkdir(path.join(output, 'portable'), { recursive: true })
   const wrapper = path.join(output, 'wrapper.cjs')
