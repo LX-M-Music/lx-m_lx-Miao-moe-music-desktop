@@ -159,7 +159,7 @@ const assertSeparatedPaths = (sourcePath: string, targetPath: string) => {
   }
 }
 
-const validateUserDataPath = (userDataPath: string, sourceUserDataPath?: string) => {
+const validateUserDataPath = (userDataPath: string, sourceUserDataPath?: string | null) => {
   assertNotLinked(userDataPath)
   assertNoLinkedItems(path.join(userDataPath, 'LxDatas'))
   for (const name of legacyRootFiles) assertNotLinked(path.join(userDataPath, name))
@@ -250,6 +250,8 @@ export const setUserDataPath = () => {
   app.setName(APP_NAME)
   if (process.platform == 'win32') app.setAppUserModelId(APP_ID)
   let userDataPath: string
+  // 未打包的开发运行使用独立数据目录，避免升级安装版数据库或抢占单例锁
+  const userDataName = app.isPackaged ? APP_NAME : `${APP_NAME} Dev`
 
   // windows平台下如果应用目录下存在 portable 文件夹则将数据存在此文件下
   if (process.platform == 'win32') {
@@ -264,16 +266,16 @@ export const setUserDataPath = () => {
       app.setPath('userData', userDataPath)
     } else {
       const appDataPath = app.getPath('appData')
-      userDataPath = path.join(appDataPath, APP_NAME)
-      legacyUserDataPath = path.join(appDataPath, legacyUserDataName)
+      userDataPath = path.join(appDataPath, userDataName)
+      legacyUserDataPath = app.isPackaged ? path.join(appDataPath, legacyUserDataName) : null
       mkdirSync(userDataPath, { recursive: true })
       validateUserDataPath(userDataPath, legacyUserDataPath)
       app.setPath('userData', userDataPath)
     }
   } else {
     const appDataPath = app.getPath('appData')
-    userDataPath = path.join(appDataPath, APP_NAME)
-    legacyUserDataPath = path.join(appDataPath, legacyUserDataName)
+    userDataPath = path.join(appDataPath, userDataName)
+    legacyUserDataPath = app.isPackaged ? path.join(appDataPath, legacyUserDataName) : null
     mkdirSync(userDataPath, { recursive: true })
     validateUserDataPath(userDataPath, legacyUserDataPath)
     app.setPath('userData', userDataPath)
