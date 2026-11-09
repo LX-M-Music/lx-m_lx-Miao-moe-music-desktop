@@ -107,7 +107,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert.equal(state.ambientLyrics, true, 'expected the ambient lyric mode')
       assert.equal(state.rightScrim, 'none', 'no panel while the dynamic background is on')
       assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
-      assert.equal(state.idle.shadow, 'none', 'no halo: the chosen colour carries the contrast on its own')
+      assert(['-1px 0px 0px', '0px 1px 0px', '0px 2px 6px'].every(token => state.idle.shadow.includes(token)), `expected the halo back, got ${state.idle.shadow}`)
       assert(state.lyricText.length > 0, 'the reading area must publish a lyric colour')
       assert(sameColor(state.idleVar, state.lyricText), `idle variable ${state.idleVar} should follow ${state.lyricText}`)
       assert(sameColor(state.idleVar, state.controlText), `lyrics ${state.idleVar} must match the control palette ${state.controlText}`)

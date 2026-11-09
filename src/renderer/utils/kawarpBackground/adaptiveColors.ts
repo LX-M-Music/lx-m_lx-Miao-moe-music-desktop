@@ -145,8 +145,10 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       scope.darkText = palette.darkText
       for (const [key, value] of Object.entries(palette.colors)) write(scope, key, value)
       // Lyrics share the controls' polarity so text and buttons always agree:
-      // pure white on dark covers, near-black on bright ones.
+      // pure white on dark covers, near-black on bright ones. The halo is the
+      // opposite tone so the glyphs keep an edge over busy artwork.
       write(scope, '--lyric-text', palette.darkText ? 'rgb(12, 12, 12)' : 'rgb(255, 255, 255)')
+      write(scope, '--lyric-halo', palette.darkText ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.45)')
       // Controls use a fixed two-tone palette chosen by the cover, not a colour
       // sampled behind each widget: identical buttons stay identical anywhere.
       const controls = palette.darkText

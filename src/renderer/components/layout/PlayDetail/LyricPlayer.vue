@@ -228,6 +228,15 @@ export default {
   --lyric-active-color: var(--lyric-text, var(--color-450));
 
   :global {
+    // Subtitle-style halo, in the opposite tone of the fixed lyric colour.
+    .line-content {
+      text-shadow:
+        -1px 0 0 var(--lyric-halo, rgba(0, 0, 0, .45)),
+        1px 0 0 var(--lyric-halo, rgba(0, 0, 0, .45)),
+        0 -1px 0 var(--lyric-halo, rgba(0, 0, 0, .45)),
+        0 1px 0 var(--lyric-halo, rgba(0, 0, 0, .45)),
+        0 2px 6px rgba(0, 0, 0, .35);
+    }
     // Karaoke progress keeps the same hue: unplayed characters sit at 55% alpha,
     // played ones use the full lyric colour. Translation and romanization sit at
     // that same 55% alpha so the whole group reads as one colour.
