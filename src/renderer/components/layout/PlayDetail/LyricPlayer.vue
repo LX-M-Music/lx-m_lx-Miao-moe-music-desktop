@@ -4,7 +4,7 @@
       <div
         v-show="!isShowLrcSelectContent"
         ref="dom_lyric"
-        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }]" :style="lrcStyles"
+        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.hidePassedLines]: appSetting['playDetail.hidePassedLyric'] }]" :style="lrcStyles"
         @wheel="handleWheel" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart"
         @contextmenu.stop="handleShowLyricMenu"
       >
@@ -170,6 +170,7 @@ export default {
     })
 
     return {
+      appSetting,
       dom_lyric,
       dom_lyric_text,
       dom_lrc_select_content,
@@ -336,7 +337,12 @@ export default {
       margin-inline: var(--lyric-zoom-margins, auto);
       transform: scale(1);
       transform-origin: var(--lyric-transform-origin, center) center;
-      transition: transform var(--duration-slow) var(--ease-standard), color var(--duration-slow) var(--ease-standard), opacity var(--duration-slow) var(--ease-standard);
+      // Overshooting curve: the active row grows slightly past its target and
+      // settles back, giving a light spring feel without a per-frame JS loop.
+      transition:
+        transform var(--duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1),
+        color var(--duration-slow) var(--ease-standard),
+        opacity var(--duration-slow) var(--ease-standard);
       .font-lrc {
         transition-duration: var(--duration-slow);
       }
@@ -344,6 +350,13 @@ export default {
         transform: scale(var(--lyric-active-scale));
       }
     }
+  }
+}
+
+// Optional: once a karaoke row finishes, fade it out so the upcoming lines lead.
+.hidePassedLines {
+  :global(.line-content.played:not(.active)) {
+    opacity: 0;
   }
 }
 

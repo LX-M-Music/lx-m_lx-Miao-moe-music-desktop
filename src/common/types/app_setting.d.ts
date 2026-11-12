@@ -337,6 +337,11 @@ declare global {
        */
       'playDetail.isDelayScroll': boolean
 
+      /**
+       * 播放详情页-已唱歌词是否淡出
+       */
+      'playDetail.hidePassedLyric': boolean
+
 
       /**
        * 是否启用桌面歌词

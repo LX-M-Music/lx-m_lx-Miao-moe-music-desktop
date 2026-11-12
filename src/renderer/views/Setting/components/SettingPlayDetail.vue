@@ -6,6 +6,8 @@ dd
   .gap-top
     base-checkbox(id="setting_play_detail_lyric_delayScroll" :model-value="appSetting['playDetail.isDelayScroll']" :label="$t('setting__play_detail_lyric_delay_scroll')" @update:model-value="updateSetting({ 'playDetail.isDelayScroll': $event })")
   .gap-top
+    base-checkbox(id="setting_play_detail_lyric_hide_passed" :model-value="appSetting['playDetail.hidePassedLyric']" :label="$t('setting__play_detail_lyric_hide_passed')" @update:model-value="updateSetting({ 'playDetail.hidePassedLyric': $event })")
+  .gap-top
     base-checkbox(id="setting_play_detail_lyric_progress_enable" :model-value="appSetting['playDetail.isShowLyricProgressSetting']" :label="$t('setting__play_detail_lyric_progress')" @update:model-value="updateSetting({'playDetail.isShowLyricProgressSetting': $event})")
 
 dd(data-setting-search="setting__play_detail_font_weight")

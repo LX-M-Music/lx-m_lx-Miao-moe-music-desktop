@@ -52,6 +52,26 @@ export const finishMotions = () => {
   finishTasks.clear()
 }
 
+export interface ScrollSpringOptions {
+  /** Milliseconds between the target lyric line and the previous line. */
+  interval?: number
+  /** The timeline jumped; settle without an overshoot. */
+  seeking?: boolean
+}
+
+/**
+ * Dense lyrics get a stiffer spring so rows do not lag behind the vocals;
+ * sparse lines keep a softer one so the sheet glides instead of snapping.
+ * Seeking always uses a stable, lightly damped spring.
+ */
+export const getScrollSpring = ({ interval, seeking }: ScrollSpringOptions = {}) => {
+  if (seeking) return { stiffness: 210, damping: 29 }
+  const spacing = interval == null || !Number.isFinite(interval) ? 450 : Math.min(Math.max(interval, 100), 800)
+  const density = 1 - (spacing - 100) / 700
+  const stiffness = 260 + density * 140
+  return { stiffness, damping: Math.sqrt(stiffness) * 1.8 }
+}
+
 /** Scroll on the same browser timing curve as the lyric scale transition. */
 export const scrollWithMotion = (element: HTMLElement, target: number, kind: MotionKind = 'slow') => {
   const to = Math.max(0, Math.min(target, element.scrollHeight - element.clientHeight))
@@ -84,7 +104,7 @@ export const scrollWithMotion = (element: HTMLElement, target: number, kind: Mot
 }
 
 /** Damped lyric scrolling, cancellable as soon as the user takes control. */
-export const scrollWithSpring = (element: HTMLElement, target: number) => {
+export const scrollWithSpring = (element: HTMLElement, target: number, options: ScrollSpringOptions = {}) => {
   const to = Math.max(0, Math.min(target, element.scrollHeight - element.clientHeight))
   let frame = 0
   let position = element.scrollTop
@@ -92,6 +112,7 @@ export const scrollWithSpring = (element: HTMLElement, target: number) => {
   let previous = performance.now()
   const started = previous
   const speed = MOTION_DURATION.panel / (getMotionDuration('panel') || MOTION_DURATION.panel)
+  const { stiffness, damping } = getScrollSpring(options)
   const cancel = () => { cancelAnimationFrame(frame); finishTasks.delete(finish) }
   const finish = () => { element.scrollTop = to; cancel() }
   if (!isMotionEnabled()) { finish(); return cancel }
@@ -100,7 +121,7 @@ export const scrollWithSpring = (element: HTMLElement, target: number) => {
     if (!element.isConnected) { cancel(); return }
     const dt = Math.min((time - previous) / 1000, 0.032)
     previous = time
-    velocity += ((to - position) * 230 * speed * speed - velocity * 27 * speed) * dt
+    velocity += ((to - position) * stiffness * speed * speed - velocity * damping * speed) * dt
     position += velocity * dt
     element.scrollTop = position
     if ((Math.abs(to - position) < 0.3 && Math.abs(velocity) < 2) || time - started > 2000 / speed) finish()

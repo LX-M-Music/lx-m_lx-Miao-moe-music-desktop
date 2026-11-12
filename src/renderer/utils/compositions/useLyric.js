@@ -1,6 +1,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from '@common/utils/vueTools'
 import { formatPlayTime2 } from '@common/utils/common'
-import { isMotionEnabled, scrollWithMotion, scrollWithSpring } from '@renderer/utils/motion'
+import { isMotionEnabled, scrollWithSpring } from '@renderer/utils/motion'
 import { play } from '@renderer/core/player/action'
 import { appSetting } from '@renderer/store/setting'
 
@@ -33,7 +33,7 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     resetManualScroll()
     window.app_event.setProgress(time)
     if (!isPlay.value) play()
-    nextTick(() => handleScrollLrc())
+    nextTick(() => handleScrollLrc(undefined, true))
   }
   const handleSkipMouseEnter = () => {
     isSkipMouseEnter = true
@@ -107,7 +107,7 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     seekFrame = null
   }
 
-  const handleScrollLrc = (duration = 300) => {
+  const handleScrollLrc = (duration = 300, seeking = false) => {
     if (!dom_lines?.length || !dom_lyric.value?.clientHeight) return
     if (isSkipMouseEnter || isSkipFocused) return
     if (isStopScroll.value) return
@@ -121,9 +121,12 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
       cancelScrollFn = null
       return
     }
-    cancelScrollFn = appSetting['playDetail.isZoomActiveLrc']
-      ? scrollWithMotion(dom_lyric.value, target)
-      : scrollWithSpring(dom_lyric.value, target)
+    // Dense lyrics get a stiffer spring than sparse ones, so fast songs and
+    // ballads both settle at the right pace.
+    const currentLine = lyric.lines[lyric.line]
+    const previousLine = lyric.lines[lyric.line - 1]
+    const interval = currentLine && previousLine ? currentLine.time - previousLine.time : undefined
+    cancelScrollFn = scrollWithSpring(dom_lyric.value, target, { interval, seeking })
   }
   const clearLyricScrollTimeout = () => {
     if (!timeout) return
@@ -217,7 +220,7 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
       if (lineOffset != null && currentLineDom && isStopScroll.value) {
         dom_lyric.value.scrollTop = currentLineDom.offsetTop - lineOffset
       } else {
-        handleScrollLrc()
+        handleScrollLrc(undefined, true)
       }
       isSetedLines = false
       setTime()

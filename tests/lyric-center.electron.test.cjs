@@ -128,8 +128,11 @@ test('the playing lyric group stays centered through zoom, wrapped text and view
         assert(zoomStarts && moveStarts && Math.abs(zoomStarts.time - moveStarts.time) <= 100, 'enlargement and upward scrolling begin together')
         assert(frames.some(frame => frame.scale > 1.005 && frame.scale < 1.135 && frame.followingTop < frames[0].followingTop - 1), 'lower lyrics move up during enlargement')
         assert(frames.at(-1).active && frames.at(-1).centerError < 1.5, 'the playing lyric settles at the viewport center')
-        const settledZoom = frames.find(frame => frame.scale >= 1.1395)
-        assert(settledZoom.centerError < 2, 'scrolling centers the lyric as its enlargement finishes')
+        // The zoom now uses an overshooting (spring-like) curve: it passes
+        // 1.14, then settles back while the scroll finishes.
+        const overshoot = frames.find(frame => frame.scale > 1.1405)
+        assert(overshoot, 'the enlargement should overshoot slightly before settling')
+        assert(Math.abs(frames.at(-1).scale - 1.14) < 0.005, 'the enlargement settles back to 1.14 after the overshoot')
       })
     }
 

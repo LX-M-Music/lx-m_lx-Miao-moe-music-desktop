@@ -1140,6 +1140,7 @@
   "setting__play_detail_font_weight_tip": "Adjust text weight on the playback detail page, including lyrics, translations, romanization and song information. 400 is regular weight; higher values are thicker. Changes apply immediately.",
   "setting__play_detail_font_weight_reset": "Reset to regular weight",
   "setting__play_detail_lyric_delay_scroll": "Delay scrolling lyrics",
+  "setting__play_detail_lyric_hide_passed": "Fade out played lyrics",
   "setting__play_detail_lyric_progress": "Show a position guide and seek button when scrolling lyrics",
   "setting__play_lyric_lxlrc": "Playback with karaoke-style lyrics if available",
   "setting__play_lyric_lxlrc_tip": "This feature requires higher performance and is not recommended to be turned on for low performance devices!",
