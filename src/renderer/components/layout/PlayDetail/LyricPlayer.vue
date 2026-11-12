@@ -96,6 +96,26 @@ export default {
 
     const dom_lrc_select_content = useSelectAllLrc()
 
+    // Passed rows are indexed against the active line, so this works for both
+    // line-level and word-level lyrics instead of relying on the transient
+    // `.played` class the font player puts on the row that just finished.
+    const markPassedLines = () => {
+      const container = dom_lyric.value
+      if (!container) return
+      const current = lyric.line
+      const hide = appSetting['playDetail.hidePassedLyric']
+      container.querySelectorAll('.line-content').forEach((row, index) => {
+        row.classList.toggle('isPassed', hide && current >= 0 && index < current)
+      })
+    }
+    watch([
+      () => lyric.line,
+      () => lyric.lines,
+      () => appSetting['playDetail.hidePassedLyric'],
+    ], () => {
+      void nextTick(markPassedLines)
+    }, { flush: 'post' })
+
     watch([isFullscreen, isShowPlayComment], () => {
       setTimeout(handleScrollLrc, 400)
     })
@@ -163,6 +183,7 @@ export default {
     onMounted(() => {
       window.app_event.on('musicToggled', updateMusicInfo)
       window.app_event.on('lyricUpdated', updateMusicInfo)
+      void nextTick(markPassedLines)
     })
     onBeforeUnmount(() => {
       window.app_event.off('musicToggled', updateMusicInfo)
@@ -353,9 +374,9 @@ export default {
   }
 }
 
-// Optional: once a karaoke row finishes, fade it out so the upcoming lines lead.
+// Optional: rows above the active line fade out so the upcoming lines lead.
 .hidePassedLines {
-  :global(.line-content.played:not(.active)) {
+  :global(.line-content.isPassed) {
     opacity: 0;
   }
 }

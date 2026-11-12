@@ -6,7 +6,20 @@ const themes = require('../src/common/theme/index.json')
 
 const rendererPath = path.resolve('dist/index.html')
 
-test('lyric zoom overshoots and played rows fade out when enabled', { timeout: 180000 }, async() => {
+const readRows = page => page.evaluate(() => {
+  const lyric = document.querySelector('.lyric')
+  return {
+    activeScale: lyric ? window.getComputedStyle(lyric).getPropertyValue('--lyric-active-scale').trim() : '',
+    rows: [...document.querySelectorAll('.line-content')].map(row => ({
+      active: row.classList.contains('active'),
+      passed: row.classList.contains('isPassed'),
+      opacity: Number(window.getComputedStyle(row).opacity),
+      timing: window.getComputedStyle(row).transitionTimingFunction,
+    })),
+  }
+})
+
+test('line-level lyrics fade passed rows and keep the zoom overshoot', { timeout: 180000 }, async() => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture
   try {
@@ -16,7 +29,7 @@ test('lyric zoom overshoots and played rows fade out when enabled', { timeout: 1
     await page.evaluate(() => window.lxData.updateSetting({
       'common.langId': 'zh-cn',
       'ui.ambientBackground': false,
-      'player.isPlayLxlrc': true,
+      'player.isPlayLxlrc': false,
       'playDetail.isZoomActiveLrc': true,
       'playDetail.isDelayScroll': false,
       'playDetail.hidePassedLyric': true,
@@ -24,43 +37,37 @@ test('lyric zoom overshoots and played rows fade out when enabled', { timeout: 1
     await page.waitForFunction(() => window.lxData.appSetting['playDetail.hidePassedLyric'] === true)
     await seedTrack(page)
     await page.evaluate(() => Object.assign(window.lxData.musicInfo, {
-      lrc: '[00:00.000]原文第一行\n[00:05.000]原文第二行\n[00:10.000]原文第三行',
-      lxlrc: '[00:00.000]<0,1500>原文<1500,3000>第一行\n[00:05.000]<0,1500>原文<1500,3000>第二行\n[00:10.000]<0,1500>原文<1500,3000>第三行',
+      lrc: '[00:00.000]第一行\n[00:02.000]第二行\n[00:04.000]第三行\n[00:06.000]第四行',
+      lxlrc: '',
       tlrc: '',
     }))
     await page.evaluate(() => window.app_event.emit('lyricUpdated'))
     await showDetail(page, true)
     await settled(page)
-    await page.waitForFunction(() => document.querySelectorAll('.line-content.font-mode').length > 1)
-    await page.evaluate(() => window.app_event.setProgress(6))
-    await page.waitForTimeout(500)
+    await page.waitForFunction(() => document.querySelectorAll('.line-content.line-mode').length === 4)
+    await page.evaluate(() => window.app_event.setProgress(5))
+    await page.waitForFunction(() => document.querySelectorAll('.line-content.active').length === 1)
+    await page.waitForTimeout(600)
 
-    const state = await page.evaluate(() => {
-      const lyric = document.querySelector('.lyric')
-      const rows = [...document.querySelectorAll('.line-content')]
-      const row = rows.find(line => !line.classList.contains('active')) ?? rows[0]
-      row.classList.add('played')
-      const style = window.getComputedStyle(row)
-      return {
-        activeScale: lyric ? window.getComputedStyle(lyric).getPropertyValue('--lyric-active-scale').trim() : '',
-        playedOpacity: Number(style.opacity),
-        timing: style.transitionTimingFunction,
-      }
-    })
-
+    const state = await readRows(page)
     assert.equal(state.activeScale, '1.14', 'zoom should be active for this test')
-    assert(state.timing.includes('cubic-bezier'), `expected a timed scale transition, got ${state.timing}`)
-    assert(state.timing.includes('1.56'), `expected the overshoot curve, got ${state.timing}`)
-    assert.equal(state.playedOpacity, 0, `played row should be hidden, got ${state.playedOpacity}`)
+    assert.equal(state.rows.length, 4)
+    assert(state.rows[0].passed && state.rows[1].passed, 'rows above the active line are passed')
+    assert.equal(state.rows[0].opacity, 0, `passed row should be hidden, got ${state.rows[0].opacity}`)
+    assert.equal(state.rows[1].opacity, 0, `passed row should be hidden, got ${state.rows[1].opacity}`)
+    assert(state.rows[2].active, 'third row should be active at 5s')
+    assert(!state.rows[2].passed, 'active row is never marked as passed')
+    assert(state.rows[2].opacity > 0.9, `active row stays visible, got ${state.rows[2].opacity}`)
+    assert(!state.rows[3].passed, 'upcoming rows stay visible')
+    assert(state.rows[2].timing.includes('cubic-bezier'), `expected a timed scale transition, got ${state.rows[2].timing}`)
+    assert(state.rows[2].timing.includes('1.56'), `expected the overshoot curve, got ${state.rows[2].timing}`)
 
     await page.evaluate(() => window.lxData.updateSetting({ 'playDetail.hidePassedLyric': false }))
     await page.waitForFunction(() => window.lxData.appSetting['playDetail.hidePassedLyric'] === false)
-    await page.waitForTimeout(500)
-    const visibleOpacity = await page.evaluate(() => {
-      const row = [...document.querySelectorAll('.line-content')].find(line => line.classList.contains('played'))
-      return row ? Number(window.getComputedStyle(row).opacity) : null
-    })
-    assert.notEqual(visibleOpacity, 0, 'disabling the setting should restore played rows')
+    await page.waitForTimeout(600)
+    const restored = await readRows(page)
+    assert(restored.rows.every(row => !row.passed), 'disabling the setting clears every passed mark')
+    assert(restored.rows[0].opacity > 0.5, `disabling should restore passed rows, got ${restored.rows[0].opacity}`)
 
     assert.deepEqual(fixture.errors, [])
   } finally { await app.close() }
