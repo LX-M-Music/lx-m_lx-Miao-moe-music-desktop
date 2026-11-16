@@ -125,6 +125,68 @@ export default {
       void nextTick(markFocusRows)
     }, { flush: 'post' })
 
+    // Word-level lyrics drive a continuous crossfade: the active row fades out
+    // across its last word while the next row fades in, so the focus gradient
+    // moves with the karaoke instead of jumping at the line boundary.
+    const parseTimestamp = label => {
+      const [whole, fraction = ''] = label.split('.')
+      const seconds = whole.split(':').reduce((total, part) => total * 60 + Number(part), 0)
+      return seconds * 1000 + Number(fraction.padEnd(3, '0'))
+    }
+    const wordTimings = computed(() => {
+      const map = new Map()
+      for (const row of String(playerMusicInfo.lxlrc ?? '').split('\n')) {
+        const match = /^\[([^\]]+)\](.*)$/.exec(row.trimEnd())
+        if (!match) continue
+        const words = [...match[2].matchAll(/<(\d+),(\d+)>/g)]
+        if (!words.length) continue
+        const last = words[words.length - 1]
+        map.set(parseTimestamp(match[1]), {
+          start: Number(last[1]),
+          end: Number(last[1]) + Number(last[2]),
+        })
+      }
+      return map
+    })
+    const FOCUS_FADE_MIN = 350
+    const updateFocusMix = () => {
+      const container = dom_lyric.value
+      if (!container || !isFocusGradient.value) return
+      const rows = [...container.querySelectorAll('.line-content')]
+      for (const row of rows) row.style.removeProperty('--lyric-focus-mix')
+      const current = lyric.line
+      const line = lyric.lines[current]
+      const timing = line ? wordTimings.value.get(line.time) : null
+      if (!timing) return
+      const offset = (lyric.offset || 0) + (lyric.tempOffset || 0)
+      const now = playProgress.nowPlayTime * 1000 + offset
+      const wordStart = line.time + timing.start
+      const lineEnd = line.time + timing.end
+      const start = Math.max(line.time, Math.min(wordStart, lineEnd - FOCUS_FADE_MIN))
+      const duration = lineEnd - start
+      if (duration <= 0) return
+      const progress = Math.max(0, Math.min(1, (now - start) / duration))
+      const mix = progress * progress * (3 - 2 * progress)
+      rows[current]?.style.setProperty('--lyric-focus-mix', String(mix))
+      rows[current + 1]?.style.setProperty('--lyric-focus-mix', String(mix))
+    }
+    watch([
+      () => lyric.line,
+      () => lyric.lines,
+      isFocusGradient,
+      wordTimings,
+    ], () => {
+      void nextTick(() => {
+        markFocusRows()
+        if (isFocusGradient.value) {
+          updateFocusMix()
+        } else {
+          dom_lyric.value?.querySelectorAll('.line-content').forEach(row => row.style.removeProperty('--lyric-focus-mix'))
+        }
+      })
+    }, { flush: 'post' })
+    watch(() => playProgress.nowPlayTime, updateFocusMix)
+
     watch([isFullscreen, isShowPlayComment], () => {
       setTimeout(handleScrollLrc, 400)
     })
@@ -396,6 +458,16 @@ export default {
   :global(.line-content.isUpcoming[data-lyric-distance="2"]) { opacity: .5; }
 
   :global(.line-content.isUpcoming[data-lyric-distance="3"]) { opacity: .38; }
+
+  // Word-level lyrics: while the last word of the active line is being sung,
+  // the row fades out and the next row fades in in the same window.
+  :global(.line-content.active) {
+    opacity: calc(1 - var(--lyric-focus-mix, 0) * .56);
+  }
+
+  :global(.line-content.isUpcoming[data-lyric-distance="1"]) {
+    opacity: calc(.62 + var(--lyric-focus-mix, 0) * .38);
+  }
 }
 
 .skip {
