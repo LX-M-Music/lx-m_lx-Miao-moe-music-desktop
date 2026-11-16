@@ -110,7 +110,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert.equal(state.ambientLyrics, true, 'expected the ambient lyric mode')
       assert.equal(state.rightScrim, 'none', 'no panel while the dynamic background is on')
       assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
-      assert(!!state.idle.shadow.includes('0px 2px 10px') && !!state.idle.shadow.includes('0px 1px 3px'), `expected a soft drop shadow, got ${state.idle.shadow}`)
+      assert(!!state.idle.shadow.includes('0px 1px 2px') && !!state.idle.shadow.includes('0px 2px 4px'), `expected a tight drop shadow, got ${state.idle.shadow}`)
       assert(!state.idle.shadow.includes('-1px 0px 0px') && !state.idle.shadow.includes('0px -1px 0px'), `the outline should be gone, got ${state.idle.shadow}`)
       assert(state.lyricText.length > 0, 'the reading area must publish a lyric colour')
       assert(sameColor(state.idleVar, state.lyricText), `idle variable ${state.idleVar} should follow ${state.lyricText}`)

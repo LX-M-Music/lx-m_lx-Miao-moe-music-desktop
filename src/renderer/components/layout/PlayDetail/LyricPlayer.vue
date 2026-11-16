@@ -326,10 +326,12 @@ export default {
   :global {
     // Soft shadow behind the glyphs instead of an outline, so the lyrics stay
     // readable over busy artwork without drawing a border around every letter.
+    // Keep the blur inside the row: a wide shadow bleeds onto the neighbouring
+    // line and reads as if it were painted over the text.
     .line-content {
       text-shadow:
-        0 2px 10px var(--lyric-shadow, rgba(0, 0, 0, .45)),
-        0 1px 3px var(--lyric-shadow, rgba(0, 0, 0, .45));
+        0 1px 2px var(--lyric-shadow, rgba(0, 0, 0, .45)),
+        0 2px 4px var(--lyric-shadow, rgba(0, 0, 0, .45));
     }
     // Karaoke progress keeps the same hue: unplayed characters sit at 55% alpha,
     // played ones use the full lyric colour. Translation and romanization sit at
