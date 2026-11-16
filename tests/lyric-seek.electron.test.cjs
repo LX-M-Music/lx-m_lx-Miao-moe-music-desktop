@@ -218,6 +218,45 @@ test('native lyric scrolling previews and seeks the actual audio position', { ti
       await page.locator(guideSelector).waitFor({ state: 'hidden' })
     })
 
+    await t.test('a stale line report right after a jump does not scroll the sheet back', async() => {
+      // The engine keeps reporting the line that was playing for a frame while the
+      // seek lands; that reflow used to start a scroll back to it.
+      await page.evaluate(async() => {
+        const audio = window.__lxPluginHost.player.getAudioElement()
+        audio.currentTime = 10
+        await audio.play()
+      })
+      await page.waitForFunction(() => window.__lxPluginHost.mainLyricState.lyric.line >= 9)
+      await page.waitForTimeout(300)
+      await scrollToLine(page, 30)
+      const before = await page.locator('.lyric').evaluate(element => Math.round(element.scrollTop))
+      await page.evaluate(() => {
+        window.__scrollSamples = []
+        const view = document.querySelector('.lyric')
+        const start = performance.now()
+        const sample = () => {
+          window.__scrollSamples.push(Math.round(view.scrollTop))
+          if (performance.now() - start < 1200) requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+      })
+      await page.evaluate(() => {
+        // Click, then immediately report the line that was playing: this is the
+        // frame where the engine has not caught up with the seek yet.
+        document.querySelector('[data-lyric-seek-guide] button').click()
+        const state = window.__lxPluginHost.mainLyricState.lyric
+        state.line = Math.max(0, state.line - 1)
+      })
+      await page.waitForTimeout(1400)
+      const samples = await page.evaluate(() => window.__scrollSamples)
+      assert(samples.length > 20, `expected scroll frames, got ${samples.length}`)
+      const lowest = Math.min(...samples)
+      assert(lowest >= before - 8, `a stale line report pulled the sheet back from ${before} to ${lowest}`)
+      const line = await page.evaluate(() => window.__lxPluginHost.mainLyricState.lyric.line)
+      assert(line >= 30, `playback should continue from the jumped line, got ${line}`)
+      await page.evaluate(() => window.__lxPluginHost.player.getAudioElement().pause())
+    })
+
     await t.test('disabling the guide, reopening details and changing tracks clear stale seek positions', async() => {
       await page.evaluate(() => { window.lxData.appSetting['playDetail.isShowLyricProgressSetting'] = false })
       await page.locator(guideSelector).waitFor({ state: 'detached' })

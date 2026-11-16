@@ -26,6 +26,10 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
   let seekFrame = null
   let resizeObserver
   let delayScrollTimeout
+  // Row a jump is settling on; see handleScrollLrc.
+  let jumpIndex = null
+  let jumpAt = 0
+  const JUMP_GUARD_MS = 600
 
   const handleSkipPlay = () => {
     // Recalculate on click as scrolling, resizing or lyric offsets may have changed.
@@ -37,6 +41,10 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     const index = seekLine.value
     if (time == null) return
     resetManualScroll()
+    if (index != null) {
+      jumpIndex = index
+      jumpAt = performance.now()
+    }
     window.app_event.setProgress(time)
     if (!isPlay.value) play()
     nextTick(() => handleScrollLrc(undefined, true, index == null ? undefined : index))
@@ -114,17 +122,26 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     isSkipFocused = false
     seekTime.value = null
     seekLine.value = null
+    jumpIndex = null
     if (seekFrame != null) window.cancelAnimationFrame(seekFrame)
     seekFrame = null
   }
 
   // `index` lets a jump centre the row the guide was over before the store catches
-  // up with the seek; everything else follows the playing line.
-  const handleScrollLrc = (duration = 300, seeking = false, index = lyric.line) => {
+  // up with the seek; everything else follows the playing line. While a jump is
+  // still settling the engine keeps reporting the line that was playing, and a
+  // reflow in that window used to start a scroll to it, so every scroll keeps
+  // aiming at the jump row until the engine agrees.
+  const handleScrollLrc = (duration = 300, seeking = false, index) => {
     if (!dom_lines?.length || !dom_lyric.value?.clientHeight) return
     if (isSkipMouseEnter || isSkipFocused) return
     if (isStopScroll.value) return
-    const lineIndex = Math.max(0, Math.min(dom_lines.length - 1, index))
+    let focusLine = index ?? lyric.line
+    if (index == null && jumpIndex != null) {
+      if (lyric.line === jumpIndex || performance.now() - jumpAt > JUMP_GUARD_MS) jumpIndex = null
+      else focusLine = jumpIndex
+    }
+    const lineIndex = Math.max(0, Math.min(dom_lines.length - 1, focusLine))
     const dom_p = dom_lines[lineIndex]
     cancelScrollFn?.()
     // Center the complete lyric group, including wrapped translations/romaji.
