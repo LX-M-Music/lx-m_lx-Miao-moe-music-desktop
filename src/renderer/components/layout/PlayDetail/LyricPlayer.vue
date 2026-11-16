@@ -133,9 +133,8 @@ export default {
       void nextTick(markFocusRows)
     }, { flush: 'post' })
 
-    // Word-level lyrics drive a continuous crossfade: the active row fades out
-    // across its last word while the next row fades in, so the focus gradient
-    // moves with the karaoke instead of jumping at the line boundary.
+    // Word-level lyrics publish how much of the line has been sung: the translation
+    // and romanization below it are wiped in with that share.
     const parseTimestamp = label => {
       const [whole, fraction = ''] = label.split('.')
       const seconds = whole.split(':').reduce((total, part) => total * 60 + Number(part), 0)
@@ -162,39 +161,10 @@ export default {
           chars += length
         })
         if (!words.length) continue
-        const last = words[words.length - 1]
-        map.set(parseTimestamp(match[1]), {
-          start: last.start,
-          end: last.start + last.duration,
-          words,
-          chars,
-        })
+        map.set(parseTimestamp(match[1]), { words, chars })
       }
       return map
     })
-    const FOCUS_FADE_MIN = 350
-    const updateFocusMix = () => {
-      const container = dom_lyric.value
-      if (!container || !isFocusGradient.value) return
-      const rows = [...container.querySelectorAll('.line-content')]
-      for (const row of rows) row.style.removeProperty('--lyric-focus-mix')
-      const current = lyric.line
-      const line = lyric.lines[current]
-      const timing = line ? karaokeLines.value.get(line.time) : null
-      if (!timing) return
-      const offset = (lyric.offset || 0) + (lyric.tempOffset || 0)
-      const now = playProgress.nowPlayTime * 1000 + offset
-      const wordStart = line.time + timing.start
-      const lineEnd = line.time + timing.end
-      const start = Math.max(line.time, Math.min(wordStart, lineEnd - FOCUS_FADE_MIN))
-      const duration = lineEnd - start
-      if (duration <= 0) return
-      const progress = Math.max(0, Math.min(1, (now - start) / duration))
-      const mix = progress * progress * (3 - 2 * progress)
-      rows[current]?.style.setProperty('--lyric-focus-mix', String(mix))
-      rows[current + 1]?.style.setProperty('--lyric-focus-mix', String(mix))
-    }
-
     // The translation and romanization sweep in with the karaoke. The playback tick
     // only arrives a few times a second, which left the wipe a quarter of a second
     // behind the sung characters, so the sweep runs on an animation frame between
@@ -259,7 +229,6 @@ export default {
     watch(() => playProgress.nowPlayTime, () => {
       revealBase = playProgress.nowPlayTime * 1000
       revealTickAt = performance.now()
-      updateFocusMix()
       writeReveal()
     })
     watch([isPlay, isFocusGradient], syncRevealLoop)
@@ -271,11 +240,6 @@ export default {
     ], () => {
       void nextTick(() => {
         markFocusRows()
-        if (isFocusGradient.value) {
-          updateFocusMix()
-        } else {
-          for (const row of dom_lyric.value?.querySelectorAll('.line-content') ?? []) row.style.removeProperty('--lyric-focus-mix')
-        }
         writeReveal()
         syncRevealLoop()
       })
@@ -575,15 +539,9 @@ export default {
 
   :global(.line-content.isUpcoming[data-lyric-distance="3"]) { opacity: .38; }
 
-  // Word-level lyrics: while the last word of the active line is being sung,
-  // the row fades out and the next row fades in in the same window.
-  :global(.line-content.active) {
-    opacity: calc(1 - var(--lyric-focus-mix, 0) * .56);
-  }
-
-  :global(.line-content.isUpcoming[data-lyric-distance="1"]) {
-    opacity: calc(.62 + var(--lyric-focus-mix, 0) * .38);
-  }
+  // The active row stays fully lit for as long as it is the current line: it only
+  // dims once the next line takes over, in step with the sheet starting to move.
+  :global(.line-content.active) { opacity: 1; }
 }
 
 .skip {

@@ -16,6 +16,7 @@ const readRows = page => page.evaluate(() => {
       upcoming: row.classList.contains('isUpcoming'),
       distance: row.dataset.lyricDistance,
       opacity: Number(window.getComputedStyle(row).opacity),
+      mix: row.style.getPropertyValue('--lyric-focus-mix'),
       timing: window.getComputedStyle(row).transitionTimingFunction,
     })),
   }
@@ -76,7 +77,7 @@ test('lyrics under the adaptive background keep a focus gradient and the zoom ov
   } finally { await app.close() }
 })
 
-test('word-level lyrics crossfade the active row with the next one', { timeout: 180000 }, async() => {
+test('the active row stays lit until the line actually changes', { timeout: 180000 }, async() => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture
   try {
@@ -103,19 +104,31 @@ test('word-level lyrics crossfade the active row with the next one', { timeout: 
     await page.waitForFunction(() => document.querySelectorAll('.line-content.font-mode').length === 4)
     await page.waitForFunction(() => document.querySelectorAll('.line-content.active').length === 1)
 
+    // The last word is being sung here: the row must still be at full strength,
+    // otherwise it dims before the sheet has moved.
     await page.evaluate(() => window.app_event.setProgress(1.5))
     await page.waitForTimeout(700)
     const midway = await readRows(page)
     assert(midway.rows[0].active, 'the first row is active at 1.5s')
-    assert(midway.rows[0].opacity > 0.55 && midway.rows[0].opacity < 0.95, `active row should be mid-fade, got ${midway.rows[0].opacity}`)
-    assert(midway.rows[1].opacity > 0.7 && midway.rows[1].opacity < 0.95, `next row should be fading in, got ${midway.rows[1].opacity}`)
+    assert(midway.rows[0].opacity > 0.95, `the active row must not dim while it is still the current line, got ${midway.rows[0].opacity}`)
+    assert(Math.abs(midway.rows[1].opacity - 0.62) < 0.02, `the next row waits at its upcoming level, got ${midway.rows[1].opacity}`)
 
     await page.evaluate(() => window.app_event.setProgress(2.9))
     await page.waitForTimeout(700)
     const finished = await readRows(page)
     assert(finished.rows[0].active, 'the first row is still active just before 4s')
-    assert(finished.rows[0].opacity < 0.5, `active row should reach the passed level before switching, got ${finished.rows[0].opacity}`)
-    assert(finished.rows[1].opacity > 0.95, `next row should already be bright before switching, got ${finished.rows[1].opacity}`)
+    assert(finished.rows[0].opacity > 0.95, `the row stays lit until the line changes, got ${finished.rows[0].opacity}`)
+    assert(finished.rows.every(row => row.mix === ''), 'no early crossfade is published any more')
+
+    // The fade belongs to the line change: the finished row dims while the next
+    // row becomes the active one.
+    await page.evaluate(() => window.app_event.setProgress(4.1))
+    await page.waitForTimeout(700)
+    const changed = await readRows(page)
+    assert(changed.rows[1].active, 'the second row is active after 4s')
+    assert(changed.rows[1].opacity > 0.95, `the new row is lit right away, got ${changed.rows[1].opacity}`)
+    assert(changed.rows[0].passed, 'the finished row is marked as passed')
+    assert(Math.abs(changed.rows[0].opacity - 0.44) < 0.02, `the finished row fades to the passed level, got ${changed.rows[0].opacity}`)
 
     assert.deepEqual(fixture.errors, [])
   } finally { await app.close() }
