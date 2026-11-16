@@ -10,6 +10,8 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
   const isMsDown = ref(false)
   const isStopScroll = ref(false)
   const seekTime = ref(null)
+  // Row under the guide; the jump centres this row instead of the playing one.
+  const seekLine = ref(null)
   const timeStr = computed(() => seekTime.value == null ? '--:--' : formatPlayTime2(seekTime.value))
   const canSeek = computed(() => seekTime.value != null)
 
@@ -29,11 +31,15 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     // Recalculate on click as scrolling, resizing or lyric offsets may have changed.
     updateSeekTime()
     const time = seekTime.value
+    // The row the guide sits on, not the row that is still playing: the store only
+    // follows the seek on the next progress tick, and scrolling to the old row first
+    // made the sheet jump back before it caught up.
+    const index = seekLine.value
     if (time == null) return
     resetManualScroll()
     window.app_event.setProgress(time)
     if (!isPlay.value) play()
-    nextTick(() => handleScrollLrc(undefined, true))
+    nextTick(() => handleScrollLrc(undefined, true, index == null ? undefined : index))
   }
   const handleSkipMouseEnter = () => {
     isSkipMouseEnter = true
@@ -56,11 +62,13 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     const container = dom_lyric.value
     if (!isShowLyricProgressSetting.value || !isStopScroll.value || !musicInfo.id || !container || !dom_lines?.length || !lyric.lines.length) {
       seekTime.value = null
+      seekLine.value = null
       return
     }
     const rect = container.getBoundingClientRect()
     if (!rect.height) {
       seekTime.value = null
+      seekLine.value = null
       return
     }
     const center = rect.top + rect.height / 2
@@ -76,11 +84,13 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     const lineTime = lyric.lines[low].time
     if (!Number.isFinite(lineTime)) {
       seekTime.value = null
+      seekLine.value = null
       return
     }
     const time = Math.max((lineTime - lyric.offset - lyric.tempOffset) / 1000, 0)
     const duration = playProgress.maxPlayTime
     seekTime.value = duration > 0 && Number.isFinite(duration) ? Math.min(time, duration) : time
+    seekLine.value = low
   }
   const setTime = () => {
     if (!isStopScroll.value) return
@@ -103,15 +113,19 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     isSkipMouseEnter = false
     isSkipFocused = false
     seekTime.value = null
+    seekLine.value = null
     if (seekFrame != null) window.cancelAnimationFrame(seekFrame)
     seekFrame = null
   }
 
-  const handleScrollLrc = (duration = 300, seeking = false) => {
+  // `index` lets a jump centre the row the guide was over before the store catches
+  // up with the seek; everything else follows the playing line.
+  const handleScrollLrc = (duration = 300, seeking = false, index = lyric.line) => {
     if (!dom_lines?.length || !dom_lyric.value?.clientHeight) return
     if (isSkipMouseEnter || isSkipFocused) return
     if (isStopScroll.value) return
-    let dom_p = dom_lines[lyric.line]
+    const lineIndex = Math.max(0, Math.min(dom_lines.length - 1, index))
+    const dom_p = dom_lines[lineIndex]
     cancelScrollFn?.()
     // Center the complete lyric group, including wrapped translations/romaji.
     // Scaling around the row's center keeps this anchor stable during zoom.
@@ -123,8 +137,8 @@ export default ({ isPlay, lyric, playProgress, musicInfo, isShowLyricProgressSet
     }
     // Dense lyrics get a stiffer spring than sparse ones, so fast songs and
     // ballads both settle at the right pace.
-    const currentLine = lyric.lines[lyric.line]
-    const previousLine = lyric.lines[lyric.line - 1]
+    const currentLine = lyric.lines[lineIndex]
+    const previousLine = lyric.lines[lineIndex - 1]
     const interval = currentLine && previousLine ? currentLine.time - previousLine.time : undefined
     cancelScrollFn = scrollWithSpring(dom_lyric.value, target, { interval, seeking })
   }

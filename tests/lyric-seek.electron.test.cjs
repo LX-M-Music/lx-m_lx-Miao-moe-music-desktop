@@ -171,6 +171,53 @@ test('native lyric scrolling previews and seeks the actual audio position', { ti
       await page.evaluate(() => { window.__lxPluginHost.playProgress.playProgress.maxPlayTime = 60 })
     })
 
+    await t.test('jumping forward never travels back through the old line first', async() => {
+      // A dense sheet played back near line 20 while the reader is far ahead: the
+      // jump must land on the guide row instead of starting a scroll towards the
+      // line that is still reported as current.
+      await page.evaluate(async() => {
+        const host = window.__lxPluginHost
+        const audio = host.player.getAudioElement()
+        const lrc = Array.from({ length: 55 }, (_value, index) => `[00:${String(index).padStart(2, '0')}.000]第 ${index + 1} 行歌词`).join('\n')
+        Object.assign(window.lxData.musicInfo, { lrc, tlrc: '', lxlrc: '', rlrc: '' })
+        window.app_event.lyricUpdated()
+        await host.vue.nextTick()
+        audio.currentTime = 20
+        await audio.play()
+      })
+      await page.waitForFunction(() => document.querySelectorAll('.lyric .line-content').length === 55)
+      await page.waitForFunction(() => window.__lxPluginHost.mainLyricState.lyric.line >= 19)
+      await page.waitForTimeout(300)
+      await scrollToLine(page, 42)
+      const before = await page.locator('.lyric').evaluate(element => Math.round(element.scrollTop))
+      await page.evaluate(() => {
+        window.__scrollSamples = []
+        const view = document.querySelector('.lyric')
+        const start = performance.now()
+        const sample = () => {
+          window.__scrollSamples.push({ time: Math.round(performance.now() - start), top: Math.round(view.scrollTop) })
+          if (performance.now() - start < 1500) requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+      })
+      await page.locator(`${guideSelector} button`).click()
+      await page.waitForTimeout(1700)
+      const samples = await page.evaluate(() => window.__scrollSamples)
+      assert(samples.length > 20, `expected scroll frames, got ${samples.length}`)
+      const lowest = Math.min(...samples.map(sample => sample.top))
+      assert(lowest >= before - 8, `the sheet travelled back from ${before} to ${lowest} before catching up`)
+      // The sheet follows the seeked line and keeps following playback from there.
+      const settled = await page.locator('.lyric').evaluate(element => {
+        const frame = element.getBoundingClientRect()
+        const row = element.querySelector('.line-content.active').getBoundingClientRect()
+        return { top: Math.round(element.scrollTop), error: Math.abs(row.top + row.height / 2 - frame.top - frame.height / 2) }
+      })
+      assert(settled.error < 3, `the active line is ${settled.error}px away from the center after the jump`)
+      assert(Math.abs(settled.top - samples.at(-1).top) <= 30, `the sheet should stay near the guide row, got ${samples.at(-1).top} then ${settled.top}`)
+      await page.evaluate(() => window.__lxPluginHost.player.getAudioElement().pause())
+      await page.locator(guideSelector).waitFor({ state: 'hidden' })
+    })
+
     await t.test('disabling the guide, reopening details and changing tracks clear stale seek positions', async() => {
       await page.evaluate(() => { window.lxData.appSetting['playDetail.isShowLyricProgressSetting'] = false })
       await page.locator(guideSelector).waitFor({ state: 'detached' })
