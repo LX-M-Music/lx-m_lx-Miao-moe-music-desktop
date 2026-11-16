@@ -40,7 +40,13 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
     const readLine = element => {
       if (!element) return null
       const style = window.getComputedStyle(element)
-      return { color: style.color, opacity: Number(style.opacity), shadow: style.textShadow }
+      const row = element.closest('.line-content')
+      return {
+        color: style.color,
+        opacity: Number(style.opacity),
+        filter: row ? window.getComputedStyle(row).filter : 'none',
+        shadow: style.textShadow,
+      }
     }
     return {
       ambientLyrics: right.hasAttribute('data-ambient-lyrics'),
@@ -91,6 +97,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
         assert.equal(state.rightScrim, 'none', 'the lyric column must not paint a panel')
         assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
         assert.equal(state.idle.shadow, 'none', 'no halo without the dynamic background')
+        assert.equal(state.idle.filter, 'none', 'no shadow without the dynamic background')
         assert(sameColor(state.idle.color, state.themeSecondary), `line colour ${state.idle.color} should follow ${state.themeSecondary}`)
         assert(Math.abs(state.lineOpacity - 0.64) <= 0.01, `inactive opacity ${state.lineOpacity}`)
         assert(sameColor(state.translation.color, state.idle.color), 'translation must match the lyric colour')
@@ -110,8 +117,11 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert.equal(state.ambientLyrics, true, 'expected the ambient lyric mode')
       assert.equal(state.rightScrim, 'none', 'no panel while the dynamic background is on')
       assert.equal(state.lyricScrim, 'none', 'the scroller must not paint a panel')
-      assert(!!state.idle.shadow.includes('0px 1px 2px') && !!state.idle.shadow.includes('0px 2px 4px'), `expected a tight drop shadow, got ${state.idle.shadow}`)
-      assert(!state.idle.shadow.includes('-1px 0px 0px') && !state.idle.shadow.includes('0px -1px 0px'), `the outline should be gone, got ${state.idle.shadow}`)
+      assert(state.idle.filter.includes('drop-shadow') && state.idle.filter.includes('0px 1px 2px') && state.idle.filter.includes('0px 2px 4px'), `expected a tight two-layer drop shadow, got ${state.idle.filter}`)
+      // Karaoke rows paint their letters as a background clipped to the text with a
+      // transparent fill, and text-shadow paints above that background, so a glyph
+      // shadow would sit on top of the letters instead of behind them.
+      assert.equal(state.idle.shadow, 'none', `the shadow must not be a text-shadow, got ${state.idle.shadow}`)
       assert(state.lyricText.length > 0, 'the reading area must publish a lyric colour')
       assert(sameColor(state.idleVar, state.lyricText), `idle variable ${state.idleVar} should follow ${state.lyricText}`)
       assert(sameColor(state.idleVar, state.controlText), `lyrics ${state.idleVar} must match the control palette ${state.controlText}`)
@@ -162,16 +172,25 @@ test('word-level lyrics keep the translation at the unplayed lyric colour', { ti
     const state = await page.evaluate(() => {
       const spans = [...document.querySelectorAll('.font-mode .font-lrc span')]
       const translation = document.querySelector('.line-content .extended .font-lrc')
+      const row = spans[1]?.closest('.line-content')
       const style = element => element ? window.getComputedStyle(element) : null
       return {
         unplayed: style(spans[1])?.backgroundColor,
         played: style(spans[0])?.backgroundImage,
         translation: style(translation)?.color,
+        spanShadow: style(spans[1])?.textShadow,
+        translationShadow: style(translation)?.textShadow,
+        rowFilter: style(row)?.filter,
       }
     })
     assert.equal(state.translation, state.unplayed, 'translation must match the unplayed karaoke text')
     assert(state.unplayed.includes('0.55'), `unplayed text should sit at 55% alpha, got ${state.unplayed}`)
     assert(state.played.includes('rgb('), 'played text should use the opaque lyric colour')
+    // The karaoke glyph is a clipped background, so the shadow has to be composited
+    // behind the row; a glyph-level text-shadow would be painted over the letters.
+    assert.equal(state.spanShadow, 'none', `karaoke letters must not carry a text-shadow, got ${state.spanShadow}`)
+    assert.equal(state.translationShadow, 'none', `translation must not carry a text-shadow, got ${state.translationShadow}`)
+    assert(state.rowFilter.includes('drop-shadow'), `the row should carry the composited shadow, got ${state.rowFilter}`)
     assert.deepEqual(fixture.errors, [])
   } finally {
     await app.close()

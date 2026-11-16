@@ -326,12 +326,14 @@ export default {
   :global {
     // Soft shadow behind the glyphs instead of an outline, so the lyrics stay
     // readable over busy artwork without drawing a border around every letter.
-    // Keep the blur inside the row: a wide shadow bleeds onto the neighbouring
-    // line and reads as if it were painted over the text.
+    // It has to be a composited drop shadow, not text-shadow: karaoke rows paint
+    // their letters as a background clipped to the text with a transparent fill,
+    // and text-shadow is drawn above that background, so it lands on the glyphs.
+    // The blur also stays inside the row so it never covers the neighbouring line.
     .line-content {
-      text-shadow:
-        0 1px 2px var(--lyric-shadow, rgba(0, 0, 0, .45)),
-        0 2px 4px var(--lyric-shadow, rgba(0, 0, 0, .45));
+      filter:
+        drop-shadow(0 1px 2px var(--lyric-shadow, rgba(0, 0, 0, .45)))
+        drop-shadow(0 2px 4px var(--lyric-shadow, rgba(0, 0, 0, .45)));
     }
     // Karaoke progress keeps the same hue: unplayed characters sit at 55% alpha,
     // played ones use the full lyric colour. Translation and romanization sit at
@@ -350,7 +352,7 @@ export default {
   }
 }
 // Lyrics sit directly on the artwork; readability comes from the adaptive text
-// colours plus the halo, not from a background layer.
+// colours plus the shadow, not from a background layer.
 .lyric {
   text-align: center;
   height: 100%;
