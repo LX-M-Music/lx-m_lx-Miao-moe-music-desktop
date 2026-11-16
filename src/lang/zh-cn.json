@@ -1142,6 +1142,8 @@
   "setting__play_detail_font_weight_reset": "恢复标准粗细",
   "setting__play_detail_lyric_delay_scroll": "延迟歌词滚动",
   "setting__play_detail_lyric_progress": "滚动歌词时显示定位线和跳转按钮",
+  "setting__play_detail_lyric_fade": "歌词随距离淡入淡出",
+  "setting__play_detail_lyric_scroll_highlight": "滚动歌词时保持全亮",
   "setting__play_lyric_lxlrc": "使用卡拉 OK 式歌词播放（如果可用）",
   "setting__play_lyric_lxlrc_tip": "此功能比较耗性能，低配置电脑不建议开启！",
   "setting__play_lyric_roma": "显示歌词罗马音（如果可用）",

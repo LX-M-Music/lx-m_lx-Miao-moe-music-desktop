@@ -1141,6 +1141,8 @@
   "setting__play_detail_font_weight_reset": "Reset to regular weight",
   "setting__play_detail_lyric_delay_scroll": "Delay scrolling lyrics",
   "setting__play_detail_lyric_progress": "Show a position guide and seek button when scrolling lyrics",
+  "setting__play_detail_lyric_fade": "Fade lyric lines by distance from the playing line",
+  "setting__play_detail_lyric_scroll_highlight": "Keep every line lit while scrolling the lyrics",
   "setting__play_lyric_lxlrc": "Playback with karaoke-style lyrics if available",
   "setting__play_lyric_lxlrc_tip": "This feature requires higher performance and is not recommended to be turned on for low performance devices!",
   "setting__play_lyric_roma": "Show romanized lyrics if available",

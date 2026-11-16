@@ -134,6 +134,64 @@ test('the active row stays lit until the line actually changes', { timeout: 1800
   } finally { await app.close() }
 })
 
+test('turning the lyric fade off keeps every row and translation at full strength', { timeout: 180000 }, async() => {
+  const fixture = await launch({ rendererPath })
+  const { app, page } = fixture
+  const read = () => page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.line-content')]
+    const extended = rows.map(row => row.querySelector('.extended .font-lrc')).filter(Boolean)
+    return {
+      opacities: rows.map(row => Number(window.getComputedStyle(row).opacity)),
+      marked: rows.filter(row => row.classList.contains('isPassed') || row.classList.contains('isUpcoming')).length,
+      sweeps: extended.map(node => parseFloat(window.getComputedStyle(node).backgroundSize)),
+    }
+  })
+  try {
+    page.setDefaultTimeout(10000)
+    const theme = themes.find(value => value.id === 'black')
+    await page.evaluate(colors => window.setTheme(colors), { ...theme.config.themeColors, ...theme.config.extInfo })
+    await page.evaluate(() => window.lxData.updateSetting({
+      'common.langId': 'zh-cn',
+      'ui.ambientBackground': true,
+      'ui.ambientBackgroundAutoContrast': true,
+      'player.isPlayLxlrc': true,
+      'player.isShowLyricTranslation': true,
+      'playDetail.isZoomActiveLrc': false,
+      'playDetail.isDelayScroll': false,
+      'playDetail.isLyricFade': false,
+    }))
+    await seedTrack(page)
+    await page.evaluate(() => Object.assign(window.lxData.musicInfo, {
+      lrc: '[00:00.000]第一行\n[00:08.000]第二行\n[00:16.000]第三行',
+      lxlrc: '[00:00.000]<0,2000>第一<2000,2000>行\n[00:08.000]<0,2000>第二<2000,2000>行\n[00:16.000]<0,2000>第三<2000,2000>行',
+      tlrc: '[00:00.000]译文一\n[00:08.000]译文二\n[00:16.000]译文三',
+    }))
+    await page.evaluate(() => window.app_event.emit('lyricUpdated'))
+    await showDetail(page, true)
+    await settled(page)
+    await page.waitForFunction(() => document.querySelectorAll('.line-content.font-mode .extended').length >= 3)
+    await page.evaluate(() => document.documentElement.classList.add('disableAnimation'))
+    await page.evaluate(() => window.app_event.setProgress(9.5))
+    await page.waitForTimeout(500)
+
+    const off = await read()
+    assert(off.opacities.every(value => value === 1), `every row stays lit with the fade off, got ${JSON.stringify(off.opacities)}`)
+    assert.equal(off.marked, 0, 'no distance marks are published with the fade off')
+    assert(off.sweeps.every(value => value >= 99), `translations stay at full tone, got ${JSON.stringify(off.sweeps)}`)
+
+    await page.evaluate(() => window.lxData.updateSetting({ 'playDetail.isLyricFade': true }))
+    await page.waitForFunction(() => window.lxData.appSetting['playDetail.isLyricFade'] === true)
+    await page.waitForTimeout(500)
+    const on = await read()
+    assert(on.opacities[0] < 0.5, `the playing line fades in again when the option is back, got ${on.opacities[0]}`)
+    assert(on.opacities[1] > 0.95, `the active row stays lit, got ${on.opacities[1]}`)
+    assert(on.marked > 0, 'distance marks come back with the fade option')
+    assert(Math.abs(on.sweeps[1] - 50) < 2, `the active translation follows the karaoke again, got ${on.sweeps[1]}%`)
+
+    assert.deepEqual(fixture.errors, [])
+  } finally { await app.close() }
+})
+
 test('the translation and romanization are wiped in with the karaoke progress', { timeout: 180000 }, async() => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture

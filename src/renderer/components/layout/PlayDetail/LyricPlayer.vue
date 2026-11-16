@@ -4,7 +4,7 @@
       <div
         v-show="!isShowLrcSelectContent"
         ref="dom_lyric"
-        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }, { [$style.browsing]: isStopScroll }]" :style="lrcStyles"
+        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }, { [$style.browsing]: isStopScroll && isScrollHighlight }]" :style="lrcStyles"
         @wheel="handleWheel" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart"
         @contextmenu.stop="handleShowLyricMenu"
       >
@@ -74,9 +74,11 @@ export default {
   },
   setup() {
     const isZoomActiveLrc = computed(() => appSetting['playDetail.isZoomActiveLrc'])
-    // The focus gradient belongs to the adaptive background; with it off the
-    // lyric sheet keeps the stock uniform look.
-    const isFocusGradient = computed(() => !!appSetting['ui.ambientBackground'])
+    // The adaptive palette paints the lyrics; the fade option then decides whether
+    // the sheet also dims rows by distance and wipes the translation in.
+    const isAmbientLyrics = computed(() => !!appSetting['ui.ambientBackground'])
+    const isFocusGradient = computed(() => isAmbientLyrics.value && appSetting['playDetail.isLyricFade'] !== false)
+    const isScrollHighlight = computed(() => appSetting['playDetail.isScrollHighlight'] !== false)
     const isShowLyricProgressSetting = computed(() => appSetting['playDetail.isShowLyricProgressSetting'] && isShowPlayerDetail.value && !isShowLrcSelectContent.value)
 
     const {
@@ -119,8 +121,9 @@ export default {
         if (passed || upcoming) row.dataset.lyricDistance = String(Math.min(Math.abs(index - current), 3))
         else delete row.dataset.lyricDistance
         // Lines behind the playhead were sung completely, so their translation keeps
-        // the full tone its finished karaoke ended on.
-        if (passed) row.style.setProperty('--lyric-reveal', '1')
+        // the full tone its finished karaoke ended on. Without the fade option the
+        // whole sheet stays lit, so every translation keeps that full tone as well.
+        if (isAmbientLyrics.value && (!enabled || passed)) row.style.setProperty('--lyric-reveal', '1')
         else row.style.removeProperty('--lyric-reveal')
       })
       revealRow = null
@@ -182,7 +185,9 @@ export default {
       const timing = line ? karaokeLines.value.get(line.time) : null
       const row = cachedRows[lyric.line]
       if (!isFocusGradient.value || !timing || !row) {
-        if (revealRow) revealRow.style.removeProperty('--lyric-reveal')
+        // markFocusRows owns the row values whenever the wipe is off; clearing here
+        // would drop the full tone it keeps for the no-fade option.
+        if (revealRow && revealRow !== row) revealRow.style.removeProperty('--lyric-reveal')
         revealRow = null
         return
       }
@@ -349,6 +354,7 @@ export default {
       isShowLyricProgressSetting,
       isZoomActiveLrc,
       isStopScroll,
+      isScrollHighlight,
       lyricMenuVisible,
       lyricMenuXY,
       handleShowLyricMenu,

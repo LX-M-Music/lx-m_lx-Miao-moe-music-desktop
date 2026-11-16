@@ -7,6 +7,10 @@ dd
     base-checkbox(id="setting_play_detail_lyric_delayScroll" :model-value="appSetting['playDetail.isDelayScroll']" :label="$t('setting__play_detail_lyric_delay_scroll')" @update:model-value="updateSetting({ 'playDetail.isDelayScroll': $event })")
   .gap-top
     base-checkbox(id="setting_play_detail_lyric_progress_enable" :model-value="appSetting['playDetail.isShowLyricProgressSetting']" :label="$t('setting__play_detail_lyric_progress')" @update:model-value="updateSetting({'playDetail.isShowLyricProgressSetting': $event})")
+  .gap-top
+    base-checkbox(id="setting_play_detail_lyric_fade" :model-value="appSetting['playDetail.isLyricFade']" :label="$t('setting__play_detail_lyric_fade')" @update:model-value="updateSetting({'playDetail.isLyricFade': $event})")
+  .gap-top
+    base-checkbox(id="setting_play_detail_lyric_scroll_highlight" :model-value="appSetting['playDetail.isScrollHighlight']" :label="$t('setting__play_detail_lyric_scroll_highlight')" @update:model-value="updateSetting({'playDetail.isScrollHighlight': $event})")
 
 dd(data-setting-search="setting__play_detail_font_weight")
   h3#play_detail_font_weight

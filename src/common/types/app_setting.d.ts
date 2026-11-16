@@ -337,6 +337,16 @@ declare global {
        */
       'playDetail.isDelayScroll': boolean
 
+      /**
+       * 播放详情页-歌词是否随距离淡入淡出（关闭后整页歌词保持常亮）
+       */
+      'playDetail.isLyricFade': boolean
+
+      /**
+       * 播放详情页-手动滚动歌词时是否临时保持全亮
+       */
+      'playDetail.isScrollHighlight': boolean
+
 
       /**
        * 是否启用桌面歌词

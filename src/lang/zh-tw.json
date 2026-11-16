@@ -1121,6 +1121,8 @@
   "setting__play_detail_font_weight_reset": "恢復標準粗細",
   "setting__play_detail_lyric_delay_scroll": "延遲歌詞滾動",
   "setting__play_detail_lyric_progress": "捲動歌詞時顯示定位線與跳轉按鈕",
+  "setting__play_detail_lyric_fade": "歌詞隨距離淡入淡出",
+  "setting__play_detail_lyric_scroll_highlight": "捲動歌詞時保持全亮",
   "setting__play_lyric_lxlrc": "使用卡拉 OK 式歌詞播放（如果可用）",
   "setting__play_lyric_lxlrc_tip": "此功能比較耗性能，低配置電腦不建議開啟！",
   "setting__play_lyric_roma": "顯示歌詞羅馬音（如果可用）",

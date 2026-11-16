@@ -79,6 +79,8 @@ const defaultSetting: LX.AppSetting = {
   'playDetail.style.fontWeight': 400,
   'playDetail.style.align': 'center',
   'playDetail.isDelayScroll': true,
+  'playDetail.isLyricFade': true,
+  'playDetail.isScrollHighlight': true,
 
   'miniPlayer.enable': false,
   'miniPlayer.showBorder': false,
