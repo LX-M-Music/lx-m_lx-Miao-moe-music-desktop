@@ -13,6 +13,8 @@ const readRows = page => page.evaluate(() => {
     rows: [...document.querySelectorAll('.line-content')].map(row => ({
       active: row.classList.contains('active'),
       passed: row.classList.contains('isPassed'),
+      upcoming: row.classList.contains('isUpcoming'),
+      distance: row.dataset.lyricDistance,
       opacity: Number(window.getComputedStyle(row).opacity),
       timing: window.getComputedStyle(row).transitionTimingFunction,
     })),
@@ -53,12 +55,14 @@ test('line-level lyrics fade passed rows and keep the zoom overshoot', { timeout
     assert.equal(state.activeScale, '1.14', 'zoom should be active for this test')
     assert.equal(state.rows.length, 4)
     assert(state.rows[0].passed && state.rows[1].passed, 'rows above the active line are passed')
-    assert.equal(state.rows[0].opacity, 0, `passed row should be hidden, got ${state.rows[0].opacity}`)
-    assert.equal(state.rows[1].opacity, 0, `passed row should be hidden, got ${state.rows[1].opacity}`)
+    assert(state.rows[0].opacity > 0.1 && state.rows[0].opacity < 0.6, `passed row stays readable, got ${state.rows[0].opacity}`)
+    assert(state.rows[1].opacity > state.rows[0].opacity, `the row closer to the focus is brighter, got ${state.rows[0].opacity} then ${state.rows[1].opacity}`)
+    assert(state.rows[0].distance === '2' && state.rows[1].distance === '1', 'passed rows carry their distance from the active line')
     assert(state.rows[2].active, 'third row should be active at 5s')
     assert(!state.rows[2].passed, 'active row is never marked as passed')
     assert(state.rows[2].opacity > 0.9, `active row stays visible, got ${state.rows[2].opacity}`)
-    assert(!state.rows[3].passed, 'upcoming rows stay visible')
+    assert(state.rows[3].upcoming, 'upcoming rows are marked so they can fade in')
+    assert(state.rows[3].opacity > 0.2 && state.rows[3].opacity < 0.9, `upcoming row stays dimmer than the active one, got ${state.rows[3].opacity}`)
     assert(state.rows[2].timing.includes('cubic-bezier'), `expected a timed scale transition, got ${state.rows[2].timing}`)
     assert(state.rows[2].timing.includes('1.56'), `expected the overshoot curve, got ${state.rows[2].timing}`)
 
@@ -66,7 +70,7 @@ test('line-level lyrics fade passed rows and keep the zoom overshoot', { timeout
     await page.waitForFunction(() => window.lxData.appSetting['playDetail.hidePassedLyric'] === false)
     await page.waitForTimeout(600)
     const restored = await readRows(page)
-    assert(restored.rows.every(row => !row.passed), 'disabling the setting clears every passed mark')
+    assert(restored.rows.every(row => !row.passed && !row.upcoming), 'disabling the setting clears every focus mark')
     assert(restored.rows[0].opacity > 0.5, `disabling should restore passed rows, got ${restored.rows[0].opacity}`)
 
     assert.deepEqual(fixture.errors, [])

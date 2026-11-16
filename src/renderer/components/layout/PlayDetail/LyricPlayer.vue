@@ -96,16 +96,22 @@ export default {
 
     const dom_lrc_select_content = useSelectAllLrc()
 
-    // Passed rows are indexed against the active line, so this works for both
-    // line-level and word-level lyrics instead of relying on the transient
-    // `.played` class the font player puts on the row that just finished.
+    // Rows are indexed against the active line so this works for both line-level
+    // and word-level lyrics instead of relying on the transient `.played` class
+    // the font player puts on the row that just finished. Passed rows dim but
+    // stay readable; upcoming rows dim more and brighten as they move into focus.
     const markPassedLines = () => {
       const container = dom_lyric.value
       if (!container) return
       const current = lyric.line
       const hide = appSetting['playDetail.hidePassedLyric']
       container.querySelectorAll('.line-content').forEach((row, index) => {
-        row.classList.toggle('isPassed', hide && current >= 0 && index < current)
+        const passed = hide && current >= 0 && index < current
+        const upcoming = hide && current >= 0 && index > current
+        row.classList.toggle('isPassed', passed)
+        row.classList.toggle('isUpcoming', upcoming)
+        if (passed || upcoming) row.dataset.lyricDistance = String(Math.min(Math.abs(index - current), 3))
+        else delete row.dataset.lyricDistance
       })
     }
     watch([
@@ -374,11 +380,20 @@ export default {
   }
 }
 
-// Optional: rows above the active line fade out so the upcoming lines lead.
+// Optional focus gradient: rows above the active line stay readable but dim,
+// rows below are dimmer still and brighten as they move into focus.
 .hidePassedLines {
-  :global(.line-content.isPassed) {
-    opacity: 0;
-  }
+  :global(.line-content.isPassed) { opacity: .44; }
+
+  :global(.line-content.isPassed[data-lyric-distance="2"]) { opacity: .33; }
+
+  :global(.line-content.isPassed[data-lyric-distance="3"]) { opacity: .27; }
+
+  :global(.line-content.isUpcoming) { opacity: .62; }
+
+  :global(.line-content.isUpcoming[data-lyric-distance="2"]) { opacity: .5; }
+
+  :global(.line-content.isUpcoming[data-lyric-distance="3"]) { opacity: .38; }
 }
 
 .skip {
