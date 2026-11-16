@@ -4,7 +4,7 @@
       <div
         v-show="!isShowLrcSelectContent"
         ref="dom_lyric"
-        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }]" :style="lrcStyles"
+        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }, { [$style.browsing]: isStopScroll }]" :style="lrcStyles"
         @wheel="handleWheel" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart"
         @contextmenu.stop="handleShowLyricMenu"
       >
@@ -527,21 +527,35 @@ export default {
 // Adaptive-background only: rows above the active line stay readable but dim,
 // rows below are dimmer still and brighten as they move into focus.
 .focusGradient {
-  :global(.line-content.isPassed) { opacity: .44; }
+  // Each distance only sets how strongly its row is dimmed; the opacity below pulls
+  // every row back to full strength while the sheet is being scrolled by hand.
+  :global(.line-content.isPassed) { --lyric-row-dim: .44; }
 
-  :global(.line-content.isPassed[data-lyric-distance="2"]) { opacity: .33; }
+  :global(.line-content.isPassed[data-lyric-distance="2"]) { --lyric-row-dim: .33; }
 
-  :global(.line-content.isPassed[data-lyric-distance="3"]) { opacity: .27; }
+  :global(.line-content.isPassed[data-lyric-distance="3"]) { --lyric-row-dim: .27; }
 
-  :global(.line-content.isUpcoming) { opacity: .62; }
+  :global(.line-content.isUpcoming) { --lyric-row-dim: .62; }
 
-  :global(.line-content.isUpcoming[data-lyric-distance="2"]) { opacity: .5; }
+  :global(.line-content.isUpcoming[data-lyric-distance="2"]) { --lyric-row-dim: .5; }
 
-  :global(.line-content.isUpcoming[data-lyric-distance="3"]) { opacity: .38; }
+  :global(.line-content.isUpcoming[data-lyric-distance="3"]) { --lyric-row-dim: .38; }
+
+  :global(.line-content.isPassed),
+  :global(.line-content.isUpcoming) {
+    opacity: calc(var(--lyric-row-dim, 1) + (1 - var(--lyric-row-dim, 1)) * var(--lyric-browse, 0));
+  }
 
   // The active row stays fully lit for as long as it is the current line: it only
   // dims once the next line takes over, in step with the sheet starting to move.
   :global(.line-content.active) { opacity: 1; }
+}
+
+// Reading the sheet by hand: the distance shading would grey out exactly the lines
+// the reader is looking at, so keep every row at full strength until playback takes
+// the sheet back.
+.browsing {
+  :global(.line-content) { --lyric-browse: 1; }
 }
 
 .skip {

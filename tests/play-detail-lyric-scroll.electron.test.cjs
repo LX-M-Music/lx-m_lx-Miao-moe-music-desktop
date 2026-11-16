@@ -68,3 +68,48 @@ test('play detail lyrics scroll the active line to the visual center', { timeout
     await app.close()
   }
 })
+
+test('browsing the lyric sheet keeps every row at full strength', { timeout: 180000 }, async() => {
+  const fixture = await launch({ rendererPath })
+  const { app, page } = fixture
+  const opacities = () => page.evaluate(() => [...document.querySelectorAll('.line-content')].map(row => Number(window.getComputedStyle(row).opacity)))
+  try {
+    page.setDefaultTimeout(10000)
+    await page.evaluate(() => window.lxData.updateSetting({
+      'common.langId': 'zh-cn',
+      'ui.ambientBackground': true,
+      'ui.ambientBackgroundAutoContrast': true,
+      'playDetail.isZoomActiveLrc': false,
+      'playDetail.isDelayScroll': false,
+    }))
+    await seedTrack(page)
+    await showDetail(page, true)
+    await settled(page)
+    await seedLyrics(page)
+    await page.waitForFunction(() => document.querySelectorAll('.line-content').length > 5)
+    await page.evaluate(() => { window.__motionLine(3) })
+    await page.waitForFunction(() => document.querySelectorAll('.line-content.isPassed').length > 0)
+    // Transitions do not advance in this hidden window, so read the target values.
+    await page.evaluate(() => document.documentElement.classList.add('disableAnimation'))
+    await page.waitForTimeout(400)
+
+    // Distance shading is what dims the rows the reader is looking at.
+    const dimmed = await opacities()
+    assert(dimmed[0] < 0.5, `rows above the active line are dimmed before scrolling, got ${dimmed[0]}`)
+
+    const box = await page.locator('.lyric').boundingBox()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.wheel(0, 180)
+    await page.waitForFunction(() => [...document.querySelectorAll('.line-content')].every(row => Number(window.getComputedStyle(row).opacity) === 1))
+    const browsing = await opacities()
+    assert(browsing.every(value => value === 1), `every row stays lit while scrolling, got ${JSON.stringify(browsing)}`)
+
+    // Playback takes the sheet back after the idle pause and the shading returns.
+    await page.waitForFunction(() => Number(window.getComputedStyle(document.querySelector('.line-content')).opacity) < 0.5, { timeout: 9000 })
+    const restored = await opacities()
+    assert(restored[0] < 0.5, `the focus shading returns once browsing ends, got ${restored[0]}`)
+    assert.deepEqual(fixture.errors, [])
+  } finally {
+    await app.close()
+  }
+})
