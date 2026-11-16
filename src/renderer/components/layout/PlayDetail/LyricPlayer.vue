@@ -103,19 +103,27 @@ export default {
     // and word-level lyrics instead of relying on the transient `.played` class
     // the font player puts on the row that just finished. Passed rows dim but
     // stay readable; upcoming rows dim more and brighten as they move into focus.
+    let cachedRows = []
+    let revealRow = null
     const markFocusRows = () => {
       const container = dom_lyric.value
       if (!container) return
+      cachedRows = [...container.querySelectorAll('.line-content')]
       const current = lyric.line
       const enabled = isFocusGradient.value
-      container.querySelectorAll('.line-content').forEach((row, index) => {
+      cachedRows.forEach((row, index) => {
         const passed = enabled && current >= 0 && index < current
         const upcoming = enabled && current >= 0 && index > current
         row.classList.toggle('isPassed', passed)
         row.classList.toggle('isUpcoming', upcoming)
         if (passed || upcoming) row.dataset.lyricDistance = String(Math.min(Math.abs(index - current), 3))
         else delete row.dataset.lyricDistance
+        // Lines behind the playhead were sung completely, so their translation keeps
+        // the full tone its finished karaoke ended on.
+        if (passed) row.style.setProperty('--lyric-reveal', '1')
+        else row.style.removeProperty('--lyric-reveal')
       })
+      revealRow = null
     }
     watch([
       () => lyric.line,
@@ -169,27 +177,13 @@ export default {
       const container = dom_lyric.value
       if (!container || !isFocusGradient.value) return
       const rows = [...container.querySelectorAll('.line-content')]
+      for (const row of rows) row.style.removeProperty('--lyric-focus-mix')
       const current = lyric.line
-      rows.forEach((row, index) => {
-        row.style.removeProperty('--lyric-focus-mix')
-        row.style.removeProperty('--lyric-reveal')
-        // Lines that are already behind the playhead were sung completely, so their
-        // translation stays at the same full tone as the finished karaoke characters.
-        if (index < current) row.style.setProperty('--lyric-reveal', '1')
-      })
       const line = lyric.lines[current]
       const timing = line ? karaokeLines.value.get(line.time) : null
       if (!timing) return
       const offset = (lyric.offset || 0) + (lyric.tempOffset || 0)
       const now = playProgress.nowPlayTime * 1000 + offset
-      // How much of the line has been sung: characters are weighted the same way
-      // the karaoke spans cover them, so the translation wipe keeps pace.
-      let revealed = 0
-      for (const word of timing.words) {
-        const sung = (now - (line.time + word.start)) / word.duration
-        if (sung > 0) revealed += word.length * Math.min(1, sung)
-      }
-      rows[current]?.style.setProperty('--lyric-reveal', String(revealed / timing.chars))
       const wordStart = line.time + timing.start
       const lineEnd = line.time + timing.end
       const start = Math.max(line.time, Math.min(wordStart, lineEnd - FOCUS_FADE_MIN))
@@ -200,6 +194,75 @@ export default {
       rows[current]?.style.setProperty('--lyric-focus-mix', String(mix))
       rows[current + 1]?.style.setProperty('--lyric-focus-mix', String(mix))
     }
+
+    // The translation and romanization sweep in with the karaoke. The playback tick
+    // only arrives a few times a second, which left the wipe a quarter of a second
+    // behind the sung characters, so the sweep runs on an animation frame between
+    // ticks: the last tick anchors the clock and each frame extends it, keeping the
+    // error at one tick at most and starting over on every seek or pause.
+    let revealFrame = null
+    let revealBase = 0
+    let revealTickAt = 0
+    // A stalled stream stops the ticks while playback still looks active; capping the
+    // extension keeps the wipe from running away from the audio.
+    const REVEAL_LEAD_MAX = 320
+
+    const writeReveal = () => {
+      const line = lyric.lines[lyric.line]
+      const timing = line ? karaokeLines.value.get(line.time) : null
+      const row = cachedRows[lyric.line]
+      if (!isFocusGradient.value || !timing || !row) {
+        if (revealRow) revealRow.style.removeProperty('--lyric-reveal')
+        revealRow = null
+        return
+      }
+      const offset = (lyric.offset || 0) + (lyric.tempOffset || 0)
+      const lead = isPlay.value ? Math.min(performance.now() - revealTickAt, REVEAL_LEAD_MAX) : 0
+      const now = revealBase + lead + offset
+      // Characters are weighted the same way the karaoke spans cover them, so the
+      // sweep keeps pace with the sung share of the line.
+      let revealed = 0
+      for (const word of timing.words) {
+        const sung = (now - (line.time + word.start)) / word.duration
+        if (sung > 0) revealed += word.length * Math.min(1, sung)
+      }
+      if (revealRow && revealRow !== row) revealRow.style.removeProperty('--lyric-reveal')
+      revealRow = row
+      row.style.setProperty('--lyric-reveal', String(revealed / timing.chars))
+    }
+    const stepReveal = () => {
+      writeReveal()
+      revealFrame = window.requestAnimationFrame(stepReveal)
+    }
+    const startReveal = () => {
+      if (revealFrame != null) return
+      // Playback resumes from the last known position, so the clock restarts here
+      // instead of trusting a tick stamp that may be seconds old.
+      revealTickAt = performance.now()
+      revealFrame = window.requestAnimationFrame(stepReveal)
+    }
+    const stopReveal = () => {
+      if (revealFrame == null) return
+      window.cancelAnimationFrame(revealFrame)
+      revealFrame = null
+    }
+    // Only animate while something is actually moving; a paused sheet keeps the
+    // value the last frame wrote and stays off the frame loop.
+    const syncRevealLoop = () => {
+      if (isPlay.value && isFocusGradient.value) {
+        startReveal()
+        return
+      }
+      stopReveal()
+      writeReveal()
+    }
+    watch(() => playProgress.nowPlayTime, () => {
+      revealBase = playProgress.nowPlayTime * 1000
+      revealTickAt = performance.now()
+      updateFocusMix()
+      writeReveal()
+    })
+    watch([isPlay, isFocusGradient], syncRevealLoop)
     watch([
       () => lyric.line,
       () => lyric.lines,
@@ -211,14 +274,12 @@ export default {
         if (isFocusGradient.value) {
           updateFocusMix()
         } else {
-          for (const row of dom_lyric.value?.querySelectorAll('.line-content') ?? []) {
-            row.style.removeProperty('--lyric-focus-mix')
-            row.style.removeProperty('--lyric-reveal')
-          }
+          for (const row of dom_lyric.value?.querySelectorAll('.line-content') ?? []) row.style.removeProperty('--lyric-focus-mix')
         }
+        writeReveal()
+        syncRevealLoop()
       })
     }, { flush: 'post' })
-    watch(() => playProgress.nowPlayTime, updateFocusMix)
 
     watch([isFullscreen, isShowPlayComment], () => {
       setTimeout(handleScrollLrc, 400)
@@ -287,11 +348,17 @@ export default {
     onMounted(() => {
       window.app_event.on('musicToggled', updateMusicInfo)
       window.app_event.on('lyricUpdated', updateMusicInfo)
-      void nextTick(markFocusRows)
+      revealBase = playProgress.nowPlayTime * 1000
+      revealTickAt = performance.now()
+      void nextTick(() => {
+        markFocusRows()
+        syncRevealLoop()
+      })
     })
     onBeforeUnmount(() => {
       window.app_event.off('musicToggled', updateMusicInfo)
       window.app_event.off('lyricUpdated', updateMusicInfo)
+      stopReveal()
     })
 
     return {
@@ -388,9 +455,6 @@ export default {
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
-      // Progress arrives with the playback tick, which is coarser than a frame:
-      // a short linear transition smooths the steps without lagging behind.
-      transition: background-size 200ms linear;
     }
   }
 

@@ -184,6 +184,36 @@ test('the translation and romanization are wiped in with the karaoke progress', 
     assert(Math.abs(middle.sweep - 60) < 2, `the wipe follows the karaoke, got ${middle.sweep}%`)
     assert(middle.sweep > early.sweep, 'the sweep must advance while the line is sung')
 
+    // A paused sheet holds its value: no ticks arrive and nothing may drift.
+    await page.waitForTimeout(250)
+    const stillPaused = await readTranslation()
+    assert(Math.abs(stillPaused.sweep - middle.sweep) < 0.5, `a paused sweep must stand still, got ${middle.sweep}% then ${stillPaused.sweep}%`)
+
+    // While playing the sweep has to move between ticks too: waiting for the next
+    // progress update left it visibly behind the sung characters.
+    const playing = await page.evaluate(() => {
+      for (const component of window.__motionComponents()) {
+        if (component.setupState && 'isPlay' in component.setupState) {
+          component.setupState.isPlay = true
+          return true
+        }
+      }
+      return false
+    })
+    assert(playing, 'the playback state must be reachable to simulate playback')
+    await page.evaluate(() => window.app_event.setProgress(1.82))
+    await page.waitForTimeout(80)
+    const frameA = await readTranslation()
+    await page.waitForTimeout(220)
+    const frameB = await readTranslation()
+    assert(frameB.sweep > frameA.sweep + 1, `the sweep must advance between ticks, got ${frameA.sweep}% then ${frameB.sweep}%`)
+    await page.evaluate(() => {
+      for (const component of window.__motionComponents()) {
+        if (component.setupState && 'isPlay' in component.setupState) component.setupState.isPlay = false
+      }
+    })
+    await page.waitForTimeout(300)
+
     await page.evaluate(() => window.app_event.setProgress(4.5))
     await page.waitForTimeout(500)
     const completed = await readTranslation()
@@ -199,6 +229,8 @@ test('the translation and romanization are wiped in with the karaoke progress', 
     assert(Math.abs(next.sweep - 13.3) < 1.5, `the new translation starts dim again, got ${next.sweep}%`)
     // A finished line keeps the full tone: nothing is left half-sung above the focus.
     assert(Math.abs(next.passedSweep - 100) < 1, `the finished line should stay fully revealed, got ${next.passedSweep}%`)
+
+    // Without the dynamic background the stock translation keeps painting text.
 
     // Without the dynamic background the stock translation keeps painting text.
     await page.evaluate(() => window.lxData.updateSetting({ 'ui.ambientBackground': false }))
