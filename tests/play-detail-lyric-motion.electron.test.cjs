@@ -121,7 +121,7 @@ test('word-level lyrics crossfade the active row with the next one', { timeout: 
   } finally { await app.close() }
 })
 
-test('the translation fades in with the karaoke progress of its line', { timeout: 180000 }, async() => {
+test('the translation and romanization are wiped in with the karaoke progress', { timeout: 180000 }, async() => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture
   // Reveal follows the length of each sung word, so "第一" (2 chars, 0-2s) and
@@ -129,10 +129,15 @@ test('the translation fades in with the karaoke progress of its line', { timeout
   const readTranslation = () => page.evaluate(() => {
     const rows = [...document.querySelectorAll('.line-content')]
     const active = rows.find(row => row.classList.contains('active'))
-    const extended = active?.querySelector('.extended')
+    const inner = active?.querySelector('.extended .font-lrc')
+    const style = inner ? window.getComputedStyle(inner) : null
+    const passed = rows[0]?.querySelector('.extended .font-lrc')
     return {
       reveal: Number(active?.style.getPropertyValue('--lyric-reveal') || 0),
-      opacity: Number(extended ? window.getComputedStyle(extended).opacity : NaN),
+      // background-size carries the sweep: its width is the sung share of the line.
+      sweep: style ? parseFloat(style.backgroundSize) : NaN,
+      fill: style?.webkitTextFillColor,
+      passedSweep: passed ? parseFloat(window.getComputedStyle(passed).backgroundSize) : NaN,
       activeIndex: rows.indexOf(active),
       translations: rows.filter(row => row.querySelector('.extended')).length,
     }
@@ -167,20 +172,23 @@ test('the translation fades in with the karaoke progress of its line', { timeout
     const early = await readTranslation()
     assert(early.translations >= 2, 'both lines carry a translation')
     assert(Math.abs(early.reveal - 0.167) < 0.02, `a quarter of the line is sung at 0.5s, got ${early.reveal}`)
-    assert(Math.abs(early.opacity - 0.625) < 0.02, `translation sits just above the unplayed tone, got ${early.opacity}`)
+    // The translation is painted through a clipped background like the karaoke
+    // characters, so its sweep has to match the published reveal.
+    assert.equal(early.fill, 'rgba(0, 0, 0, 0)', `the translation should use the clipped reveal, got ${early.fill}`)
+    assert(Math.abs(early.sweep - 16.7) < 1.5, `the translation should be wiped to the sung share, got ${early.sweep}%`)
 
     await page.evaluate(() => window.app_event.setProgress(1.8))
     await page.waitForTimeout(500)
     const middle = await readTranslation()
     assert(Math.abs(middle.reveal - 0.6) < 0.02, `most of the first word is sung at 1.8s, got ${middle.reveal}`)
-    assert(Math.abs(middle.opacity - 0.82) < 0.02, `translation brightens with the karaoke, got ${middle.opacity}`)
-    assert(middle.opacity > early.opacity, 'the translation must not dim while the line is sung')
+    assert(Math.abs(middle.sweep - 60) < 2, `the wipe follows the karaoke, got ${middle.sweep}%`)
+    assert(middle.sweep > early.sweep, 'the sweep must advance while the line is sung')
 
     await page.evaluate(() => window.app_event.setProgress(4.5))
     await page.waitForTimeout(500)
     const completed = await readTranslation()
     assert(Math.abs(completed.reveal - 1) < 0.02, `the line is fully sung at 4.5s, got ${completed.reveal}`)
-    assert(Math.abs(completed.opacity - 1) < 0.02, `the translation reaches full brightness, got ${completed.opacity}`)
+    assert(Math.abs(completed.sweep - 100) < 1, `the translation ends fully lit, got ${completed.sweep}%`)
 
     // The line-relative progress must reset with the next line, not carry over.
     await page.evaluate(() => window.app_event.setProgress(8.4))
@@ -188,20 +196,22 @@ test('the translation fades in with the karaoke progress of its line', { timeout
     const next = await readTranslation()
     assert.equal(next.activeIndex, 1, 'the second row is active at 8.4s')
     assert(Math.abs(next.reveal - 0.133) < 0.02, `the new line starts near the unplayed tone, got ${next.reveal}`)
-    assert(Math.abs(next.opacity - 0.61) < 0.02, `the new translation starts dim again, got ${next.opacity}`)
+    assert(Math.abs(next.sweep - 13.3) < 1.5, `the new translation starts dim again, got ${next.sweep}%`)
+    // A finished line keeps the full tone: nothing is left half-sung above the focus.
+    assert(Math.abs(next.passedSweep - 100) < 1, `the finished line should stay fully revealed, got ${next.passedSweep}%`)
 
-    // Without the dynamic background the stock translation stays opaque.
+    // Without the dynamic background the stock translation keeps painting text.
     await page.evaluate(() => window.lxData.updateSetting({ 'ui.ambientBackground': false }))
     await page.waitForFunction(() => window.lxData.appSetting['ui.ambientBackground'] === false)
     await page.waitForTimeout(400)
     const stock = await page.evaluate(() => {
-      const extended = document.querySelector('.line-content .extended')
+      const inner = document.querySelector('.line-content .extended .font-lrc')
       return {
-        opacity: Number(window.getComputedStyle(extended).opacity),
-        reveal: extended.closest('.line-content').style.getPropertyValue('--lyric-reveal'),
+        fill: window.getComputedStyle(inner).webkitTextFillColor,
+        reveal: inner.closest('.line-content').style.getPropertyValue('--lyric-reveal'),
       }
     })
-    assert.equal(stock.opacity, 1, `the stock translation must stay at full opacity, got ${stock.opacity}`)
+    assert.notEqual(stock.fill, 'rgba(0, 0, 0, 0)', `the stock translation must paint normal text, got ${stock.fill}`)
     assert.equal(stock.reveal, '', 'no karaoke reveal is published without the dynamic background')
 
     assert.deepEqual(fixture.errors, [])

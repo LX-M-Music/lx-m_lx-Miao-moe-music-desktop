@@ -169,19 +169,21 @@ export default {
       const container = dom_lyric.value
       if (!container || !isFocusGradient.value) return
       const rows = [...container.querySelectorAll('.line-content')]
-      for (const row of rows) {
+      const current = lyric.line
+      rows.forEach((row, index) => {
         row.style.removeProperty('--lyric-focus-mix')
         row.style.removeProperty('--lyric-reveal')
-      }
-      const current = lyric.line
+        // Lines that are already behind the playhead were sung completely, so their
+        // translation stays at the same full tone as the finished karaoke characters.
+        if (index < current) row.style.setProperty('--lyric-reveal', '1')
+      })
       const line = lyric.lines[current]
       const timing = line ? karaokeLines.value.get(line.time) : null
       if (!timing) return
       const offset = (lyric.offset || 0) + (lyric.tempOffset || 0)
       const now = playProgress.nowPlayTime * 1000 + offset
-      // Translation and romanization brighten with the characters they sit under,
-      // so they are weighted by length exactly like the sung spans: the sum matches
-      // the share of the row the karaoke has already covered.
+      // How much of the line has been sung: characters are weighted the same way
+      // the karaoke spans cover them, so the translation wipe keeps pace.
       let revealed = 0
       for (const word of timing.words) {
         const sung = (now - (line.time + word.start)) / word.duration
@@ -375,11 +377,20 @@ export default {
     }
     // Only word-level rows publish a reveal: line-level lyrics have no progress to
     // follow, so their translations keep the stock full-strength colour.
-    .line-content.font-mode .extended {
-      opacity: calc(.55 + var(--lyric-reveal, 0) * .45);
+    // The reveal is the same sweep the karaoke characters use, applied to the whole
+    // translation and romanization line: the sung share is painted in the full tone
+    // and the rest stays at the unplayed tone, so the group advances as one.
+    .line-content.font-mode .extended .font-lrc {
+      background-color: color-mix(in srgb, var(--lyric-idle-color) 55%, transparent);
+      background-image: linear-gradient(var(--lyric-active-color, var(--lyric-idle-color)), var(--lyric-active-color, var(--lyric-idle-color)));
+      background-repeat: no-repeat;
+      background-size: calc(var(--lyric-reveal, 0) * 100%) 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
       // Progress arrives with the playback tick, which is coarser than a frame:
       // a short linear transition smooths the steps without lagging behind.
-      transition: opacity 200ms linear;
+      transition: background-size 200ms linear;
     }
   }
 
