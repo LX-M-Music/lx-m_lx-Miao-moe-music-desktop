@@ -62,6 +62,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       idle: readLine(idle?.querySelector('.font-lrc')),
       active: readLine(active?.querySelector('.font-lrc')),
       translation: readLine(translation),
+      translationOpacity: Number(window.getComputedStyle(translation?.closest('.extended') ?? translation).opacity),
       lineOpacity: Number(window.getComputedStyle(idle).opacity),
       activeLineOpacity: Number(window.getComputedStyle(active).opacity),
       count: document.querySelectorAll('.line-content').length,
@@ -101,6 +102,7 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
         assert(sameColor(state.idle.color, state.themeSecondary), `line colour ${state.idle.color} should follow ${state.themeSecondary}`)
         assert(Math.abs(state.lineOpacity - 0.64) <= 0.01, `inactive opacity ${state.lineOpacity}`)
         assert(sameColor(state.translation.color, state.idle.color), 'translation must match the lyric colour')
+        assert.equal(state.translationOpacity, 1, `the stock theme must not dim the translation, got ${state.translationOpacity}`)
         await page.screenshot({ path: path.join(output, `lyrics-${id}.png`) })
       })
     }
@@ -132,6 +134,9 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert(channels[0] === channels[1] && channels[1] === channels[2], `lyric colour must be neutral, got ${state.idle.color}`)
       assert(sameColor(state.active.color, state.idle.color), 'activating a line must not recolour the sheet')
       assert(sameColor(state.translation.color, state.idle.color), 'translation must match the lyric colour')
+      // Line-level rows have no karaoke to follow, so their translation keeps the
+      // stock brightness instead of sitting at the unplayed word tone.
+      assert.equal(state.translationOpacity, 1, `line-level translation must not dim, got ${state.translationOpacity}`)
       assert.equal(state.activeLineOpacity, 1, `the active row stays fully opaque: ${state.activeLineOpacity}`)
       assert(state.lineOpacity >= 0.2 && state.lineOpacity < 1, `inactive rows dim with distance under the adaptive background: ${state.lineOpacity}`)
       await page.screenshot({ path: path.join(output, 'lyrics-ambient.png') })
@@ -172,18 +177,24 @@ test('word-level lyrics keep the translation at the unplayed lyric colour', { ti
     const state = await page.evaluate(() => {
       const spans = [...document.querySelectorAll('.font-mode .font-lrc span')]
       const translation = document.querySelector('.line-content .extended .font-lrc')
+      const extended = translation?.closest('.extended')
       const row = spans[1]?.closest('.line-content')
       const style = element => element ? window.getComputedStyle(element) : null
       return {
         unplayed: style(spans[1])?.backgroundColor,
         played: style(spans[0])?.backgroundImage,
         translation: style(translation)?.color,
+        idle: style(row)?.getPropertyValue('--lyric-idle-color').trim(),
+        translationOpacity: Number(style(extended)?.opacity),
         spanShadow: style(spans[1])?.textShadow,
         translationShadow: style(translation)?.textShadow,
         rowFilter: style(row)?.filter,
       }
     })
-    assert.equal(state.translation, state.unplayed, 'translation must match the unplayed karaoke text')
+    // The translation shares the lyric colour and dims through opacity so it can
+    // fade in with the karaoke; the unplayed characters keep the 55% tone.
+    assert.equal(state.translation, state.idle.trim(), `translation must use the lyric colour, got ${state.translation} instead of ${state.idle}`)
+    assert(Math.abs(state.translationOpacity - 0.55) <= 0.01, `translation starts at the unplayed tone, got ${state.translationOpacity}`)
     assert(state.unplayed.includes('0.55'), `unplayed text should sit at 55% alpha, got ${state.unplayed}`)
     assert(state.played.includes('rgb('), 'played text should use the opaque lyric colour')
     // The karaoke glyph is a clipped background, so the shadow has to be composited

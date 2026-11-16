@@ -120,3 +120,90 @@ test('word-level lyrics crossfade the active row with the next one', { timeout: 
     assert.deepEqual(fixture.errors, [])
   } finally { await app.close() }
 })
+
+test('the translation fades in with the karaoke progress of its line', { timeout: 180000 }, async() => {
+  const fixture = await launch({ rendererPath })
+  const { app, page } = fixture
+  // Reveal follows the length of each sung word, so "第一" (2 chars, 0-2s) and
+  // "行" (1 char, 2-4s) give 0.167 at 0.5s, 0.6 at 1.8s and 1 after 4s.
+  const readTranslation = () => page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.line-content')]
+    const active = rows.find(row => row.classList.contains('active'))
+    const extended = active?.querySelector('.extended')
+    return {
+      reveal: Number(active?.style.getPropertyValue('--lyric-reveal') || 0),
+      opacity: Number(extended ? window.getComputedStyle(extended).opacity : NaN),
+      activeIndex: rows.indexOf(active),
+      translations: rows.filter(row => row.querySelector('.extended')).length,
+    }
+  })
+  try {
+    page.setDefaultTimeout(10000)
+    const theme = themes.find(value => value.id === 'black')
+    await page.evaluate(colors => window.setTheme(colors), { ...theme.config.themeColors, ...theme.config.extInfo })
+    await page.evaluate(() => window.lxData.updateSetting({
+      'common.langId': 'zh-cn',
+      'ui.ambientBackground': true,
+      'ui.ambientBackgroundAutoContrast': true,
+      'player.isPlayLxlrc': true,
+      'player.isShowLyricTranslation': true,
+      'playDetail.isZoomActiveLrc': false,
+      'playDetail.isDelayScroll': false,
+    }))
+    await seedTrack(page)
+    await page.evaluate(() => Object.assign(window.lxData.musicInfo, {
+      lrc: '[00:00.000]第一行\n[00:08.000]第二行',
+      lxlrc: '[00:00.000]<0,2000>第一<2000,2000>行\n[00:08.000]<0,2000>第二<2000,2000>行',
+      tlrc: '[00:00.000]译文第一行\n[00:08.000]译文第二行',
+    }))
+    await page.evaluate(() => window.app_event.emit('lyricUpdated'))
+    await showDetail(page, true)
+    await settled(page)
+    await page.waitForFunction(() => document.querySelectorAll('.line-content.font-mode .extended').length >= 2)
+    await page.waitForFunction(() => document.querySelectorAll('.line-content.active').length === 1)
+
+    await page.evaluate(() => window.app_event.setProgress(0.5))
+    await page.waitForTimeout(500)
+    const early = await readTranslation()
+    assert(early.translations >= 2, 'both lines carry a translation')
+    assert(Math.abs(early.reveal - 0.167) < 0.02, `a quarter of the line is sung at 0.5s, got ${early.reveal}`)
+    assert(Math.abs(early.opacity - 0.625) < 0.02, `translation sits just above the unplayed tone, got ${early.opacity}`)
+
+    await page.evaluate(() => window.app_event.setProgress(1.8))
+    await page.waitForTimeout(500)
+    const middle = await readTranslation()
+    assert(Math.abs(middle.reveal - 0.6) < 0.02, `most of the first word is sung at 1.8s, got ${middle.reveal}`)
+    assert(Math.abs(middle.opacity - 0.82) < 0.02, `translation brightens with the karaoke, got ${middle.opacity}`)
+    assert(middle.opacity > early.opacity, 'the translation must not dim while the line is sung')
+
+    await page.evaluate(() => window.app_event.setProgress(4.5))
+    await page.waitForTimeout(500)
+    const completed = await readTranslation()
+    assert(Math.abs(completed.reveal - 1) < 0.02, `the line is fully sung at 4.5s, got ${completed.reveal}`)
+    assert(Math.abs(completed.opacity - 1) < 0.02, `the translation reaches full brightness, got ${completed.opacity}`)
+
+    // The line-relative progress must reset with the next line, not carry over.
+    await page.evaluate(() => window.app_event.setProgress(8.4))
+    await page.waitForTimeout(500)
+    const next = await readTranslation()
+    assert.equal(next.activeIndex, 1, 'the second row is active at 8.4s')
+    assert(Math.abs(next.reveal - 0.133) < 0.02, `the new line starts near the unplayed tone, got ${next.reveal}`)
+    assert(Math.abs(next.opacity - 0.61) < 0.02, `the new translation starts dim again, got ${next.opacity}`)
+
+    // Without the dynamic background the stock translation stays opaque.
+    await page.evaluate(() => window.lxData.updateSetting({ 'ui.ambientBackground': false }))
+    await page.waitForFunction(() => window.lxData.appSetting['ui.ambientBackground'] === false)
+    await page.waitForTimeout(400)
+    const stock = await page.evaluate(() => {
+      const extended = document.querySelector('.line-content .extended')
+      return {
+        opacity: Number(window.getComputedStyle(extended).opacity),
+        reveal: extended.closest('.line-content').style.getPropertyValue('--lyric-reveal'),
+      }
+    })
+    assert.equal(stock.opacity, 1, `the stock translation must stay at full opacity, got ${stock.opacity}`)
+    assert.equal(stock.reveal, '', 'no karaoke reveal is published without the dynamic background')
+
+    assert.deepEqual(fixture.errors, [])
+  } finally { await app.close() }
+})

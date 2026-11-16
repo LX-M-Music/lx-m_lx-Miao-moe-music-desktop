@@ -133,17 +133,33 @@ export default {
       const seconds = whole.split(':').reduce((total, part) => total * 60 + Number(part), 0)
       return seconds * 1000 + Number(fraction.padEnd(3, '0'))
     }
-    const wordTimings = computed(() => {
+    const karaokeLines = computed(() => {
       const map = new Map()
       for (const row of String(playerMusicInfo.lxlrc ?? '').split('\n')) {
         const match = /^\[([^\]]+)\](.*)$/.exec(row.trimEnd())
         if (!match) continue
-        const words = [...match[2].matchAll(/<(\d+),(\d+)>/g)]
+        const marks = [...match[2].matchAll(/<(\d+),(\d+)>/g)]
+        if (!marks.length) continue
+        const words = []
+        let chars = 0
+        marks.forEach((mark, index) => {
+          const text = match[2].slice(mark.index + mark[0].length, marks[index + 1]?.index ?? match[2].length)
+          const length = [...text].length
+          if (!length) return
+          words.push({
+            start: Number(mark[1]),
+            duration: Math.max(1, Number(mark[2])),
+            length,
+          })
+          chars += length
+        })
         if (!words.length) continue
         const last = words[words.length - 1]
         map.set(parseTimestamp(match[1]), {
-          start: Number(last[1]),
-          end: Number(last[1]) + Number(last[2]),
+          start: last.start,
+          end: last.start + last.duration,
+          words,
+          chars,
         })
       }
       return map
@@ -153,13 +169,25 @@ export default {
       const container = dom_lyric.value
       if (!container || !isFocusGradient.value) return
       const rows = [...container.querySelectorAll('.line-content')]
-      for (const row of rows) row.style.removeProperty('--lyric-focus-mix')
+      for (const row of rows) {
+        row.style.removeProperty('--lyric-focus-mix')
+        row.style.removeProperty('--lyric-reveal')
+      }
       const current = lyric.line
       const line = lyric.lines[current]
-      const timing = line ? wordTimings.value.get(line.time) : null
+      const timing = line ? karaokeLines.value.get(line.time) : null
       if (!timing) return
       const offset = (lyric.offset || 0) + (lyric.tempOffset || 0)
       const now = playProgress.nowPlayTime * 1000 + offset
+      // Translation and romanization brighten with the characters they sit under,
+      // so they are weighted by length exactly like the sung spans: the sum matches
+      // the share of the row the karaoke has already covered.
+      let revealed = 0
+      for (const word of timing.words) {
+        const sung = (now - (line.time + word.start)) / word.duration
+        if (sung > 0) revealed += word.length * Math.min(1, sung)
+      }
+      rows[current]?.style.setProperty('--lyric-reveal', String(revealed / timing.chars))
       const wordStart = line.time + timing.start
       const lineEnd = line.time + timing.end
       const start = Math.max(line.time, Math.min(wordStart, lineEnd - FOCUS_FADE_MIN))
@@ -174,14 +202,17 @@ export default {
       () => lyric.line,
       () => lyric.lines,
       isFocusGradient,
-      wordTimings,
+      karaokeLines,
     ], () => {
       void nextTick(() => {
         markFocusRows()
         if (isFocusGradient.value) {
           updateFocusMix()
         } else {
-          dom_lyric.value?.querySelectorAll('.line-content').forEach(row => row.style.removeProperty('--lyric-focus-mix'))
+          for (const row of dom_lyric.value?.querySelectorAll('.line-content') ?? []) {
+            row.style.removeProperty('--lyric-focus-mix')
+            row.style.removeProperty('--lyric-reveal')
+          }
         }
       })
     }, { flush: 'post' })
@@ -336,13 +367,19 @@ export default {
         drop-shadow(0 2px 4px var(--lyric-shadow, rgba(0, 0, 0, .45)));
     }
     // Karaoke progress keeps the same hue: unplayed characters sit at 55% alpha,
-    // played ones use the full lyric colour. Translation and romanization sit at
-    // that same 55% alpha so the whole group reads as one colour.
+    // played ones use the full lyric colour. Translation and romanization keep the
+    // same unplayed tone and brighten with the characters above them, so the whole
+    // group fades in together instead of leaving the translation permanently dim.
     .line-content.font-mode > .line > .font-lrc > span {
       background-color: color-mix(in srgb, var(--lyric-idle-color) 55%, transparent);
     }
-    .line-content.font-mode .extended .font-lrc {
-      color: color-mix(in srgb, var(--lyric-idle-color) 55%, transparent);
+    // Only word-level rows publish a reveal: line-level lyrics have no progress to
+    // follow, so their translations keep the stock full-strength colour.
+    .line-content.font-mode .extended {
+      opacity: calc(.55 + var(--lyric-reveal, 0) * .45);
+      // Progress arrives with the playback tick, which is coarser than a frame:
+      // a short linear transition smooths the steps without lagging behind.
+      transition: opacity 200ms linear;
     }
   }
 
