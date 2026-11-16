@@ -351,3 +351,46 @@ test('adaptive background colors cover app controls and selections, restore them
     console.log('Adaptive color previews:', output)
   } finally { await app.close() }
 })
+
+test('the control palette is decided once per cover and held across page changes', { timeout: 180000 }, async() => {
+  const fixture = await launch(options)
+  const { app, page } = fixture
+  const readPalette = () => page.locator('#root').evaluate(root => ({
+    font: getComputedStyle(root).getPropertyValue('--color-font').trim(),
+    lyric: getComputedStyle(root).getPropertyValue('--lyric-text').trim(),
+    controls: root.dataset.ambientControls ?? null,
+  }))
+  try {
+    page.setDefaultTimeout(20000)
+    await update(page, { 'ui.ambientBackground': true, [settingKey]: true, 'ui.ambientBackgroundPlayDetailMask': false })
+    await seedTrack(page)
+    // This grey blends onto the light surface right at the crossover: deciding the
+    // palette from the live sample flipped the whole sheet when the detail page
+    // opened or closed.
+    await page.evaluate(() => {
+      const image = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#202020"/></svg>'
+      window.lxData.musicInfo.pic = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(image)
+    })
+    await theme(page, 'green')
+    await page.waitForFunction(background => document.querySelector(background).dataset.ambientState === 'static', background)
+    await page.waitForTimeout(400)
+    const home = await readPalette()
+    assert.equal(home.controls, 'light', 'the cover is judged by the settled blend')
+
+    await showDetail(page, true)
+    await settled(page)
+    await page.waitForTimeout(600)
+    const opened = await readPalette()
+    assert.deepEqual({ ...opened, controls: 'light' }, { ...home, controls: 'light' }, `opening the detail must not recolour the library, got ${JSON.stringify(opened)}`)
+
+    await showDetail(page, false)
+    const during = []
+    for (let index = 0; index < 22; index++) {
+      during.push(await readPalette())
+      await page.waitForTimeout(60)
+    }
+    const values = [...new Set(during.map(row => `${row.font}|${row.lyric}|${row.controls}`))]
+    assert.deepEqual(values, [`${home.font}|${home.lyric}|${home.controls}`], `the library palette must stay fixed while the page returns, got ${JSON.stringify(values)}`)
+    assert.deepEqual(fixture.errors, [])
+  } finally { await app.close() }
+})

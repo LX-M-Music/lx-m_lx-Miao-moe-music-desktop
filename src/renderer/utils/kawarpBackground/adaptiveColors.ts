@@ -7,6 +7,7 @@ interface BackgroundFrame {
   to: Artwork | null
   mix: number
   opacity: number
+  done: boolean
 }
 
 // Owned by the shared background. No second renderer, cover request or timer.
@@ -19,6 +20,8 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
     values: Map<string, string>
     attribute: string | null
     darkText?: boolean
+    // Palette already decided for this cover and blend; reused until it changes.
+    latch?: { artwork: Artwork | null, key: string, darkText: boolean }
   }
   const scopes = new Map<HTMLElement, ColorScope>()
   const scopeFor = (element: HTMLElement) => {
@@ -63,6 +66,9 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
   }
   const themeObserver = new MutationObserver(() => {
     lastSample = -Infinity
+    // A new theme changes the surface the artwork is blended onto, so the latched
+    // palettes no longer describe the page.
+    for (const scope of scopes.values()) scope.latch = undefined
     // Keep the background's shading independent of the foreground palette.
     background.style.setProperty('--ambient-shade-color', backgroundColors().shade)
     // The renderer's gradient follows the theme even when adaptive controls
@@ -136,20 +142,34 @@ export const createAdaptiveColors = (background: HTMLElement, themeChanged: () =
       context.filter = 'none'
     }
     const currentArtwork = artwork = stabilizeColor(artwork, frame.opacity ? artworkColor(pixels) : [125, 125, 125], moving)
+    const averageLuminance = (colors: RGB[]) => colors.reduce((total, color) => total + luminance(color), 0) / colors.length
     // Both screens can be visible during expansion. Keep their own contrast
     // palettes instead of recoloring the fading screen to match the incoming one.
     const publish = (element: HTMLElement, surface: ReturnType<typeof parseColor>, targetOpacity: number) => {
       const opacity = frame.opacity * targetOpacity
       const scope = scopeFor(element)
-      // Prefer white over most coloured artwork: sample the reading area and
-      // only switch to dark text on genuinely bright panels.
+      // Prefer white over most coloured artwork: sample the reading area and only
+      // switch to dark text on genuinely bright panels.
       const readingArea: RGB[] = []
       for (let row = 2; row < 14; row += 1) {
         for (let column = 12; column < 24; column += 1) readingArea.push(pixels[row * 24 + column])
       }
-      const readingBackground = compositeBackgrounds(readingArea, surface, opacity)
-      const readingLuminance = readingBackground.reduce((total, color) => total + luminance(color), 0) / readingBackground.length
-      const palette = createAdaptivePalette(compositeBackgrounds(pixels, surface, opacity), currentArtwork, scope.darkText, readingLuminance > 0.5)
+      const readingLuminance = averageLuminance(compositeBackgrounds(readingArea, surface, opacity))
+      // Decide the side once the cover has settled, then keep it: the live sample
+      // still moves while a cover fades, the two screens swap or the background
+      // drifts, and re-deciding from it flipped the whole sheet between white and
+      // black. Until the cover settles the blend is still changing, so follow it.
+      const source = frame.to ?? frame.from ?? null
+      const key = `${targetOpacity}|${surface.join(',')}`
+      const cached = scope.latch
+      let darkText
+      if (cached && cached.artwork === source && cached.key === key) {
+        darkText = cached.darkText
+      } else {
+        darkText = readingLuminance > 0.5
+        if (frame.done && frame.opacity >= 0.999) scope.latch = { artwork: source, key, darkText }
+      }
+      const palette = createAdaptivePalette(compositeBackgrounds(pixels, surface, opacity), currentArtwork, scope.darkText, darkText)
       scope.darkText = palette.darkText
       for (const [key, value] of Object.entries(palette.colors)) write(scope, key, value)
       // Lyrics share the controls' polarity so text and buttons always agree:
