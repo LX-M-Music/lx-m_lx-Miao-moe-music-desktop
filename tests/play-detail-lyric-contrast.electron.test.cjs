@@ -121,8 +121,8 @@ test('play detail lyrics keep one colour and the stock look without the dynamic 
       assert(channels[0] === channels[1] && channels[1] === channels[2], `lyric colour must be neutral, got ${state.idle.color}`)
       assert(sameColor(state.active.color, state.idle.color), 'activating a line must not recolour the sheet')
       assert(sameColor(state.translation.color, state.idle.color), 'translation must match the lyric colour')
-      assert.equal(state.lineOpacity, 1, `inactive lyrics should stay fully opaque: ${state.lineOpacity}`)
-      assert.equal(state.activeLineOpacity, 1, `activating a line must not change its opacity: ${state.activeLineOpacity}`)
+      assert.equal(state.activeLineOpacity, 1, `the active row stays fully opaque: ${state.activeLineOpacity}`)
+      assert(state.lineOpacity >= 0.2 && state.lineOpacity < 1, `inactive rows dim with distance under the adaptive background: ${state.lineOpacity}`)
       await page.screenshot({ path: path.join(output, 'lyrics-ambient.png') })
     })
 

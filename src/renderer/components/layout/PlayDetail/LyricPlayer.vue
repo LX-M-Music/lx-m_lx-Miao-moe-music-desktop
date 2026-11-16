@@ -4,7 +4,7 @@
       <div
         v-show="!isShowLrcSelectContent"
         ref="dom_lyric"
-        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.hidePassedLines]: appSetting['playDetail.hidePassedLyric'] }]" :style="lrcStyles"
+        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }]" :style="lrcStyles"
         @wheel="handleWheel" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart"
         @contextmenu.stop="handleShowLyricMenu"
       >
@@ -74,6 +74,9 @@ export default {
   },
   setup() {
     const isZoomActiveLrc = computed(() => appSetting['playDetail.isZoomActiveLrc'])
+    // The focus gradient belongs to the adaptive background; with it off the
+    // lyric sheet keeps the stock uniform look.
+    const isFocusGradient = computed(() => !!appSetting['ui.ambientBackground'])
     const isShowLyricProgressSetting = computed(() => appSetting['playDetail.isShowLyricProgressSetting'] && isShowPlayerDetail.value && !isShowLrcSelectContent.value)
 
     const {
@@ -100,14 +103,14 @@ export default {
     // and word-level lyrics instead of relying on the transient `.played` class
     // the font player puts on the row that just finished. Passed rows dim but
     // stay readable; upcoming rows dim more and brighten as they move into focus.
-    const markPassedLines = () => {
+    const markFocusRows = () => {
       const container = dom_lyric.value
       if (!container) return
       const current = lyric.line
-      const hide = appSetting['playDetail.hidePassedLyric']
+      const enabled = isFocusGradient.value
       container.querySelectorAll('.line-content').forEach((row, index) => {
-        const passed = hide && current >= 0 && index < current
-        const upcoming = hide && current >= 0 && index > current
+        const passed = enabled && current >= 0 && index < current
+        const upcoming = enabled && current >= 0 && index > current
         row.classList.toggle('isPassed', passed)
         row.classList.toggle('isUpcoming', upcoming)
         if (passed || upcoming) row.dataset.lyricDistance = String(Math.min(Math.abs(index - current), 3))
@@ -117,9 +120,9 @@ export default {
     watch([
       () => lyric.line,
       () => lyric.lines,
-      () => appSetting['playDetail.hidePassedLyric'],
+      isFocusGradient,
     ], () => {
-      void nextTick(markPassedLines)
+      void nextTick(markFocusRows)
     }, { flush: 'post' })
 
     watch([isFullscreen, isShowPlayComment], () => {
@@ -189,7 +192,7 @@ export default {
     onMounted(() => {
       window.app_event.on('musicToggled', updateMusicInfo)
       window.app_event.on('lyricUpdated', updateMusicInfo)
-      void nextTick(markPassedLines)
+      void nextTick(markFocusRows)
     })
     onBeforeUnmount(() => {
       window.app_event.off('musicToggled', updateMusicInfo)
@@ -198,6 +201,7 @@ export default {
 
     return {
       appSetting,
+      isFocusGradient,
       dom_lyric,
       dom_lyric_text,
       dom_lrc_select_content,
@@ -380,9 +384,9 @@ export default {
   }
 }
 
-// Optional focus gradient: rows above the active line stay readable but dim,
+// Adaptive-background only: rows above the active line stay readable but dim,
 // rows below are dimmer still and brighten as they move into focus.
-.hidePassedLines {
+.focusGradient {
   :global(.line-content.isPassed) { opacity: .44; }
 
   :global(.line-content.isPassed[data-lyric-distance="2"]) { opacity: .33; }

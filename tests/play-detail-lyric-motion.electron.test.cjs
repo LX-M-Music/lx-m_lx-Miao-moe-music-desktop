@@ -21,7 +21,7 @@ const readRows = page => page.evaluate(() => {
   }
 })
 
-test('line-level lyrics fade passed rows and keep the zoom overshoot', { timeout: 180000 }, async() => {
+test('lyrics under the adaptive background keep a focus gradient and the zoom overshoot', { timeout: 180000 }, async() => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture
   try {
@@ -30,13 +30,12 @@ test('line-level lyrics fade passed rows and keep the zoom overshoot', { timeout
     await page.evaluate(colors => window.setTheme(colors), { ...theme.config.themeColors, ...theme.config.extInfo })
     await page.evaluate(() => window.lxData.updateSetting({
       'common.langId': 'zh-cn',
-      'ui.ambientBackground': false,
+      'ui.ambientBackground': true,
+      'ui.ambientBackgroundAutoContrast': true,
       'player.isPlayLxlrc': false,
       'playDetail.isZoomActiveLrc': true,
       'playDetail.isDelayScroll': false,
-      'playDetail.hidePassedLyric': true,
     }))
-    await page.waitForFunction(() => window.lxData.appSetting['playDetail.hidePassedLyric'] === true)
     await seedTrack(page)
     await page.evaluate(() => Object.assign(window.lxData.musicInfo, {
       lrc: '[00:00.000]第一行\n[00:02.000]第二行\n[00:04.000]第三行\n[00:06.000]第四行',
@@ -66,12 +65,12 @@ test('line-level lyrics fade passed rows and keep the zoom overshoot', { timeout
     assert(state.rows[2].timing.includes('cubic-bezier'), `expected a timed scale transition, got ${state.rows[2].timing}`)
     assert(state.rows[2].timing.includes('1.56'), `expected the overshoot curve, got ${state.rows[2].timing}`)
 
-    await page.evaluate(() => window.lxData.updateSetting({ 'playDetail.hidePassedLyric': false }))
-    await page.waitForFunction(() => window.lxData.appSetting['playDetail.hidePassedLyric'] === false)
+    await page.evaluate(() => window.lxData.updateSetting({ 'ui.ambientBackground': false }))
+    await page.waitForFunction(() => window.lxData.appSetting['ui.ambientBackground'] === false)
     await page.waitForTimeout(600)
     const restored = await readRows(page)
-    assert(restored.rows.every(row => !row.passed && !row.upcoming), 'disabling the setting clears every focus mark')
-    assert(restored.rows[0].opacity > 0.5, `disabling should restore passed rows, got ${restored.rows[0].opacity}`)
+    assert(restored.rows.every(row => !row.passed && !row.upcoming), 'without the adaptive background every focus mark is cleared')
+    assert(restored.rows[0].opacity > 0.5, `stock lyric opacity should return, got ${restored.rows[0].opacity}`)
 
     assert.deepEqual(fixture.errors, [])
   } finally { await app.close() }

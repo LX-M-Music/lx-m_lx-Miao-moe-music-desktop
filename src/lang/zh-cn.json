@@ -1141,7 +1141,6 @@
   "setting__play_detail_font_weight_tip": "调整播放详情页的文字粗细，包含歌词、翻译／罗马音和歌曲信息。400 为标准粗细，数值越大越粗；修改后立即生效。",
   "setting__play_detail_font_weight_reset": "恢复标准粗细",
   "setting__play_detail_lyric_delay_scroll": "延迟歌词滚动",
-  "setting__play_detail_lyric_hide_passed": "已唱歌词淡出",
   "setting__play_detail_lyric_progress": "滚动歌词时显示定位线和跳转按钮",
   "setting__play_lyric_lxlrc": "使用卡拉 OK 式歌词播放（如果可用）",
   "setting__play_lyric_lxlrc_tip": "此功能比较耗性能，低配置电脑不建议开启！",
