@@ -4,7 +4,7 @@
       <div
         v-show="!isShowLrcSelectContent"
         ref="dom_lyric"
-        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }, { [$style.browsing]: isStopScroll && isScrollHighlight }]" :style="lrcStyles"
+        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }, { [$style.browsing]: isStopScroll && isScrollHighlight }, { flatLyrics: isFlatLyrics }]" :style="lrcStyles"
         @wheel="handleWheel" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart"
         @contextmenu.stop="handleShowLyricMenu"
       >
@@ -79,6 +79,9 @@ export default {
     const isAmbientLyrics = computed(() => !!appSetting['ui.ambientBackground'])
     const isFocusGradient = computed(() => isAmbientLyrics.value && appSetting['playDetail.isLyricFade'] !== false)
     const isScrollHighlight = computed(() => appSetting['playDetail.isScrollHighlight'] !== false)
+    // Without the fade the karaoke tint stays on the playing row only; every other
+    // row is painted at full strength so nothing above or below looks half drawn.
+    const isFlatLyrics = computed(() => isAmbientLyrics.value && !isFocusGradient.value)
     const isShowLyricProgressSetting = computed(() => appSetting['playDetail.isShowLyricProgressSetting'] && isShowPlayerDetail.value && !isShowLrcSelectContent.value)
 
     const {
@@ -355,6 +358,7 @@ export default {
       isZoomActiveLrc,
       isStopScroll,
       isScrollHighlight,
+      isFlatLyrics,
       lyricMenuVisible,
       lyricMenuXY,
       handleShowLyricMenu,
@@ -411,6 +415,11 @@ export default {
     // group fades in together instead of leaving the translation permanently dim.
     .line-content.font-mode > .line > .font-lrc > span {
       background-color: color-mix(in srgb, var(--lyric-idle-color) 55%, transparent);
+    }
+    // Fade option off: only the playing row keeps that tint, so the lines above and
+    // below stay painted at full strength instead of looking half sung.
+    .lyric.flatLyrics .line-content.font-mode:not(.active) > .line > .font-lrc > span {
+      background-color: var(--lyric-active-color, var(--lyric-idle-color));
     }
     // Only word-level rows publish a reveal: line-level lyrics have no progress to
     // follow, so their translations keep the stock full-strength colour.

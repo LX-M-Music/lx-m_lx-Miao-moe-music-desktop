@@ -140,10 +140,24 @@ test('turning the lyric fade off keeps every row and translation at full strengt
   const read = () => page.evaluate(() => {
     const rows = [...document.querySelectorAll('.line-content')]
     const extended = rows.map(row => row.querySelector('.extended .font-lrc')).filter(Boolean)
+    const alphaOf = node => {
+      if (!node) return null
+      const value = window.getComputedStyle(node).backgroundColor
+      // Modern Chromium serialises color-mix() as color(srgb r g b / a).
+      const mixed = value.match(/^color\(srgb [^/]+\/\s*([\d.]+)\)$/)
+      if (mixed) return Number(mixed[1])
+      const rgba = value.match(/^rgba\(([^)]+)\)$/)
+      if (rgba) return Number(rgba[1].split(',')[3] ?? 1)
+      return 1
+    }
     return {
       opacities: rows.map(row => Number(window.getComputedStyle(row).opacity)),
       marked: rows.filter(row => row.classList.contains('isPassed') || row.classList.contains('isUpcoming')).length,
       sweeps: extended.map(node => parseFloat(window.getComputedStyle(node).backgroundSize)),
+      // Unsung characters in a word-level row are painted at 55% alpha; the fade
+      // option should leave that tint on the playing row only.
+      characterAlphas: rows.map(row => alphaOf(row.querySelector('.line > .font-lrc > span'))),
+      activeIndex: rows.findIndex(row => row.classList.contains('active')),
     }
   })
   try {
@@ -178,6 +192,11 @@ test('turning the lyric fade off keeps every row and translation at full strengt
     assert(off.opacities.every(value => value === 1), `every row stays lit with the fade off, got ${JSON.stringify(off.opacities)}`)
     assert.equal(off.marked, 0, 'no distance marks are published with the fade off')
     assert(off.sweeps.every(value => value >= 99), `translations stay at full tone, got ${JSON.stringify(off.sweeps)}`)
+    // Only the playing row keeps the karaoke tint; rows above and below are painted
+    // at full strength instead of showing half-drawn characters.
+    const offOthers = off.characterAlphas.filter((_value, index) => index !== off.activeIndex)
+    assert(offOthers.every(value => value === 1), `rows above and below are fully painted, got ${JSON.stringify(off.characterAlphas)} (active ${off.activeIndex})`)
+    assert(Math.abs(off.characterAlphas[off.activeIndex] - 0.55) < 0.03, `the playing row keeps the karaoke tint, got ${off.characterAlphas[off.activeIndex]}`)
 
     await page.evaluate(() => window.lxData.updateSetting({ 'playDetail.isLyricFade': true }))
     await page.waitForFunction(() => window.lxData.appSetting['playDetail.isLyricFade'] === true)
@@ -187,6 +206,8 @@ test('turning the lyric fade off keeps every row and translation at full strengt
     assert(on.opacities[1] > 0.95, `the active row stays lit, got ${on.opacities[1]}`)
     assert(on.marked > 0, 'distance marks come back with the fade option')
     assert(Math.abs(on.sweeps[1] - 50) < 2, `the active translation follows the karaoke again, got ${on.sweeps[1]}%`)
+    const onOthers = on.characterAlphas.filter((_value, index) => index !== on.activeIndex)
+    assert(onOthers.every(value => Math.abs(value - 0.55) < 0.03), `the tint comes back on every row with the fade option, got ${JSON.stringify(on.characterAlphas)}`)
 
     assert.deepEqual(fixture.errors, [])
   } finally { await app.close() }
