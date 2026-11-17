@@ -342,11 +342,6 @@ declare global {
        */
       'playDetail.isLyricFade': boolean
 
-      /**
-       * 播放详情页-手动滚动歌词时是否临时保持全亮
-       */
-      'playDetail.isScrollHighlight': boolean
-
 
       /**
        * 是否启用桌面歌词

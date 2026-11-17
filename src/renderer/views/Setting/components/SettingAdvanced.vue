@@ -82,6 +82,13 @@ dd
         @update:model-value="updateSetting({ 'ui.ambientBackgroundAutoContrast': $event })"
       )
       svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_background_auto_contrast_tip')")
+    .gap-top
+      base-checkbox(
+        id="setting_advanced_background_lyric_fade"
+        :model-value="appSetting['playDetail.isLyricFade']"
+        :label="$t('setting__advanced_background_lyric_fade')"
+        @update:model-value="updateSetting({ 'playDetail.isLyricFade': $event })"
+      )
     .p.gap-top.setting-row
       label(for="setting_advanced_background_quality") {{ $t('setting__advanced_background_quality') }}
       select#setting_advanced_background_quality.gap-left(:value="appSetting['ui.ambientBackgroundQuality']" @change="updateSetting({ 'ui.ambientBackgroundQuality': $event.target.value })")

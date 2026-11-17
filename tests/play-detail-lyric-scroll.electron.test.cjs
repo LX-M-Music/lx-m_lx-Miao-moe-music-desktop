@@ -69,46 +69,6 @@ test('play detail lyrics scroll the active line to the visual center', { timeout
   }
 })
 
-test('the scroll highlight can be turned off', { timeout: 180000 }, async() => {
-  const fixture = await launch({ rendererPath })
-  const { app, page } = fixture
-  const opacities = () => page.evaluate(() => [...document.querySelectorAll('.line-content')].map(row => Number(window.getComputedStyle(row).opacity)))
-  try {
-    page.setDefaultTimeout(10000)
-    await page.evaluate(() => window.lxData.updateSetting({
-      'common.langId': 'zh-cn',
-      'ui.ambientBackground': true,
-      'ui.ambientBackgroundAutoContrast': true,
-      'playDetail.isZoomActiveLrc': false,
-      'playDetail.isDelayScroll': false,
-      'playDetail.isScrollHighlight': false,
-    }))
-    await seedTrack(page)
-    await showDetail(page, true)
-    await settled(page)
-    await seedLyrics(page)
-    await page.waitForFunction(() => document.querySelectorAll('.line-content').length > 5)
-    await page.evaluate(() => { window.__motionLine(3) })
-    await page.evaluate(() => document.documentElement.classList.add('disableAnimation'))
-    await page.waitForTimeout(400)
-    const dimmed = await opacities()
-    assert(dimmed[0] < 0.5, `rows above the active line are dimmed, got ${dimmed[0]}`)
-
-    const box = await page.locator('.lyric').boundingBox()
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await page.mouse.wheel(0, 180)
-    // The guide proves the wheel landed; the shading must survive it.
-    await page.locator('[data-lyric-seek-guide]').waitFor({ state: 'visible' })
-    await page.waitForTimeout(500)
-    const scrolling = await opacities()
-    assert(Math.abs(scrolling[0] - dimmed[0]) < 0.02, `the shading must stay with the option off, got ${scrolling[0]} instead of ${dimmed[0]}`)
-    assert(scrolling[1] < 0.5, `dimmer rows stay dim, got ${scrolling[1]}`)
-    assert.deepEqual(fixture.errors, [])
-  } finally {
-    await app.close()
-  }
-})
-
 test('browsing the lyric sheet keeps every row at full strength', { timeout: 180000 }, async() => {
   const fixture = await launch({ rendererPath })
   const { app, page } = fixture

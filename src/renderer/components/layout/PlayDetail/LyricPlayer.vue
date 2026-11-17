@@ -4,7 +4,7 @@
       <div
         v-show="!isShowLrcSelectContent"
         ref="dom_lyric"
-        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }, { [$style.browsing]: isStopScroll && isScrollHighlight }, { flatLyrics: isFlatLyrics }]" :style="lrcStyles"
+        :class="['lyric', $style.lyric, { [$style.draging]: isMsDown }, { [$style.lrcActiveZoom]: isZoomActiveLrc }, { [$style.focusGradient]: isFocusGradient }, { [$style.browsing]: isStopScroll }, { flatLyrics: isFlatLyrics }]" :style="lrcStyles"
         @wheel="handleWheel" @mousedown="handleLyricMouseDown" @touchstart="handleLyricTouchStart"
         @contextmenu.stop="handleShowLyricMenu"
       >
@@ -77,8 +77,7 @@ export default {
     // The adaptive palette paints the lyrics; the fade option then decides whether
     // the sheet also dims rows by distance and wipes the translation in.
     const isAmbientLyrics = computed(() => !!appSetting['ui.ambientBackground'])
-    const isFocusGradient = computed(() => isAmbientLyrics.value && appSetting['playDetail.isLyricFade'] !== false)
-    const isScrollHighlight = computed(() => appSetting['playDetail.isScrollHighlight'] !== false)
+    const isFocusGradient = computed(() => isAmbientLyrics.value && appSetting['playDetail.isLyricFade'])
     // Without the fade the karaoke tint stays on the playing row only; every other
     // row is painted at full strength so nothing above or below looks half drawn.
     const isFlatLyrics = computed(() => isAmbientLyrics.value && !isFocusGradient.value)
@@ -357,7 +356,6 @@ export default {
       isShowLyricProgressSetting,
       isZoomActiveLrc,
       isStopScroll,
-      isScrollHighlight,
       isFlatLyrics,
       lyricMenuVisible,
       lyricMenuXY,
