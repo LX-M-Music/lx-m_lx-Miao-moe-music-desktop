@@ -106,7 +106,6 @@ test('Kawarp replaces the old effects, follows artwork without analysing audio, 
     await t.test('Advanced keeps its switch and quality with no background-style or music-response controls', async() => {
       await openSettings(page)
       assert.equal(await page.locator('#setting_advanced_background_enabled').isChecked(), true)
-      assert.equal(await page.locator('#setting_advanced_background_only_play_detail').isChecked(), false)
       assert.equal(await page.locator('#setting_advanced_background_music').count(), 0)
       assert.equal(await page.locator('#setting_advanced_background_style').count(), 0)
       assert.equal(await page.evaluate(() => Object.hasOwn(window.lxData.appSetting, 'ui.ambientBackgroundMusic')), false)
@@ -470,59 +469,6 @@ test('Kawarp replaces the old effects, follows artwork without analysing audio, 
       await state(page, main, 'playing')
       assert.deepEqual(await page.evaluate(() => window.__kawarpShaderErrors), [])
     })
-    await t.test('detail-only mode restores normal pages and releases rendering and adaptive colors on every exit', async() => {
-      await openSettings(page)
-      await update(page, { 'ui.ambientBackground': false })
-      await page.locator(main).waitFor({ state: 'detached' })
-      const normalColors = () => page.evaluate(async() => {
-        const right = document.querySelector('#right')
-        await Promise.allSettled(right.getAnimations().map(animation => animation.finished))
-        return [
-          getComputedStyle(right).backgroundColor,
-          getComputedStyle(document.querySelector('#player'), '::before').backgroundColor,
-          getComputedStyle(document.querySelector('#setting_advanced_background_enabled + label')).color,
-        ]
-      })
-      const expectedColors = await normalColors()
-      await update(page, { 'ui.ambientBackground': true, 'ui.ambientBackgroundAutoContrast': true })
-      await page.locator('#root[data-ambient-controls]').waitFor()
-      await page.locator('label[for="setting_advanced_background_only_play_detail"]').click()
-      await page.locator(main).waitFor({ state: 'detached' })
-      const expectNormalPage = async() => {
-        assert.equal(await page.locator('#container[data-ambient-enabled], #root[data-ambient-controls], [data-ambient-zone]').count(), 0)
-        assert.equal(await page.evaluate(() => window.__kawarpPrograms.size), 0)
-        assert.deepEqual(await normalColors(), expectedColors)
-      }
-      await expectNormalPage()
-      for (const [color, channel] of [['#d92c38', 0], ['#2844ce', 2]]) {
-        await cover(page, color)
-        assert.equal(await page.locator(main).count(), 0, 'changing covers outside detail must not start rendering')
-        await showDetail(page, true)
-        await settled(page)
-        await state(page, main, 'playing')
-        await dominant(page, channel)
-        assert.equal(await page.locator('[data-ambient-background] canvas').count(), 1)
-        assert.equal(await page.evaluate(() => window.__kawarpPrograms.size), 2)
-        await page.locator('#root[data-ambient-controls]').waitFor()
-        assert.equal(await page.locator('[data-player-detail] [data-ambient-lyrics]').count(), 1)
-        await showDetail(page, false)
-        await settled(page)
-        await page.locator(main).waitFor({ state: 'detached' })
-        await expectNormalPage()
-      }
-      await showDetail(page, true)
-      await state(page, main, 'playing')
-      await update(page, { 'ui.ambientBackground': false })
-      await page.locator(main).waitFor({ state: 'detached' })
-      await expectNormalPage()
-      await update(page, { 'ui.ambientBackground': true })
-      await state(page, main, 'playing')
-      await openSettings(page)
-      await page.locator(main).waitFor({ state: 'detached' })
-      await page.locator('label[for="setting_advanced_background_only_play_detail"]').click()
-      await state(page, main, 'playing')
-      await update(page, { 'ui.ambientBackgroundAutoContrast': false })
-    })
     await t.test('turning off releases all programs, no WebGL stays usable, and no analyser was created', async() => {
       await openSettings(page)
       await update(page, { 'ui.ambientBackground': false })
@@ -548,20 +494,16 @@ test('Kawarp replaces the old effects, follows artwork without analysing audio, 
       await page.screenshot({ path: path.join(output, 'kawarp-fallback.png') })
       await page.evaluate(() => { HTMLCanvasElement.prototype.getContext = window.__kawarpGetContext })
     })
-    await t.test('detail-only scope, quality and explicit opt-out survive a restart while obsolete style settings are discarded', async() => {
+    await t.test('quality and explicit opt-out survive a restart while obsolete style settings are discarded', async() => {
       await openSettings(page)
       await page.locator('#setting_advanced_background_quality').selectOption('static')
-      await page.locator('label[for="setting_advanced_background_only_play_detail"]').click()
-      await page.waitForFunction(() => window.lxData.appSetting['ui.ambientBackgroundOnlyPlayDetail'] === true)
       await page.locator('label[for="setting_advanced_background_enabled"]').click()
-      // Detail-only mode already detached the canvas on this page. Wait for the
-      // saved setting acknowledgement before reading the durable configuration.
+      // Wait for the saved setting acknowledgement before reading the durable configuration.
       await page.waitForFunction(() => window.lxData.appSetting['ui.ambientBackground'] === false)
       await page.locator(main).waitFor({ state: 'detached' })
       const configPath = path.join(output, 'portable/userData/LxDatas/config_v2.json')
       const config = JSON.parse(await fs.readFile(configPath, 'utf8')).setting
       assert.equal(config['ui.ambientBackground'], false)
-      assert.equal(config['ui.ambientBackgroundOnlyPlayDetail'], true)
       assert.equal(Object.hasOwn(config, 'ui.ambientBackgroundStyle'), false)
       assert.equal(config['ui.ambientBackgroundQuality'], 'static')
       assert.deepEqual(fixture.errors, [])
@@ -578,8 +520,7 @@ test('Kawarp replaces the old effects, follows artwork without analysing audio, 
       assert.equal(await page.locator('#setting_advanced_background_style').count(), 0)
       assert.equal(await page.evaluate(() => Object.hasOwn(window.lxData.appSetting, 'ui.ambientBackgroundStyle')), false)
       assert.equal(await page.locator('#setting_advanced_background_quality').inputValue(), 'static')
-      assert.equal(await page.locator('#setting_advanced_background_only_play_detail').isChecked(), true)
-      assert.equal(await page.locator(main).count(), 0)
+      await page.locator(main).waitFor()
       await seedTrack(page)
       await showDetail(page, true)
       await state(page, main, 'static')

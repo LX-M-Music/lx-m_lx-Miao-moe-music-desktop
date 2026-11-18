@@ -5,8 +5,10 @@
     <div class="setting-actions">
       <base-btn class="btn gap-left" min :disabled="busy" @click="openImport('playlists')">{{ $t('setting__backup_part_import_list') }}</base-btn>
       <base-btn class="btn gap-left" min :disabled="busy" @click="exportBackup('playlists')">{{ $t('setting__backup_part_export_list') }}</base-btn>
+      <base-btn class="btn gap-left" min :disabled="busy" @click="exportBackup('compat_playlists')">{{ $t('setting__backup_compat_export_list') }}</base-btn>
       <base-btn class="btn gap-left" min :disabled="busy" @click="openImport('settings')">{{ $t('setting__backup_part_import_setting') }}</base-btn>
       <base-btn class="btn gap-left" min :disabled="busy" @click="exportBackup('settings')">{{ $t('setting__backup_part_export_setting') }}</base-btn>
+      <base-btn class="btn gap-left" min :disabled="busy" @click="exportBackup('compat_settings')">{{ $t('setting__backup_compat_export_setting') }}</base-btn>
     </div>
   </dd>
   <dd>
@@ -14,6 +16,8 @@
     <div class="setting-actions">
       <base-btn class="btn gap-left" min :disabled="busy" @click="openImport('all')">{{ $t('setting__backup_all_import') }}</base-btn>
       <base-btn class="btn gap-left" min :disabled="busy" @click="exportBackup('all')">{{ $t('setting__backup_all_export') }}</base-btn>
+      <base-btn class="btn gap-left" min :disabled="busy" @click="exportBackup('compat_all')">{{ $t('setting__backup_compat_export_all') }}</base-btn>
+      <svg-icon class="help-icon" name="help-circle-outline" :aria-label="$t('setting__backup_compat_hint')" />
     </div>
     <p v-if="busy" :class="$style.note" role="status">{{ $t('setting__backup_working') }}</p>
     <p v-if="notice" :class="$style.notice" :role="failed ? 'alert' : 'status'" data-backup-notice>{{ notice }}</p>
@@ -115,8 +119,16 @@ const restore = async() => run(async() => {
   preview.value = null
   notice.value = t(result.restart ? 'setting__backup_restored_restart' : 'setting__backup_restored')
 })
+const exportBackupNames = {
+  playlists: 'lx_list.lxmc',
+  settings: 'lx_setting_v2.lxmc',
+  all: 'lx_datas_v3.lxmc',
+  compat_playlists: 'lx_list_compat.lxmc',
+  compat_settings: 'lx_setting_compat.lxmc',
+  compat_all: 'lx_datas_compat.lxmc',
+}
 const exportBackup = async kind => run(async() => {
-  const result = await openSaveDir({ title: t('setting__backup_all_export_desc'), defaultPath: kind === 'all' ? 'lx_datas_v3.lxmc' : kind === 'settings' ? 'lx_setting_v2.lxmc' : 'lx_list.lxmc' })
+  const result = await openSaveDir({ title: t('setting__backup_all_export_desc'), defaultPath: exportBackupNames[kind] })
   if (result.canceled || !result.filePath) return
   await rendererInvoke(BACKUP_IPC.export, { path: result.filePath, kind })
   notice.value = t('setting__backup_exported')

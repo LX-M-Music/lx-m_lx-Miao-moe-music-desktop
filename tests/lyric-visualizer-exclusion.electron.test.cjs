@@ -47,7 +47,7 @@ test('lyrics exclude audio visualization with legacy settings, playback, fullscr
     await page.evaluate(() => {
       Object.assign(window.lxData.musicInfo, { lrc: '[00:00.000]歌词页面只有歌词动效\n[00:10.000]不叠加音频可视化', lxlrc: '', tlrc: '', rlrc: '' })
       window.app_event.lyricUpdated()
-      window.lxData.updateSetting({ 'player.audioVisualization': true, 'common.isShowAnimation': false, 'ui.ambientBackground': true, 'ui.ambientBackgroundOnlyPlayDetail': true })
+      window.lxData.updateSetting({ 'player.audioVisualization': true, 'common.isShowAnimation': false, 'ui.ambientBackground': true })
       window.__lxPluginHost.player.getAudioElement().muted = true
     })
     await startSilentAudio(page)

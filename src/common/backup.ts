@@ -73,6 +73,70 @@ export const validateBackupSettings = (value: any): Partial<LX.AppSetting> => {
   }
   return result
 }
+
+// Original LX Music 2.12.6 export/import formats. These files are intentionally
+// independent from the versioned v3 backup and must keep the exact v2 shape.
+export const BACKUP_COMPAT_KINDS = ['compat_playlists', 'compat_settings', 'compat_all'] as const
+export type BackupCompatKind = typeof BACKUP_COMPAT_KINDS[number]
+export interface BackupCompatPlaylist {
+  id: string
+  name: string
+  source?: LX.OnlineSource
+  sourceListId?: string
+  locationUpdateTime: number | null
+  list: LX.Music.MusicInfo[]
+}
+interface CompatMusicMeta extends LX.Music.MusicInfoMetaBase {
+  qualitys?: LX.Music.MusicQualityType[]
+  _qualitys?: LX.Music._MusicQualityType
+}
+const compatMusic = (musicInfo: LX.Music.MusicInfo): LX.Music.MusicInfo => {
+  // The cached database objects must not be rewritten by quality normalization.
+  const meta: CompatMusicMeta = { ...musicInfo.meta }
+  const result = { ...musicInfo, meta } as unknown as LX.Music.MusicInfo
+  // Same rule as the original filterMusicList.
+  if (result.singer == null) result.singer = ''
+  if (result.source != 'local') {
+    // Older rows can miss these containers, while fixNewMusicInfoQuality assumes both exist.
+    meta.qualitys = Array.isArray(meta.qualitys) ? meta.qualitys.map(quality => ({ ...quality })) : []
+    meta._qualitys = record(meta._qualitys) ? { ...meta._qualitys } : {}
+    fixNewMusicInfoQuality(result)
+  }
+  return result
+}
+const compatPlaylists = (lists: BackupList[]): BackupCompatPlaylist[] => {
+  const result: BackupCompatPlaylist[] = []
+  for (const item of lists) {
+    // The original client never exported the temporary list.
+    if (item.id == LIST_IDS.TEMP) continue
+    const songs = new Map<string, LX.Music.MusicInfo>()
+    for (const musicInfo of item.list ?? []) {
+      // LX Music 2.12.6 has no extended sources: such songs import but cannot be
+      // played, so exclude them from compatible files before dedupe/normalization.
+      if (!musicInfo || isMusicFreeSource(musicInfo.source)) continue
+      if (!musicInfo.id || !musicInfo.name || songs.has(musicInfo.id)) continue
+      songs.set(musicInfo.id, compatMusic(musicInfo))
+    }
+    result.push({
+      id: item.id,
+      name: item.name,
+      ...(item.source ? { source: item.source } : {}),
+      ...(item.sourceListId != null ? { sourceListId: item.sourceListId } : {}),
+      locationUpdateTime: item.locationUpdateTime ?? null,
+      list: [...songs.values()],
+    })
+  }
+  return result
+}
+export const buildCompatExport = (kind: BackupCompatKind, source: { playlists: BackupList[], settings: Partial<LX.AppSetting> }): unknown => {
+  const playlists = compatPlaylists(source.playlists ?? [])
+  switch (kind) {
+    case 'compat_playlists': return { type: 'playList_v2', data: playlists }
+    case 'compat_settings': return { type: 'setting_v2', data: validateBackupSettings(source.settings ?? {}) }
+    case 'compat_all': return { type: 'allData_v2', setting: validateBackupSettings(source.settings ?? {}), playList: playlists }
+    default: throw new BackupError('type')
+  }
+}
 const music = (value: any): LX.Music.MusicInfo => {
   if (!record(value) || !text(value.id) || !value.id || !text(value.name) || !text(value.singer) || !(['local', 'kw', 'kg', 'tx', 'wy', 'mg'].includes(value.source) || isMusicFreeSource(value.source))) fail('song')
   if (value.interval != null && !text(value.interval, 80)) fail('song.interval')

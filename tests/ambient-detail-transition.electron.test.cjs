@@ -75,7 +75,7 @@ test('dynamic background detail transitions keep window, sidebar and playback ic
       window.lxData.musicInfo.lrc = '[00:00.00]I just wanna run\n[00:01.00]Run because they are chasing me down\n[00:03.00]I just wanna run throw it away'
       window.app_event.lyricUpdated()
     })
-    await update(page, { 'ui.ambientBackground': true, 'ui.ambientBackgroundOnlyPlayDetail': false, 'ui.ambientBackgroundQuality': 'static' })
+    await update(page, { 'ui.ambientBackground': true, 'ui.ambientBackgroundQuality': 'static' })
     await page.waitForTimeout(1400)
     await page.evaluate(() => { window.__detailTransitionCanvas = document.querySelector('[data-ambient-background] canvas') })
 
@@ -138,34 +138,6 @@ test('dynamic background detail transitions keep window, sidebar and playback ic
       await update(page, { 'common.isShowAnimation': true })
     })
 
-    await t.test('detail-only background exits immediately while the page finishes closing, including fallback cleanup', async() => {
-      await page.evaluate(() => window.__lxPluginHost.player.setPause())
-      await update(page, { 'ui.ambientBackgroundOnlyPlayDetail': true, 'ui.ambientBackgroundQuality': 'static' })
-      await page.locator(background).waitFor({ state: 'detached' })
-      await showDetail(page, true)
-      await settled(page)
-      await page.locator('[data-player-detail][data-ambient-controls="dark"]').waitFor()
-      const leave = await capture(page, false)
-      assert(leave.some(sample => sample.time >= 0 && sample.controls.some(control => control.section === 'detail' && control.opacity > 0.1)), 'measured the actual exit')
-      for (const sample of leave) {
-        if (sample.time < 0) continue
-        assert.equal(sample.background, false, 'detail-only background is removed on the first closing frame')
-        assert.equal(sample.rootMode, '', 'the main page palette is restored immediately')
-        assert.equal(sample.detailMode, '', 'unmounting the background cleans its detail palette')
-      }
-      await page.locator(background).waitFor({ state: 'detached' })
-      assert.equal(await page.locator('[data-ambient-zone], [data-ambient-controls]').count(), 0)
-      await update(page, { 'ui.ambientBackgroundOnlyPlayDetail': false })
-      await page.locator(background + ' canvas').evaluate(canvas => canvas.getContext('webgl').getExtension('WEBGL_lose_context').loseContext())
-      await page.waitForFunction(() => document.querySelector('[data-ambient-background]').dataset.ambientRenderer === 'fallback')
-      await page.waitForTimeout(500)
-      const fallbackEnter = await capture(page, true)
-      const fallbackLeave = await capture(page, false)
-      stableColors(fallbackEnter, 'shell', fallbackEnter[0], 'fallback main page')
-      stableColors(fallbackLeave, 'detail', fallbackLeave[0], 'fallback detail page')
-      await update(page, { 'ui.ambientBackground': false })
-      assert.equal(await page.locator('[data-ambient-background], [data-ambient-zone], [data-ambient-controls], [style*="--ambient-zone-"]').count(), 0)
-    })
     assert.deepEqual(errors, [])
     await fs.writeFile(path.join(output, 'detail-icon-frames.json'), JSON.stringify(traces, null, 2))
     console.log('Detail icon transition traces:', output)

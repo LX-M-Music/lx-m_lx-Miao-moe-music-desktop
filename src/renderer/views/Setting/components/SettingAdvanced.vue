@@ -69,13 +69,6 @@ dd
       svg-icon.help-icon(name="help-circle-outline" :aria-label="$t('setting__advanced_background_play_detail_mask_tip')")
     .gap-top
       base-checkbox(
-        id="setting_advanced_background_only_play_detail"
-        :model-value="appSetting['ui.ambientBackgroundOnlyPlayDetail']"
-        :label="$t('setting__advanced_background_only_play_detail')"
-        @update:model-value="updateSetting({ 'ui.ambientBackgroundOnlyPlayDetail': $event })"
-      )
-    .gap-top
-      base-checkbox(
         id="setting_advanced_background_auto_contrast"
         :model-value="appSetting['ui.ambientBackgroundAutoContrast']"
         :label="$t('setting__advanced_background_auto_contrast')"

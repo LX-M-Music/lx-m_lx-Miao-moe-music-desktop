@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
 import { assertIpcRequest } from '@main/utils/ipcPolicy'
 import { errorForTransport } from '@common/utils/errorMessage'
-import { BACKUP_IPC, BACKUP_SECTIONS, BackupError, preferenceFile, validateBackupData, type BackupData, type BackupPreview, type BackupSection } from '@common/backup'
+import { BACKUP_COMPAT_KINDS, BACKUP_IPC, BACKUP_SECTIONS, BackupError, buildCompatExport, preferenceFile, validateBackupData, type BackupCompatKind, type BackupData, type BackupPreview, type BackupSection } from '@common/backup'
 import { LIST_IDS, STORE_NAMES } from '@common/constants'
 import { readFileLimited, saveLxConfigFile } from '@common/utils/nodejs'
 import getStore, { withStoreExclusive, protectStoreRecovery } from '@main/utils/store'
@@ -80,11 +80,19 @@ export default () => {
     })
   })
   handle(BACKUP_IPC.discard, (event, token: string) => { assertIpcRequest(event, BACKUP_IPC.discard, token); authorize(event); if (preview?.token === token) clearPreview() })
-  handle(BACKUP_IPC.export, async(event, params: { path: string, kind: 'all' | 'settings' | 'playlists' }) => {
+  const isCompatKind = (kind: unknown): kind is BackupCompatKind => typeof kind === 'string' && BACKUP_COMPAT_KINDS.includes(kind as BackupCompatKind)
+  handle(BACKUP_IPC.export, async(event, params: { path: string, kind: 'all' | 'settings' | 'playlists' | BackupCompatKind }) => {
     assertIpcRequest(event, BACKUP_IPC.export, params)
     authorize(event)
     return exclusive(async() => {
-      if (!params || typeof params.path !== 'string' || params.path.length > 8192 || !['all', 'settings', 'playlists'].includes(params.kind)) throw new BackupError('invalid')
+      if (!params || typeof params.path !== 'string' || params.path.length > 8192 || !(params.kind === 'all' || params.kind === 'settings' || params.kind === 'playlists' || isCompatKind(params.kind))) throw new BackupError('invalid')
+      // Original LX Music 2.12.6 formats: save the raw v2 structure without
+      // v3 validation, which rejects `allData_v2` and `setting_v2` by design.
+      if (isCompatKind(params.kind)) {
+        const playlists = (await global.lx.worker.dbService.backupRead()).playlists ?? []
+        const settings = getStore(STORE_NAMES.APP_SETTINGS).get<LX.AppSetting>('setting') ?? { ...global.lx.appSetting }
+        return saveLxConfigFile(params.path, buildCompatExport(params.kind, { playlists, settings }))
+      }
       const data = await withStoreExclusive(async() => getPluginManager().withBackupRegistry(async registry => {
         const data: BackupData = params.kind === 'settings' ? {} : await global.lx.worker.dbService.backupRead()
         if (params.kind !== 'playlists') data.settings = getStore(STORE_NAMES.APP_SETTINGS).get<LX.AppSetting>('setting') ?? { ...global.lx.appSetting }

@@ -27,9 +27,8 @@ import KawarpBackground from '@renderer/components/layout/PlayDetail/KawarpBackg
 import { appSetting } from '@renderer/store/setting'
 import { musicInfo, isShowPlayerDetail, isPlayerDetailDisplayed } from '@renderer/store/player/state'
 
-// Remove detail-only backgrounds as soon as the page starts closing.
-const ambientBackgroundEnabled = computed(() => appSetting['ui.ambientBackground'] &&
-  (!appSetting['ui.ambientBackgroundOnlyPlayDetail'] || isShowPlayerDetail.value))
+// One shared background is used by both the library and the playback detail.
+const ambientBackgroundEnabled = computed(() => appSetting['ui.ambientBackground'])
 
 useApp()
 

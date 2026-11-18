@@ -165,7 +165,7 @@ export default {
       }
     },
     filter() {
-      return this.teleport == '#root' || this.modalCount > 1
+      return this.teleport == '#root' || this.teleport == '[data-player-detail]' || this.modalCount > 1
     },
   },
   watch: {

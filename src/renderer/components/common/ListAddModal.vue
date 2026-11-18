@@ -1,5 +1,5 @@
 <template>
-  <material-modal :show="show" :bg-close="bgClose" :teleport="teleport" max-width="70%" min-width="200px" @close="handleClose">
+  <material-modal :show="show" :bg-close="bgClose" :teleport="modalTeleport" max-width="70%" min-width="200px" @close="handleClose" @after-leave="handleAfterLeave">
     <main :class="$style.main">
       <h2>{{ $t('list_add__' + (isMove ? 'title_first_move' : 'title_first_add')) }}&nbsp;<span :class="$style.name">{{ currentMusicInfo.name }}</span>&nbsp;{{ $t('list_add__title_last') }}</h2>
       <div class="scroll" :class="$style.btnContent">
@@ -21,6 +21,8 @@
 import { watch, ref, onBeforeUnmount } from '@common/utils/vueTools'
 import { defaultList, loveList, userLists } from '@renderer/store/list/state'
 import { addListMusics, moveListMusics, createUserList, getMusicExistListIds } from '@renderer/store/list/action'
+import { listChangeRevision } from '@renderer/store/list/listManage'
+import { isShowPlayerDetail } from '@renderer/store/player/state'
 import useKeyDown from '@renderer/utils/compositions/useKeyDown'
 import { useI18n } from '@root/lang'
 import { dialog } from '@renderer/plugins/Dialog'
@@ -64,20 +66,37 @@ export default {
     },
   },
   emits: ['update:show'],
-  setup(props) {
+  setup(props, { emit }) {
     const keyModDown = useKeyDown('mod')
     const t = useI18n()
     const lists = ref([])
 
     const currentMusicInfo = ref({})
+    const modalTeleport = ref(props.teleport)
+    // Every lookup gets a token: a reply for an older song or a closed popup
+    // must not paint the lists of the current one.
+    let existRequestId = 0
+
+    const musicInfoIdOf = info => info ? ('progress' in info ? info.metadata.musicInfo.id : info.id) : null
+
+    // Root-level popups inherit the library palette from #root. While the
+    // playback detail is open its adaptive palette lives on [data-player-detail],
+    // so a #root teleport would keep the plain theme colors. Follow the scope
+    // the popup is actually drawn on instead.
+    const getTeleportTarget = () => {
+      if (props.teleport !== '#root') return props.teleport
+      const detail = document.querySelector('[data-player-detail]')
+      return detail && detail.getAttribute('aria-hidden') !== 'true' ? '[data-player-detail]' : '#root'
+    }
 
     const checkMusicExist = (musicInfo) => {
-      const mid = musicInfo.id
-      void getMusicExistListIds(mid).then(ids => {
-        if (mid != musicInfo.id) return
-        for (const list of lists.value) {
-          if (ids.includes(list.id)) list.isExist = true
-        }
+      if (!musicInfo.id) return
+      const request = ++existRequestId
+      void getMusicExistListIds(musicInfo.id).then(ids => {
+        if (request !== existRequestId || currentMusicInfo.value.id !== musicInfo.id) return
+        for (const list of lists.value) list.isExist = ids.includes(list.id)
+      }).catch(error => {
+        if (request === existRequestId) console.warn('Failed to check playlist membership:', error)
       })
     }
 
@@ -94,6 +113,7 @@ export default {
 
     watch(() => props.show, show => {
       if (!show) {
+        existRequestId++
         if (stopWatchUserList) {
           stopWatchUserList()
           stopWatchUserList = null
@@ -102,6 +122,7 @@ export default {
       }
       if (!props.musicInfo) return lists.value = []
 
+      modalTeleport.value = getTeleportTarget()
       currentMusicInfo.value = 'progress' in props.musicInfo ? props.musicInfo.metadata.musicInfo : props.musicInfo
 
       getList()
@@ -109,7 +130,26 @@ export default {
       stopWatchUserList = watch(userLists, getList)
     })
 
+    watch(listChangeRevision, () => {
+      if (props.show) checkMusicExist(currentMusicInfo.value)
+    })
+
+    // Do not keep offering the old song after playback moved on.
+    watch(() => musicInfoIdOf(props.musicInfo), id => {
+      if (props.show && id !== currentMusicInfo.value.id) emit('update:show', false)
+    })
+
+    // The detail page owns the teleport target while it is open. If it closes
+    // programmatically (shortcut, deeplink, another entry), a popup left inside
+    // the now hidden container would be unreachable; close it instead.
+    watch(isShowPlayerDetail, open => {
+      if (open || !props.show || modalTeleport.value !== '[data-player-detail]') return
+      existRequestId++
+      emit('update:show', false)
+    })
+
     onBeforeUnmount(() => {
+      existRequestId++
       if (stopWatchUserList) {
         stopWatchUserList()
         stopWatchUserList = null
@@ -121,6 +161,7 @@ export default {
       lists,
       checkMusicExist,
       currentMusicInfo,
+      modalTeleport,
     }
   },
   data() {
@@ -174,6 +215,13 @@ export default {
     },
     handleClose() {
       this.$emit('update:show', false)
+    },
+    handleAfterLeave() {
+      // A rapid reopen may still be waiting for the leave animation; keep the
+      // scope that the new open already resolved.
+      if (this.show) return
+      // Re-resolve the scope on the next open; the detail page may be gone by then.
+      this.modalTeleport = this.teleport
     },
     handleEditing(event) {
       if (this.isEditing) return

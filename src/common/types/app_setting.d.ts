@@ -837,8 +837,6 @@ declare global {
       'ui.ambientBackground': boolean
       /** 在播放详情页的动态背景上显示黑色遮罩 */
       'ui.ambientBackgroundPlayDetailMask': boolean
-      /** 仅在播放详情页显示专辑封面动态背景 */
-      'ui.ambientBackgroundOnlyPlayDetail': boolean
       /** 根据动态背景调整按钮与选中文字的颜色 */
       'ui.ambientBackgroundAutoContrast': boolean
       'ui.ambientBackgroundQuality': 'static' | 'gentle' | 'full'

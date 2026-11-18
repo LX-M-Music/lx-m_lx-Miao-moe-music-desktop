@@ -6,6 +6,17 @@ import { playMusicInfo } from '@renderer/store/player/state'
 
 const RECHECK_DELAY = 250
 
+// Downloads are played from LX.Download.ListItem whose id is the task key
+// (`musicId_quality_ext`), but playlists store the plain music id.
+const getMusicInfoId = (musicInfo: LX.Player.PlayMusicInfo['musicInfo'] | null | undefined) => {
+  if (!musicInfo) return null
+  return 'progress' in musicInfo ? musicInfo.metadata.musicInfo.id : musicInfo.id
+}
+
+// The default and temporary lists are not saved playlists: songs land in the
+// default list just by playing them, and the temporary list is the queue.
+const isSavedListId = (listId: string) => listId !== LIST_IDS.DEFAULT && listId !== LIST_IDS.TEMP
+
 /**
  * Whether the current song already exists in a saved playlist.
  * Cookie-synced playlists are stored as regular user lists, so they are included.
@@ -17,7 +28,7 @@ export default () => {
   let timer: ReturnType<typeof setTimeout> | null = null
 
   const check = async() => {
-    const musicInfoId = playMusicInfo.musicInfo?.id
+    const musicInfoId = getMusicInfoId(playMusicInfo.musicInfo)
     const id = ++requestId
     if (!musicInfoId) {
       isExistInList.value = false
@@ -25,7 +36,7 @@ export default () => {
     }
     try {
       const listIds = await getMusicExistListIds(musicInfoId)
-      if (id === requestId) isExistInList.value = listIds.some(listId => listId !== LIST_IDS.DEFAULT)
+      if (id === requestId) isExistInList.value = listIds.some(isSavedListId)
     } catch (error) {
       if (id === requestId) isExistInList.value = false
       console.warn('Failed to check whether the current song is in a playlist:', error)
@@ -40,7 +51,7 @@ export default () => {
     }, RECHECK_DELAY)
   }
 
-  watch(() => playMusicInfo.musicInfo?.id, () => { void check() }, { immediate: true })
+  watch(() => getMusicInfoId(playMusicInfo.musicInfo), () => { void check() }, { immediate: true })
   watch(listChangeRevision, scheduleCheck)
 
   onBeforeUnmount(() => {

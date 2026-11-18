@@ -225,7 +225,6 @@ const defaultSetting: LX.AppSetting = {
   'ui.animationSpeed': 1.0,
   'ui.ambientBackground': true,
   'ui.ambientBackgroundPlayDetailMask': true,
-  'ui.ambientBackgroundOnlyPlayDetail': false,
   'ui.ambientBackgroundAutoContrast': false,
   'ui.ambientBackgroundQuality': 'gentle',
   'ui.sidebar.width': 0,
